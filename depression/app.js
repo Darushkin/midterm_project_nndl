@@ -205,124 +205,159 @@ function analyzeMissingValues() {
                  'Percentage Missing');
 }
 
-// Generate statistical summary - COMPLETELY REWRITTEN
+// Generate statistical summary - SIMPLIFIED VERSION
 function generateStatsSummary() {
     const statsDiv = document.getElementById('statsSummary');
-    let statsHTML = '<div class="stats-section">';
     
-    // Numeric features in table
+    // Start with numeric features
+    let statsHTML = '<div class="stats-section">';
     statsHTML += '<div><h4>Numeric Features Summary:</h4>';
     statsHTML += '<table class="stats-table"><thead><tr><th>Feature</th><th>Mean</th><th>Median</th><th>Std Dev</th><th>Min</th><th>Max</th></tr></thead><tbody>';
     
-    // Process numeric features
-    for (let i = 0; i < NUMERIC_FEATURES.length; i++) {
-        const feature = NUMERIC_FEATURES[i];
-        const values = [];
-        
-        // Collect numeric values
-        for (let j = 0; j < dataset.length; j++) {
-            const val = dataset[j][feature];
-            if (val && val.trim() !== '') {
-                const num = parseFloat(val);
-                if (!isNaN(num)) {
-                    values.push(num);
-                }
-            }
-        }
-        
-        if (values.length === 0) {
-            statsHTML += `<tr><td>${feature}</td><td colspan="5">No numeric data found</td></tr>`;
-            continue;
-        }
-        
-        // Calculate statistics
-        const mean = (values.reduce((a, b) => a + b, 0) / values.length).toFixed(2);
-        const sorted = [...values].sort((a, b) => a - b);
-        const median = sorted[Math.floor(sorted.length / 2)].toFixed(2);
-        const meanNum = parseFloat(mean);
-        const std = Math.sqrt(values.reduce((sq, n) => sq + Math.pow(n - meanNum, 2), 0) / values.length).toFixed(2);
-        const min = Math.min(...values).toFixed(2);
-        const max = Math.max(...values).toFixed(2);
-        
-        statsHTML += `<tr>
-            <td>${feature}</td>
-            <td>${mean}</td>
-            <td>${median}</td>
-            <td>${std}</td>
-            <td>${min}</td>
-            <td>${max}</td>
-        </tr>`;
+    // Process Age
+    const ageValues = getNumericValues('Age');
+    if (ageValues.length > 0) {
+        const stats = calculateStats(ageValues);
+        statsHTML += `<tr><td>Age</td><td>${stats.mean}</td><td>${stats.median}</td><td>${stats.std}</td><td>${stats.min}</td><td>${stats.max}</td></tr>`;
+    } else {
+        statsHTML += '<tr><td>Age</td><td colspan="5">No data</td></tr>';
     }
+    
+    // Process Number of Children
+    const childrenValues = getNumericValues('Number of Children');
+    if (childrenValues.length > 0) {
+        const stats = calculateStats(childrenValues);
+        statsHTML += `<tr><td>Number of Children</td><td>${stats.mean}</td><td>${stats.median}</td><td>${stats.std}</td><td>${stats.min}</td><td>${stats.max}</td></tr>`;
+    } else {
+        statsHTML += '<tr><td>Number of Children</td><td colspan="5">No data</td></tr>';
+    }
+    
+    // Process Income
+    const incomeValues = getNumericValues('Income');
+    if (incomeValues.length > 0) {
+        const stats = calculateStats(incomeValues);
+        statsHTML += `<tr><td>Income</td><td>${stats.mean}</td><td>${stats.median}</td><td>${stats.std}</td><td>${stats.min}</td><td>${stats.max}</td></tr>`;
+    } else {
+        statsHTML += '<tr><td>Income</td><td colspan="5">No data</td></tr>';
+    }
+    
     statsHTML += '</tbody></table></div>';
     
-    // Categorical features in table
+    // Categorical features
     statsHTML += '<div><h4>Categorical Features Counts:</h4>';
     
-    // Process categorical features
-    for (let i = 0; i < CATEGORICAL_FEATURES.length; i++) {
-        const feature = CATEGORICAL_FEATURES[i];
-        const counts = {};
-        
-        // Count categorical values
-        for (let j = 0; j < dataset.length; j++) {
-            const val = dataset[j][feature];
-            if (val && val.trim() !== '') {
-                counts[val] = (counts[val] || 0) + 1;
-            }
-        }
-        
-        if (Object.keys(counts).length > 0) {
-            statsHTML += `<h5>${feature}:</h5>`;
-            statsHTML += '<table class="stats-table"><thead><tr><th>Value</th><th>Count</th><th>Percentage</th></tr></thead><tbody>';
-            
-            const countEntries = Object.entries(counts);
-            for (let k = 0; k < countEntries.length; k++) {
-                const [value, count] = countEntries[k];
-                const percentage = ((count / dataset.length) * 100).toFixed(1);
-                statsHTML += `<tr><td>${value}</td><td>${count}</td><td>${percentage}%</td></tr>`;
-            }
-            statsHTML += '</tbody></table>';
-        } else {
-            statsHTML += `<h5>${feature}:</h5><p>No data found</p>`;
-        }
-    }
+    // Process each categorical feature individually
+    statsHTML += processCategoricalFeature('Marital Status');
+    statsHTML += processCategoricalFeature('Education Level');
+    statsHTML += processCategoricalFeature('Smoking Status');
+    statsHTML += processCategoricalFeature('Physical Activity Level');
+    statsHTML += processCategoricalFeature('Employment Status');
+    statsHTML += processCategoricalFeature('Alcohol Consumption');
+    statsHTML += processCategoricalFeature('Dietary Habits');
+    statsHTML += processCategoricalFeature('Sleep Patterns');
+    statsHTML += processCategoricalFeature('History of Substance Abuse');
+    statsHTML += processCategoricalFeature('Family History of Depression');
+    statsHTML += processCategoricalFeature('Chronic Medical Conditions');
+    
     statsHTML += '</div>';
     
-    // Target variable analysis
+    // Target variable
+    statsHTML += processTargetVariable();
+    
+    statsHTML += '</div>';
+    statsDiv.innerHTML = statsHTML;
+}
+
+// Helper function to get numeric values
+function getNumericValues(columnName) {
+    const values = [];
+    for (let i = 0; i < dataset.length; i++) {
+        const val = dataset[i][columnName];
+        if (val && val.trim() !== '') {
+            const num = parseFloat(val);
+            if (!isNaN(num)) {
+                values.push(num);
+            }
+        }
+    }
+    return values;
+}
+
+// Helper function to calculate statistics
+function calculateStats(values) {
+    const mean = (values.reduce((a, b) => a + b, 0) / values.length).toFixed(2);
+    const sorted = [...values].sort((a, b) => a - b);
+    const median = sorted[Math.floor(sorted.length / 2)].toFixed(2);
+    const meanNum = parseFloat(mean);
+    const std = Math.sqrt(values.reduce((sq, n) => sq + Math.pow(n - meanNum, 2), 0) / values.length).toFixed(2);
+    const min = Math.min(...values).toFixed(2);
+    const max = Math.max(...values).toFixed(2);
+    
+    return { mean, median, std, min, max };
+}
+
+// Helper function to process categorical features
+function processCategoricalFeature(featureName) {
+    const counts = {};
+    for (let i = 0; i < dataset.length; i++) {
+        const val = dataset[i][featureName];
+        if (val && val.trim() !== '') {
+            counts[val] = (counts[val] || 0) + 1;
+        }
+    }
+    
+    let html = '';
+    if (Object.keys(counts).length > 0) {
+        html += `<h5>${featureName}:</h5>`;
+        html += '<table class="stats-table"><thead><tr><th>Value</th><th>Count</th><th>Percentage</th></tr></thead><tbody>';
+        
+        const entries = Object.entries(counts);
+        for (let i = 0; i < entries.length; i++) {
+            const [value, count] = entries[i];
+            const percentage = ((count / dataset.length) * 100).toFixed(1);
+            html += `<tr><td>${value}</td><td>${count}</td><td>${percentage}%</td></tr>`;
+        }
+        html += '</tbody></table>';
+    } else {
+        html += `<h5>${featureName}:</h5><p>No data found</p>`;
+    }
+    
+    return html;
+}
+
+// Helper function to process target variable
+function processTargetVariable() {
     const targetCol = TARGET_COLUMN;
+    let html = '<div><h4>Target Variable Analysis:</h4>';
     
     if (dataset[0] && dataset[0].hasOwnProperty(targetCol)) {
-        statsHTML += '<div><h4>Target Variable Analysis:</h4>';
-        statsHTML += `<p><strong>Target Column:</strong> ${targetCol}</p>`;
-        statsHTML += '<table class="stats-table"><thead><tr><th>Value</th><th>Count</th><th>Percentage</th></tr></thead><tbody>';
+        html += `<p><strong>Target Column:</strong> ${targetCol}</p>`;
+        html += '<table class="stats-table"><thead><tr><th>Value</th><th>Count</th><th>Percentage</th></tr></thead><tbody>';
         
         const groups = {};
         for (let i = 0; i < dataset.length; i++) {
             const group = dataset[i][targetCol];
             if (group && group.trim() !== '') {
-                if (!groups[group]) groups[group] = [];
-                groups[group].push(dataset[i]);
+                groups[group] = (groups[group] || 0) + 1;
             }
         }
         
-        const groupEntries = Object.entries(groups);
-        if (groupEntries.length > 0) {
-            for (let i = 0; i < groupEntries.length; i++) {
-                const [group, data] = groupEntries[i];
-                const percentage = ((data.length / dataset.length) * 100).toFixed(1);
-                statsHTML += `<tr><td>${group}</td><td>${data.length}</td><td>${percentage}%</td></tr>`;
+        const entries = Object.entries(groups);
+        if (entries.length > 0) {
+            for (let i = 0; i < entries.length; i++) {
+                const [group, count] = entries[i];
+                const percentage = ((count / dataset.length) * 100).toFixed(1);
+                html += `<tr><td>${group}</td><td>${count}</td><td>${percentage}%</td></tr>`;
             }
         } else {
-            statsHTML += '<tr><td colspan="3">No target data found</td></tr>';
+            html += '<tr><td colspan="3">No target data found</td></tr>';
         }
-        statsHTML += '</tbody></table></div>';
+        html += '</tbody></table></div>';
     } else {
-        statsHTML += '<div><h4>Target Variable Analysis:</h4>';
-        statsHTML += `<p>Target column "${targetCol}" not found in dataset</p></div>`;
+        html += `<p>Target column "${targetCol}" not found in dataset</p></div>`;
     }
     
-    statsHTML += '</div>';
-    statsDiv.innerHTML = statsHTML;
+    return html;
 }
 
 // Create all visualizations
