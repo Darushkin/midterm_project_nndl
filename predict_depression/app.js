@@ -1,466 +1,268 @@
-// app.js
-class MentalHealthEDA {
-    constructor() {
-        this.data = null;
-        this.initializeEventListeners();
+// =======================
+// Global Variables
+// =======================
+let rawData = [];
+let processedData = { X: null, y: null };
+let model = null;
+let featureNames = [];
+let scaler = { min: {}, max: {} };
+let categoricalMaps = {};
+
+// =======================
+// CSV Upload & Preview
+// =======================
+document.getElementById('csvFileInput').addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  Papa.parse(file, {
+    header: true,
+    dynamicTyping: true,
+    skipEmptyLines: true,
+    complete: function(results) {
+      rawData = results.data;
+      displayPreview(rawData);
     }
+  });
+});
 
-    initializeEventListeners() {
-        document.getElementById('loadBtn').addEventListener('click', () => this.loadData());
-        document.getElementById('edaBtn').addEventListener('click', () => this.runEDA());
-        document.getElementById('exportBtn').addEventListener('click', () => this.exportResults());
-    }
-
-    async loadData() {
-        const fileInput = document.getElementById('fileInput');
-        const file = fileInput.files[0];
-        
-        if (!file) {
-            alert('Please select a CSV file first.');
-            return;
-        }
-
-        try {
-            const text = await this.readFile(file);
-            this.data = this.parseCSV(text);
-            this.enableButtons(true);
-            this.showOverview();
-        } catch (error) {
-            alert('Error loading file: ' + error.message);
-        }
-    }
-
-    readFile(file) {
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = e => resolve(e.target.result);
-            reader.onerror = e => reject(new Error('File reading failed'));
-            reader.readAsText(file);
-        });
-    }
-
-    parseCSV(text) {
-        const lines = text.trim().split('\n');
-        const headers = lines[0].split(',').map(h => h.trim());
-        
-        return lines.slice(1).map(line => {
-            const values = line.split(',').map(v => v.trim());
-            const row = {};
-            headers.forEach((header, index) => {
-                row[header] = values[index];
-            });
-            return row;
-        });
-    }
-
-    enableButtons(enabled) {
-        document.getElementById('edaBtn').disabled = !enabled;
-        document.getElementById('exportBtn').disabled = !enabled;
-    }
-
-    showOverview() {
-        const content = document.getElementById('overviewContent');
-        if (!this.data || this.data.length === 0) {
-            content.innerHTML = '<p>No data loaded.</p>';
-            return;
-        }
-
-        const shape = `${this.data.length} rows × ${Object.keys(this.data[0]).length} columns`;
-        
-        let tableHtml = '<h3>Data Preview (First 5 rows)</h3>';
-        tableHtml += '<table><tr>';
-        
-        // Headers
-        Object.keys(this.data[0]).forEach(header => {
-            tableHtml += `<th>${header}</th>`;
-        });
-        tableHtml += '</tr>';
-        
-        // First 5 rows
-        this.data.slice(0, 5).forEach(row => {
-            tableHtml += '<tr>';
-            Object.values(row).forEach(value => {
-                tableHtml += `<td>${value}</td>`;
-            });
-            tableHtml += '</tr>';
-        });
-        tableHtml += '</table>';
-        
-        content.innerHTML = `<p><strong>Dataset Shape:</strong> ${shape}</p>${tableHtml}`;
-    }
-
-    runEDA() {
-        if (!this.data) {
-            alert('Please load data first.');
-            return;
-        }
-
-        this.analyzeMissingValues();
-        this.generateStatsSummary();
-        this.createVisualizations();
-    }
-
-    analyzeMissingValues() {
-        const content = document.getElementById('missingContent');
-        const headers = Object.keys(this.data[0]);
-        
-        const missingCounts = headers.map(header => {
-            const missing = this.data.filter(row => !row[header] || row[header] === '').length;
-            const percentage = (missing / this.data.length * 100).toFixed(2);
-            return { header, missing, percentage };
-        });
-
-        // Create bar chart
-        const canvas = document.createElement('canvas');
-        canvas.id = 'missingChart';
-        content.innerHTML = '<h3>Missing Values Percentage by Column</h3>';
-        content.appendChild(canvas);
-
-        new Chart(canvas, {
-            type: 'bar',
-            data: {
-                labels: missingCounts.map(item => item.header),
-                datasets: [{
-                    label: 'Missing Values (%)',
-                    data: missingCounts.map(item => parseFloat(item.percentage)),
-                    backgroundColor: 'rgba(255, 99, 132, 0.6)'
-                }]
-            },
-            options: {
-                responsive: true,
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        title: { display: true, text: 'Percentage (%)' }
-                    },
-                    x: {
-                        ticks: { maxRotation: 45 }
-                    }
-                }
-            }
-        });
-    }
-
-    generateStatsSummary() {
-        const content = document.getElementById('statsContent');
-        if (!this.data) return;
-
-        // Define schema - UPDATE THESE FOR OTHER DATASETS
-        const numericColumns = ['Age', 'Number of Children', 'Income'];
-        const categoricalColumns = [
-            'Marital Status', 'Education Level', 'Smoking Status', 
-            'Physical Activity Level', 'Employment Status', 'Alcohol Consumption',
-            'Dietary Habits', 'Sleep Patterns', 'History of Substance Abuse',
-            'Family History of Depression', 'Chronic Medical Conditions', 'History of Mental Illness'
-        ];
-
-        let statsHtml = '<h3>Numeric Statistics</h3>';
-        statsHtml += this.generateNumericStats(numericColumns);
-        
-        statsHtml += '<h3>Categorical Counts</h3>';
-        statsHtml += this.generateCategoricalStats(categoricalColumns);
-        
-        statsHtml += '<h3>Statistics by Mental Illness History</h3>';
-        statsHtml += this.generateGroupedStats();
-
-        content.innerHTML = statsHtml;
-    }
-
-    generateNumericStats(columns) {
-        let html = '<table><tr><th>Column</th><th>Mean</th><th>Median</th><th>Std Dev</th><th>Min</th><th>Max</th></tr>';
-        
-        columns.forEach(col => {
-            const values = this.data.map(row => parseFloat(row[col])).filter(v => !isNaN(v));
-            if (values.length === 0) return;
-            
-            const mean = values.reduce((a, b) => a + b, 0) / values.length;
-            const sorted = [...values].sort((a, b) => a - b);
-            const median = sorted[Math.floor(sorted.length / 2)];
-            const std = Math.sqrt(values.reduce((sq, n) => sq + Math.pow(n - mean, 2), 0) / values.length);
-            const min = Math.min(...values);
-            const max = Math.max(...values);
-            
-            html += `<tr>
-                <td>${col}</td>
-                <td>${mean.toFixed(2)}</td>
-                <td>${median.toFixed(2)}</td>
-                <td>${std.toFixed(2)}</td>
-                <td>${min}</td>
-                <td>${max}</td>
-            </tr>`;
-        });
-        
-        html += '</table>';
-        return html;
-    }
-
-    generateCategoricalStats(columns) {
-        let html = '';
-        
-        columns.forEach(col => {
-            const counts = {};
-            this.data.forEach(row => {
-                const value = row[col];
-                counts[value] = (counts[value] || 0) + 1;
-            });
-            
-            html += `<h4>${col}</h4><table><tr><th>Value</th><th>Count</th><th>Percentage</th></tr>`;
-            Object.entries(counts).forEach(([value, count]) => {
-                const percentage = ((count / this.data.length) * 100).toFixed(2);
-                html += `<tr><td>${value}</td><td>${count}</td><td>${percentage}%</td></tr>`;
-            });
-            html += '</table>';
-        });
-        
-        return html;
-    }
-
-    generateGroupedStats() {
-        if (!this.data.some(row => row['History of Mental Illness'])) {
-            return '<p>No mental illness history data available for grouping.</p>';
-        }
-
-        const groups = {};
-        this.data.forEach(row => {
-            const group = row['History of Mental Illness'] || 'Unknown';
-            if (!groups[group]) groups[group] = [];
-            groups[group].push(row);
-        });
-
-        let html = '';
-        Object.entries(groups).forEach(([group, data]) => {
-            html += `<h4>${group} (n=${data.length})</h4>`;
-            
-            // Average age and income by group
-            const avgAge = data.reduce((sum, row) => sum + parseFloat(row.Age || 0), 0) / data.length;
-            const avgIncome = data.reduce((sum, row) => sum + parseFloat(row.Income || 0), 0) / data.length;
-            
-            html += `<p>Average Age: ${avgAge.toFixed(2)}, Average Income: $${avgIncome.toFixed(2)}</p>`;
-            
-            // Key categorical distributions
-            const keyColumns = ['Employment Status', 'Physical Activity Level', 'Family History of Depression'];
-            keyColumns.forEach(col => {
-                const counts = {};
-                data.forEach(row => {
-                    const value = row[col];
-                    counts[value] = (counts[value] || 0) + 1;
-                });
-                
-                html += `<p><strong>${col}:</strong> ${Object.entries(counts)
-                    .map(([k, v]) => `${k} (${v})`)
-                    .join(', ')}</p>`;
-            });
-        });
-        
-        return html;
-    }
-
-    createVisualizations() {
-        const content = document.getElementById('vizContent');
-        content.innerHTML = '<h3>Distribution Charts</h3>';
-        
-        // Categorical variable charts
-        const categoricalVars = [
-            'Marital Status', 'Education Level', 'Smoking Status', 
-            'Physical Activity Level', 'Employment Status', 'Alcohol Consumption',
-            'Dietary Habits', 'Sleep Patterns', 'History of Substance Abuse',
-            'Family History of Depression', 'Chronic Medical Conditions'
-        ];
-        
-        categoricalVars.forEach(variable => {
-            this.createBarChart(variable, content);
-        });
-        
-        // Numeric variable histograms
-        const numericVars = ['Age', 'Number of Children', 'Income'];
-        numericVars.forEach(variable => {
-            this.createHistogram(variable, content);
-        });
-        
-        // Correlation matrix
-        this.createCorrelationMatrix(content);
-    }
-
-    createBarChart(variable, container) {
-        const counts = {};
-        this.data.forEach(row => {
-            const value = row[variable];
-            counts[value] = (counts[value] || 0) + 1;
-        });
-        
-        const canvas = document.createElement('canvas');
-        canvas.className = 'chart-container';
-        container.appendChild(document.createElement('h4')).textContent = variable;
-        container.appendChild(canvas);
-        
-        new Chart(canvas, {
-            type: 'bar',
-            data: {
-                labels: Object.keys(counts),
-                datasets: [{
-                    label: `Count of ${variable}`,
-                    data: Object.values(counts),
-                    backgroundColor: 'rgba(54, 162, 235, 0.6)'
-                }]
-            },
-            options: {
-                responsive: true,
-                plugins: {
-                    title: { display: true, text: variable }
-                }
-            }
-        });
-    }
-
-    createHistogram(variable, container) {
-        const values = this.data.map(row => parseFloat(row[variable])).filter(v => !isNaN(v));
-        if (values.length === 0) return;
-        
-        const canvas = document.createElement('canvas');
-        canvas.className = 'chart-container';
-        container.appendChild(document.createElement('h4')).textContent = `${variable} Distribution`;
-        container.appendChild(canvas);
-        
-        // Simple histogram using bar chart
-        const min = Math.min(...values);
-        const max = Math.max(...values);
-        const range = max - min;
-        const binCount = Math.min(10, Math.sqrt(values.length));
-        const binSize = range / binCount;
-        
-        const bins = Array(binCount).fill(0);
-        values.forEach(value => {
-            const binIndex = Math.min(Math.floor((value - min) / binSize), binCount - 1);
-            bins[binIndex]++;
-        });
-        
-        const labels = Array(binCount).fill(0).map((_, i) => 
-            `${(min + i * binSize).toFixed(1)}-${(min + (i + 1) * binSize).toFixed(1)}`
-        );
-        
-        new Chart(canvas, {
-            type: 'bar',
-            data: {
-                labels: labels,
-                datasets: [{
-                    label: `Frequency of ${variable}`,
-                    data: bins,
-                    backgroundColor: 'rgba(75, 192, 192, 0.6)'
-                }]
-            },
-            options: {
-                responsive: true,
-                plugins: {
-                    title: { display: true, text: `${variable} Histogram` }
-                }
-            }
-        });
-    }
-
-    createCorrelationMatrix(container) {
-        const numericColumns = ['Age', 'Number of Children', 'Income'];
-        const matrix = this.calculateCorrelationMatrix(numericColumns);
-        
-        const canvas = document.createElement('canvas');
-        canvas.className = 'chart-container';
-        container.appendChild(document.createElement('h4')).textContent = 'Correlation Matrix';
-        container.appendChild(canvas);
-        
-        new Chart(canvas, {
-            type: 'bar', // Using bar chart as simple alternative to heatmap
-            data: {
-                labels: numericColumns,
-                datasets: numericColumns.map((col, i) => ({
-                    label: col,
-                    data: matrix[i],
-                    backgroundColor: `rgba(${100 + i * 50}, 162, 235, 0.6)`
-                }))
-            },
-            options: {
-                responsive: true,
-                plugins: {
-                    title: { display: true, text: 'Correlation Matrix (Bar Chart Representation)' }
-                }
-            }
-        });
-    }
-
-    calculateCorrelationMatrix(columns) {
-        const matrix = [];
-        
-        for (let i = 0; i < columns.length; i++) {
-            matrix[i] = [];
-            for (let j = 0; j < columns.length; j++) {
-                if (i === j) {
-                    matrix[i][j] = 1;
-                } else {
-                    const corr = this.calculateCorrelation(columns[i], columns[j]);
-                    matrix[i][j] = corr;
-                }
-            }
-        }
-        
-        return matrix;
-    }
-
-    calculateCorrelation(col1, col2) {
-        const values1 = this.data.map(row => parseFloat(row[col1])).filter(v => !isNaN(v));
-        const values2 = this.data.map(row => parseFloat(row[col2])).filter(v => !isNaN(v));
-        
-        if (values1.length !== values2.length || values1.length === 0) return 0;
-        
-        const mean1 = values1.reduce((a, b) => a + b, 0) / values1.length;
-        const mean2 = values2.reduce((a, b) => a + b, 0) / values2.length;
-        
-        let numerator = 0;
-        let denom1 = 0;
-        let denom2 = 0;
-        
-        for (let i = 0; i < values1.length; i++) {
-            numerator += (values1[i] - mean1) * (values2[i] - mean2);
-            denom1 += Math.pow(values1[i] - mean1, 2);
-            denom2 += Math.pow(values2[i] - mean2, 2);
-        }
-        
-        return numerator / Math.sqrt(denom1 * denom2);
-    }
-
-    exportResults() {
-        if (!this.data) {
-            alert('No data to export.');
-            return;
-        }
-
-        // Create a simple report
-        let report = 'Mental Health EDA Report\n\n';
-        report += `Generated on: ${new Date().toLocaleString()}\n`;
-        report += `Dataset size: ${this.data.length} rows\n\n`;
-        
-        // Add basic statistics to report
-        report += 'SUMMARY STATISTICS:\n';
-        const numericCols = ['Age', 'Number of Children', 'Income'];
-        numericCols.forEach(col => {
-            const values = this.data.map(row => parseFloat(row[col])).filter(v => !isNaN(v));
-            if (values.length > 0) {
-                const mean = values.reduce((a, b) => a + b, 0) / values.length;
-                report += `${col}: Mean = ${mean.toFixed(2)}\n`;
-            }
-        });
-        
-        // Create downloadable file
-        const blob = new Blob([report], { type: 'text/plain' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'mental_health_eda_report.txt';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-    }
+function displayPreview(data) {
+  const previewRows = data.slice(0, 5);
+  let html = '<table class="table-auto border-collapse border border-gray-300">';
+  html += '<tr>' + Object.keys(previewRows[0]).map(col => `<th class="border px-2 py-1">${col}</th>`).join('') + '</tr>';
+  previewRows.forEach(row => {
+    html += '<tr>' + Object.values(row).map(val => `<td class="border px-2 py-1">${val}</td>`).join('') + '</tr>';
+  });
+  html += '</table>';
+  document.getElementById('dataPreview').innerHTML = html;
+  document.getElementById('dataShape').textContent = `Dataset Shape: ${data.length} rows, ${Object.keys(data[0]).length} columns`;
 }
 
-// Initialize the application when the page loads
-document.addEventListener('DOMContentLoaded', () => {
-    new MentalHealthEDA();
+// =======================
+// Preprocessing
+// =======================
+document.getElementById('preprocessBtn').addEventListener('click', () => {
+  if (!rawData.length) return alert("Upload dataset first.");
+
+  // Drop rows with missing target
+  rawData = rawData.filter(r => r['History of Mental Illness'] !== null && r['History of Mental Illness'] !== undefined);
+
+  // Separate features and target
+  const X = rawData.map(r => ({ ...r }));
+  const y = rawData.map(r => r['History of Mental Illness'] === 'Yes' ? 1 : 0);
+
+  // Remove non-feature columns
+  X.forEach(r => delete r['Name']);
+  X.forEach(r => delete r['History of Mental Illness']);
+
+  // Encode categorical variables
+  featureNames = Object.keys(X[0]);
+  featureNames.forEach(f => {
+    if (typeof X[0][f] === 'string') {
+      const uniqueVals = [...new Set(X.map(r => r[f]))];
+      categoricalMaps[f] = {};
+      uniqueVals.forEach((v, i) => { categoricalMaps[f][v] = i; });
+      X.forEach(r => { r[f] = categoricalMaps[f][r[f]]; });
+    }
+  });
+
+  // Normalize numeric columns
+  featureNames.forEach(f => {
+    const vals = X.map(r => r[f]);
+    const min = Math.min(...vals);
+    const max = Math.max(...vals);
+    scaler.min[f] = min; scaler.max[f] = max;
+    X.forEach(r => { r[f] = (r[f]-min)/(max-min+1e-7); });
+  });
+
+  // Convert to tf.tensor
+  processedData.X = tf.tensor2d(X.map(r => featureNames.map(f => r[f])));
+  processedData.y = tf.tensor2d(y, [y.length, 1]);
+
+  document.getElementById('preprocessStatus').textContent = "Preprocessing Done!";
+});
+
+// =======================
+// EDA Visualizations
+// =======================
+function createHistPlot(data, feature) {
+  const vals = data.map(r => r[feature]);
+  const trace = { x: vals, type: 'histogram', marker: {color: '#4f46e5'} };
+  const layout = { title: feature };
+  return [trace, layout];
+}
+
+function createBarPlot(data, feature) {
+  const counts = {};
+  data.forEach(r => { counts[r[feature]] = (counts[r[feature]] || 0) + 1; });
+  const trace = { x: Object.keys(counts), y: Object.values(counts), type: 'bar', marker: {color: '#f59e0b'} };
+  const layout = { title: feature };
+  return [trace, layout];
+}
+
+function plotEDA() {
+  const container = document.getElementById('edaPlots');
+  container.innerHTML = '';
+  featureNames.forEach(f => {
+    const div = document.createElement('div'); div.id = `plot_${f}`; div.className = 'bg-gray-50 p-2 rounded';
+    container.appendChild(div);
+    if (typeof rawData[0][f] === 'number') {
+      const [trace, layout] = createHistPlot(rawData, f);
+      Plotly.newPlot(div.id, [trace], layout, {responsive:true});
+    } else {
+      const [trace, layout] = createBarPlot(rawData, f);
+      Plotly.newPlot(div.id, [trace], layout, {responsive:true});
+    }
+  });
+}
+document.getElementById('preprocessBtn').addEventListener('click', plotEDA);
+
+// =======================
+// Neural Network Model
+// =======================
+document.getElementById('trainBtn').addEventListener('click', async () => {
+  if (!processedData.X) return alert("Preprocess data first.");
+
+  const epochs = parseInt(document.getElementById('epochsInput').value);
+  const batchSize = parseInt(document.getElementById('batchSizeInput').value);
+  const lr = parseFloat(document.getElementById('lrInput').value);
+
+  // Train/test split
+  const datasetSize = processedData.X.shape[0];
+  const trainSize = Math.floor(datasetSize * 0.8);
+  const [X_train, X_test] = tf.split(processedData.X, [trainSize, datasetSize - trainSize]);
+  const [y_train, y_test] = tf.split(processedData.y, [trainSize, datasetSize - trainSize]);
+
+  // Define model
+  model = tf.sequential();
+  model.add(tf.layers.dense({inputShape: [processedData.X.shape[1]], units: 32, activation: 'relu'}));
+  model.add(tf.layers.dense({units: 16, activation: 'relu'}));
+  model.add(tf.layers.dense({units: 1, activation: 'sigmoid'}));
+  model.compile({optimizer: tf.train.adam(lr), loss: 'binaryCrossentropy', metrics: ['accuracy']});
+
+  // Training visualization
+  const trainLogs = [];
+  await model.fit(X_train, y_train, {
+    epochs,
+    batchSize,
+    validationData: [X_test, y_test],
+    callbacks: {
+      onEpochEnd: (epoch, logs) => {
+        trainLogs.push({epoch, ...logs});
+        Plotly.newPlot('trainingChart', [
+          {x: trainLogs.map(l => l.epoch), y: trainLogs.map(l => l.loss), name: 'Loss', type:'scatter'},
+          {x: trainLogs.map(l => l.epoch), y: trainLogs.map(l => l.val_loss), name: 'Val Loss', type:'scatter'}
+        ], {title:'Training Progress'});
+      }
+    }
+  });
+
+  computeMetrics(X_test, y_test);
+});
+
+// =======================
+// Metrics & ROC
+// =======================
+let lastPredProbs = null;
+function computeMetrics(X_test, y_test) {
+  lastPredProbs = model.predict(X_test).dataSync();
+  const y_true = y_test.dataSync();
+  const threshold = parseFloat(document.getElementById('thresholdSlider').value);
+  const y_pred = Array.from(lastPredProbs).map(p => p>=threshold?1:0);
+
+  const tp = y_pred.reduce((sum, p, i) => sum + (p===1 && y_true[i]===1?1:0),0);
+  const tn = y_pred.reduce((sum, p, i) => sum + (p===0 && y_true[i]===0?1:0),0);
+  const fp = y_pred.reduce((sum, p, i) => sum + (p===1 && y_true[i]===0?1:0),0);
+  const fn = y_pred.reduce((sum, p, i) => sum + (p===0 && y_true[i]===1?1:0),0);
+
+  const accuracy = (tp+tn)/(tp+tn+fp+fn);
+  const precision = tp/(tp+fp+1e-7);
+  const recall = tp/(tp+fn+1e-7);
+  const f1 = 2*precision*recall/(precision+recall+1e-7);
+
+  document.getElementById('metrics').innerHTML = `
+    Accuracy: ${accuracy.toFixed(2)}<br>
+    Precision: ${precision.toFixed(2)}<br>
+    Recall: ${recall.toFixed(2)}<br>
+    F1-Score: ${f1.toFixed(2)}
+  `;
+
+  plotROCCurve(y_true, lastPredProbs);
+}
+
+// ROC curve plotting
+function plotROCCurve(y_true, y_prob) {
+  const thresholds = Array.from({length:101}, (_,i)=>i/100);
+  const tpr = thresholds.map(t => {
+    const tp = y_prob.reduce((sum, p, i) => sum + (p>=t && y_true[i]===1?1:0),0);
+    const fn = y_prob.reduce((sum, p, i) => sum + (p<t && y_true[i]===1?1:0),0);
+    return tp/(tp+fn+1e-7);
+  });
+  const fpr = thresholds.map(t => {
+    const fp = y_prob.reduce((sum, p, i) => sum + (p>=t && y_true[i]===0?1:0),0);
+    const tn = y_prob.reduce((sum, p, i) => sum + (p<t && y_true[i]===0?1:0),0);
+    return fp/(fp+tn+1e-7);
+  });
+
+  Plotly.newPlot('rocCurve', [{x: fpr, y: tpr, type:'scatter', mode:'lines', name:'ROC'}, {x:[0,1], y:[0,1], type:'scatter', mode:'lines', line:{dash:'dash'}, name:'Random'}], {title:'ROC Curve', xaxis:{title:'FPR'}, yaxis:{title:'TPR'}});
+}
+
+// Update metrics on threshold change
+document.getElementById('thresholdSlider').addEventListener('input', () => {
+  if (!lastPredProbs) return;
+  // Recompute metrics with new threshold
+  const datasetSize = processedData.X.shape[0];
+  const testSize = Math.floor(datasetSize * 0.2);
+  const X_test = processedData.X.slice([datasetSize-testSize, 0], [testSize, processedData.X.shape[1]]);
+  const y_test = processedData.y.slice([datasetSize-testSize,0],[testSize,1]);
+  computeMetrics(X_test, y_test);
+});
+
+// =======================
+// Prediction Form
+// =======================
+document.getElementById('predictForm').addEventListener('submit', (e) => {
+  e.preventDefault();
+  if (!model) return alert("Train model first.");
+  const formData = new FormData(e.target);
+  const input = {};
+  featureNames.forEach(f => {
+    let val = formData.get(f);
+    if (categoricalMaps[f]) val = categoricalMaps[f][val];
+    if (!categoricalMaps[f]) {
+      const numVal = parseFloat(val);
+      val = (numVal - scaler.min[f]) / (scaler.max[f]-scaler.min[f]+1e-7);
+    }
+    input[f] = val;
+  });
+  const inputTensor = tf.tensor2d([featureNames.map(f=>input[f])]);
+  const prob = model.predict(inputTensor).dataSync()[0];
+  const threshold = parseFloat(document.getElementById('thresholdSlider').value);
+  document.getElementById('predictionResult').textContent = `Probability: ${prob.toFixed(2)}, Prediction: ${prob>=threshold?'Yes':'No'}`;
+});
+
+// =======================
+// Export
+// =======================
+document.getElementById('exportDataBtn').addEventListener('click', () => {
+  const dataToExport = rawData.map(r => {
+    const row = {...r};
+    featureNames.forEach(f => {
+      if (categoricalMaps[f]) {
+        // Reverse map
+        const revMap = Object.fromEntries(Object.entries(categoricalMaps[f]).map(([k,v])=>[v,k]));
+        row[f] = revMap[row[f]];
+      }
+    });
+    return row;
+  });
+  const csv = Papa.unparse(dataToExport);
+  const blob = new Blob([csv], {type:'text/csv'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href=url; a.download='preprocessed_data.csv'; a.click();
+});
+
+document.getElementById('exportModelBtn').addEventListener('click', async () => {
+  if (!model) return alert("Train model first.");
+  await model.save('downloads://mental_illness_model');
 });
