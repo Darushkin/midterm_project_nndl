@@ -7,6 +7,7 @@ let model = null;
 let featureNames = [];
 let scaler = { min: {}, max: {} };
 let categoricalMaps = {};
+let lastPredProbs = null;
 
 // =======================
 // CSV Upload & Preview
@@ -27,6 +28,7 @@ document.getElementById('csvFileInput').addEventListener('change', (e) => {
 });
 
 function displayPreview(data) {
+  if (!data.length) return;
   const previewRows = data.slice(0, 5);
   let html = '<table class="table-auto border-collapse border border-gray-300">';
   html += '<tr>' + Object.keys(previewRows[0]).map(col => `<th class="border px-2 py-1">${col}</th>`).join('') + '</tr>';
@@ -80,6 +82,9 @@ document.getElementById('preprocessBtn').addEventListener('click', () => {
   processedData.y = tf.tensor2d(y, [y.length, 1]);
 
   document.getElementById('preprocessStatus').textContent = "Preprocessing Done!";
+
+  // Call EDA after preprocessing
+  plotEDA();
 });
 
 // =======================
@@ -101,10 +106,13 @@ function createBarPlot(data, feature) {
 }
 
 function plotEDA() {
+  if (!rawData.length) return;
   const container = document.getElementById('edaPlots');
   container.innerHTML = '';
   featureNames.forEach(f => {
-    const div = document.createElement('div'); div.id = `plot_${f}`; div.className = 'bg-gray-50 p-2 rounded';
+    const div = document.createElement('div'); 
+    div.id = `plot_${f}`; 
+    div.className = 'bg-gray-50 p-2 rounded';
     container.appendChild(div);
     if (typeof rawData[0][f] === 'number') {
       const [trace, layout] = createHistPlot(rawData, f);
@@ -115,7 +123,6 @@ function plotEDA() {
     }
   });
 }
-document.getElementById('preprocessBtn').addEventListener('click', plotEDA);
 
 // =======================
 // Neural Network Model
@@ -163,7 +170,6 @@ document.getElementById('trainBtn').addEventListener('click', async () => {
 // =======================
 // Metrics & ROC
 // =======================
-let lastPredProbs = null;
 function computeMetrics(X_test, y_test) {
   lastPredProbs = model.predict(X_test).dataSync();
   const y_true = y_test.dataSync();
@@ -190,7 +196,6 @@ function computeMetrics(X_test, y_test) {
   plotROCCurve(y_true, lastPredProbs);
 }
 
-// ROC curve plotting
 function plotROCCurve(y_true, y_prob) {
   const thresholds = Array.from({length:101}, (_,i)=>i/100);
   const tpr = thresholds.map(t => {
@@ -204,13 +209,15 @@ function plotROCCurve(y_true, y_prob) {
     return fp/(fp+tn+1e-7);
   });
 
-  Plotly.newPlot('rocCurve', [{x: fpr, y: tpr, type:'scatter', mode:'lines', name:'ROC'}, {x:[0,1], y:[0,1], type:'scatter', mode:'lines', line:{dash:'dash'}, name:'Random'}], {title:'ROC Curve', xaxis:{title:'FPR'}, yaxis:{title:'TPR'}});
+  Plotly.newPlot('rocCurve', [
+    {x: fpr, y: tpr, type:'scatter', mode:'lines', name:'ROC'},
+    {x:[0,1], y:[0,1], type:'scatter', mode:'lines', line:{dash:'dash'}, name:'Random'}
+  ], {title:'ROC Curve', xaxis:{title:'FPR'}, yaxis:{title:'TPR'}});
 }
 
 // Update metrics on threshold change
 document.getElementById('thresholdSlider').addEventListener('input', () => {
   if (!lastPredProbs) return;
-  // Recompute metrics with new threshold
   const datasetSize = processedData.X.shape[0];
   const testSize = Math.floor(datasetSize * 0.2);
   const X_test = processedData.X.slice([datasetSize-testSize, 0], [testSize, processedData.X.shape[1]]);
@@ -224,6 +231,7 @@ document.getElementById('thresholdSlider').addEventListener('input', () => {
 document.getElementById('predictForm').addEventListener('submit', (e) => {
   e.preventDefault();
   if (!model) return alert("Train model first.");
+
   const formData = new FormData(e.target);
   const input = {};
   featureNames.forEach(f => {
@@ -249,7 +257,6 @@ document.getElementById('exportDataBtn').addEventListener('click', () => {
     const row = {...r};
     featureNames.forEach(f => {
       if (categoricalMaps[f]) {
-        // Reverse map
         const revMap = Object.fromEntries(Object.entries(categoricalMaps[f]).map(([k,v])=>[v,k]));
         row[f] = revMap[row[f]];
       }
