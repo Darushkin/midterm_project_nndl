@@ -1,0 +1,250 @@
+<!-- index.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Health Improvement Recommender</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f9fc;
+        }
+        
+        .container {
+            background-color: white;
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .form-section {
+            margin-bottom: 25px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid #eee;
+        }
+        
+        h2 {
+            color: #3498db;
+            font-size: 1.2rem;
+            margin-bottom: 15px;
+        }
+        
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+        }
+        
+        input, select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+        
+        button {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            width: 100%;
+            transition: background-color 0.3s;
+        }
+        
+        button:hover {
+            background-color: #2980b9;
+        }
+        
+        .results {
+            margin-top: 30px;
+            display: none;
+        }
+        
+        .profile-summary {
+            background-color: #e8f4fc;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            font-weight: bold;
+        }
+        
+        .recommendations {
+            list-style-type: none;
+            padding: 0;
+        }
+        
+        .recommendation-item {
+            background-color: #f9f9f9;
+            margin-bottom: 10px;
+            padding: 15px;
+            border-left: 4px solid #3498db;
+            border-radius: 4px;
+        }
+        
+        .category {
+            font-weight: bold;
+            color: #3498db;
+            margin-bottom: 5px;
+        }
+        
+        .error {
+            color: #e74c3c;
+            font-size: 14px;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Health Improvement Recommender System</h1>
+        
+        <form id="healthForm">
+            <div class="form-section">
+                <h2>Personal Information</h2>
+                <div class="form-group">
+                    <label for="age">Age</label>
+                    <input type="number" id="age" name="age" min="1" max="120" required>
+                </div>
+                <div class="form-group">
+                    <label for="gender">Gender</label>
+                    <select id="gender" name="gender" required>
+                        <option value="">Select Gender</option>
+                        <option value="Male">Male</option>
+                        <option value="Female">Female</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div class="form-section">
+                <h2>Body Measurements</h2>
+                <div class="form-group">
+                    <label for="weight">Weight (kg)</label>
+                    <input type="number" id="weight" name="weight" min="1" step="0.1" required>
+                </div>
+                <div class="form-group">
+                    <label for="height">Height (m)</label>
+                    <input type="number" id="height" name="height" min="0.5" max="2.5" step="0.01" required>
+                </div>
+                <div class="form-group">
+                    <label for="fatPercentage">Body Fat Percentage (%)</label>
+                    <input type="number" id="fatPercentage" name="fatPercentage" min="1" max="60" step="0.1" required>
+                </div>
+            </div>
+            
+            <div class="form-section">
+                <h2>Health Metrics</h2>
+                <div class="form-group">
+                    <label for="restingBPM">Resting Heart Rate (BPM)</label>
+                    <input type="number" id="restingBPM" name="restingBPM" min="30" max="120" required>
+                </div>
+                <div class="form-group">
+                    <label for="avgBPM">Average Exercise Heart Rate (BPM)</label>
+                    <input type="number" id="avgBPM" name="avgBPM" min="60" max="200">
+                </div>
+                <div class="form-group">
+                    <label for="maxBPM">Maximum Heart Rate (BPM)</label>
+                    <input type="number" id="maxBPM" name="maxBPM" min="100" max="220">
+                </div>
+            </div>
+            
+            <div class="form-section">
+                <h2>Nutrition & Hydration</h2>
+                <div class="form-group">
+                    <label for="waterIntake">Daily Water Intake (liters)</label>
+                    <input type="number" id="waterIntake" name="waterIntake" min="0" step="0.1" required>
+                </div>
+                <div class="form-group">
+                    <label for="dailyMeals">Daily Meal Frequency</label>
+                    <input type="number" id="dailyMeals" name="dailyMeals" min="1" max="10" required>
+                </div>
+                <div class="form-group">
+                    <label for="dietType">Diet Type</label>
+                    <select id="dietType" name="dietType" required>
+                        <option value="">Select Diet Type</option>
+                        <option value="Balanced">Balanced</option>
+                        <option value="Vegan">Vegan</option>
+                        <option value="Vegetarian">Vegetarian</option>
+                        <option value="Keto">Keto</option>
+                        <option value="Low-Carb">Low-Carb</option>
+                        <option value="Paleo">Paleo</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="calories">Daily Calorie Intake</label>
+                    <input type="number" id="calories" name="calories" min="500" max="5000" required>
+                </div>
+                <div class="form-group">
+                    <label for="protein">Daily Protein Intake (g)</label>
+                    <input type="number" id="protein" name="protein" min="0" max="500" required>
+                </div>
+            </div>
+            
+            <div class="form-section">
+                <h2>Exercise & Activity</h2>
+                <div class="form-group">
+                    <label for="workoutFrequency">Workout Frequency (days/week)</label>
+                    <input type="number" id="workoutFrequency" name="workoutFrequency" min="0" max="7" step="0.1" required>
+                </div>
+                <div class="form-group">
+                    <label for="experienceLevel">Experience Level</label>
+                    <select id="experienceLevel" name="experienceLevel" required>
+                        <option value="">Select Experience Level</option>
+                        <option value="1">Beginner</option>
+                        <option value="2">Intermediate</option>
+                        <option value="3">Advanced</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="workoutType">Primary Workout Type</label>
+                    <select id="workoutType" name="workoutType" required>
+                        <option value="">Select Workout Type</option>
+                        <option value="Strength">Strength Training</option>
+                        <option value="Cardio">Cardio</option>
+                        <option value="HIIT">HIIT</option>
+                        <option value="Yoga">Yoga</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="sessionDuration">Session Duration (hours)</label>
+                    <input type="number" id="sessionDuration" name="sessionDuration" min="0.1" max="4" step="0.1" required>
+                </div>
+                <div class="form-group">
+                    <label for="caloriesBurned">Calories Burned per Session</label>
+                    <input type="number" id="caloriesBurned" name="caloriesBurned" min="0" max="2000" required>
+                </div>
+            </div>
+            
+            <button type="submit">Get Health Recommendations</button>
+        </form>
+        
+        <div class="results" id="results">
+            <div class="profile-summary" id="profileSummary"></div>
+            <h2>Your Personalized Health Recommendations</h2>
+            <ul class="recommendations" id="recommendationsList"></ul>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
