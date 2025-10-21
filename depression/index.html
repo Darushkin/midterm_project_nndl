@@ -19,6 +19,7 @@
             padding: 20px;
             border-radius: 8px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            overflow-x: hidden; /* Prevent horizontal scroll */
         }
         h1, h2 {
             color: #333;
@@ -49,24 +50,30 @@
             margin: 10px 0;
         }
         table {
-            width: 100%;
             border-collapse: collapse;
             margin: 10px 0;
+            font-size: 12px; /* Smaller font for table */
         }
         table, th, td {
             border: 1px solid #ddd;
         }
         th, td {
-            padding: 8px;
+            padding: 6px; /* Smaller padding */
             text-align: left;
+            white-space: nowrap; /* Prevent text wrapping */
         }
         th {
             background-color: #f2f2f2;
+            position: sticky;
+            top: 0;
         }
         .chart-container {
             position: relative;
-            height: 300px;
-            margin: 15px 0;
+            height: 400px;
+            margin: 20px 0;
+            border: 1px solid #eee;
+            padding: 10px;
+            background: white;
         }
         .note {
             background-color: #fff3cd;
@@ -75,12 +82,46 @@
             border-radius: 4px;
             margin: 10px 0;
         }
+        .scrollable-table {
+            max-height: 400px;
+            overflow: auto;
+            border: 1px solid #ddd;
+            width: 100%; /* Ensure it takes full width */
+        }
+        .stats-table {
+            width: auto;
+            min-width: 300px;
+            margin: 10px;
+        }
+        .stats-section {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+        .visualization-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+            gap: 20px;
+        }
+        .table-wrapper {
+            width: 100%;
+            overflow-x: auto; /* Horizontal scroll for table */
+        }
         @media (max-width: 768px) {
             .container {
                 padding: 10px;
             }
             .chart-container {
-                height: 250px;
+                height: 300px;
+            }
+            .visualization-grid {
+                grid-template-columns: 1fr;
+            }
+            table {
+                font-size: 10px; /* Even smaller font on mobile */
+            }
+            th, td {
+                padding: 4px;
             }
         }
     </style>
@@ -127,10 +168,7 @@
         <!-- Visualizations Section -->
         <div class="section">
             <h2>5. Visualizations</h2>
-            <div id="visualizations">
-                <div class="chart-container">
-                    <canvas id="correlationHeatmap"></canvas>
-                </div>
+            <div id="visualizations" class="visualization-grid">
                 <!-- Charts will be dynamically added here -->
             </div>
         </div>
