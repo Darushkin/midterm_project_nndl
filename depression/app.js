@@ -205,7 +205,7 @@ function analyzeMissingValues() {
                  'Percentage Missing');
 }
 
-// Generate statistical summary - FIXED: No infinite loop
+// Generate statistical summary - COMPLETELY REWRITTEN
 function generateStatsSummary() {
     const statsDiv = document.getElementById('statsSummary');
     let statsHTML = '<div class="stats-section">';
@@ -214,24 +214,33 @@ function generateStatsSummary() {
     statsHTML += '<div><h4>Numeric Features Summary:</h4>';
     statsHTML += '<table class="stats-table"><thead><tr><th>Feature</th><th>Mean</th><th>Median</th><th>Std Dev</th><th>Min</th><th>Max</th></tr></thead><tbody>';
     
-    NUMERIC_FEATURES.forEach(feature => {
-        // Simple numeric processing without complex logging
-        const values = dataset.map(row => {
-            const val = row[feature];
-            if (val === '' || val === null || val === undefined) return NaN;
-            const num = parseFloat(val);
-            return isNaN(num) ? NaN : num;
-        }).filter(v => !isNaN(v));
+    // Process numeric features
+    for (let i = 0; i < NUMERIC_FEATURES.length; i++) {
+        const feature = NUMERIC_FEATURES[i];
+        const values = [];
+        
+        // Collect numeric values
+        for (let j = 0; j < dataset.length; j++) {
+            const val = dataset[j][feature];
+            if (val && val.trim() !== '') {
+                const num = parseFloat(val);
+                if (!isNaN(num)) {
+                    values.push(num);
+                }
+            }
+        }
         
         if (values.length === 0) {
             statsHTML += `<tr><td>${feature}</td><td colspan="5">No numeric data found</td></tr>`;
-            return;
+            continue;
         }
         
+        // Calculate statistics
         const mean = (values.reduce((a, b) => a + b, 0) / values.length).toFixed(2);
-        const sorted = values.slice().sort((a, b) => a - b);
+        const sorted = [...values].sort((a, b) => a - b);
         const median = sorted[Math.floor(sorted.length / 2)].toFixed(2);
-        const std = Math.sqrt(values.reduce((sq, n) => sq + Math.pow(n - mean, 2), 0) / values.length).toFixed(2);
+        const meanNum = parseFloat(mean);
+        const std = Math.sqrt(values.reduce((sq, n) => sq + Math.pow(n - meanNum, 2), 0) / values.length).toFixed(2);
         const min = Math.min(...values).toFixed(2);
         const max = Math.max(...values).toFixed(2);
         
@@ -243,56 +252,66 @@ function generateStatsSummary() {
             <td>${min}</td>
             <td>${max}</td>
         </tr>`;
-    });
+    }
     statsHTML += '</tbody></table></div>';
     
     // Categorical features in table
     statsHTML += '<div><h4>Categorical Features Counts:</h4>';
-    CATEGORICAL_FEATURES.forEach(feature => {
+    
+    // Process categorical features
+    for (let i = 0; i < CATEGORICAL_FEATURES.length; i++) {
+        const feature = CATEGORICAL_FEATURES[i];
         const counts = {};
-        dataset.forEach(row => {
-            const val = row[feature];
+        
+        // Count categorical values
+        for (let j = 0; j < dataset.length; j++) {
+            const val = dataset[j][feature];
             if (val && val.trim() !== '') {
                 counts[val] = (counts[val] || 0) + 1;
             }
-        });
+        }
         
         if (Object.keys(counts).length > 0) {
             statsHTML += `<h5>${feature}:</h5>`;
             statsHTML += '<table class="stats-table"><thead><tr><th>Value</th><th>Count</th><th>Percentage</th></tr></thead><tbody>';
-            Object.entries(counts).forEach(([value, count]) => {
+            
+            const countEntries = Object.entries(counts);
+            for (let k = 0; k < countEntries.length; k++) {
+                const [value, count] = countEntries[k];
                 const percentage = ((count / dataset.length) * 100).toFixed(1);
                 statsHTML += `<tr><td>${value}</td><td>${count}</td><td>${percentage}%</td></tr>`;
-            });
+            }
             statsHTML += '</tbody></table>';
         } else {
             statsHTML += `<h5>${feature}:</h5><p>No data found</p>`;
         }
-    });
+    }
     statsHTML += '</div>';
     
     // Target variable analysis
     const targetCol = TARGET_COLUMN;
     
-    if (dataset[0].hasOwnProperty(targetCol)) {
+    if (dataset[0] && dataset[0].hasOwnProperty(targetCol)) {
         statsHTML += '<div><h4>Target Variable Analysis:</h4>';
         statsHTML += `<p><strong>Target Column:</strong> ${targetCol}</p>`;
         statsHTML += '<table class="stats-table"><thead><tr><th>Value</th><th>Count</th><th>Percentage</th></tr></thead><tbody>';
         
         const groups = {};
-        dataset.forEach(row => {
-            const group = row[targetCol];
+        for (let i = 0; i < dataset.length; i++) {
+            const group = dataset[i][targetCol];
             if (group && group.trim() !== '') {
                 if (!groups[group]) groups[group] = [];
-                groups[group].push(row);
+                groups[group].push(dataset[i]);
             }
-        });
+        }
         
-        if (Object.keys(groups).length > 0) {
-            Object.entries(groups).forEach(([group, data]) => {
+        const groupEntries = Object.entries(groups);
+        if (groupEntries.length > 0) {
+            for (let i = 0; i < groupEntries.length; i++) {
+                const [group, data] = groupEntries[i];
                 const percentage = ((data.length / dataset.length) * 100).toFixed(1);
                 statsHTML += `<tr><td>${group}</td><td>${data.length}</td><td>${percentage}%</td></tr>`;
-            });
+            }
         } else {
             statsHTML += '<tr><td colspan="3">No target data found</td></tr>';
         }
@@ -304,7 +323,6 @@ function generateStatsSummary() {
     
     statsHTML += '</div>';
     statsDiv.innerHTML = statsHTML;
-    console.log('Statistical summary generated');
 }
 
 // Create all visualizations
@@ -312,14 +330,16 @@ function createVisualizations() {
     console.log('Creating visualizations...');
     
     // Create categorical feature charts
-    CATEGORICAL_FEATURES.forEach(feature => {
+    for (let i = 0; i < CATEGORICAL_FEATURES.length; i++) {
+        const feature = CATEGORICAL_FEATURES[i];
         createCategoricalChart(feature);
-    });
+    }
     
     // Create numeric feature histograms
-    NUMERIC_FEATURES.forEach(feature => {
+    for (let i = 0; i < NUMERIC_FEATURES.length; i++) {
+        const feature = NUMERIC_FEATURES[i];
         createHistogram(feature);
-    });
+    }
     
     console.log('All visualizations created');
 }
@@ -327,12 +347,12 @@ function createVisualizations() {
 // Create chart for categorical feature
 function createCategoricalChart(feature) {
     const counts = {};
-    dataset.forEach(row => {
-        const val = row[feature];
+    for (let i = 0; i < dataset.length; i++) {
+        const val = dataset[i][feature];
         if (val && val.trim() !== '') {
             counts[val] = (counts[val] || 0) + 1;
         }
-    });
+    }
     
     const categories = Object.keys(counts);
     if (categories.length === 0) {
@@ -416,12 +436,16 @@ function createCategoricalChart(feature) {
 
 // Create histogram for numeric feature
 function createHistogram(feature) {
-    const values = dataset.map(row => {
-        const val = row[feature];
-        if (val === '' || val === null || val === undefined) return NaN;
-        const num = parseFloat(val);
-        return isNaN(num) ? NaN : num;
-    }).filter(v => !isNaN(v));
+    const values = [];
+    for (let i = 0; i < dataset.length; i++) {
+        const val = dataset[i][feature];
+        if (val && val.trim() !== '') {
+            const num = parseFloat(val);
+            if (!isNaN(num)) {
+                values.push(num);
+            }
+        }
+    }
     
     if (values.length === 0) {
         return;
@@ -434,10 +458,11 @@ function createHistogram(feature) {
     const binSize = range / binCount;
     
     const bins = Array(binCount).fill(0);
-    values.forEach(value => {
+    for (let i = 0; i < values.length; i++) {
+        const value = values[i];
         const binIndex = Math.min(Math.floor((value - min) / binSize), binCount - 1);
         bins[binIndex]++;
-    });
+    }
     
     const labels = Array.from({length: binCount}, (_, i) => {
         const start = (min + i * binSize).toFixed(1);
