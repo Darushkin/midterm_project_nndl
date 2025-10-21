@@ -46,15 +46,14 @@ function loadData() {
                 return;
             }
 
-            // Display the actual column names for debugging
-            const actualColumns = Object.keys(dataset[0]);
-            console.log('Actual columns in dataset:', actualColumns);
+            console.log('Dataset loaded successfully:', dataset.length, 'rows');
+            console.log('Columns:', Object.keys(dataset[0]));
             
             displayOverview();
             runEDABtn.disabled = false;
             exportBtn.disabled = false;
             
-            alert(`Data loaded successfully! ${dataset.length} records found. Check console for column names.`);
+            alert(`Data loaded successfully! ${dataset.length} records found.`);
             
         } catch (error) {
             console.error('Error loading data:', error);
@@ -161,6 +160,8 @@ function runEDA() {
         return;
     }
 
+    console.log('Starting EDA analysis...');
+
     // Clear previous charts
     Object.values(charts).forEach(chart => {
         if (chart && typeof chart.destroy === 'function') {
@@ -204,35 +205,7 @@ function analyzeMissingValues() {
                  'Percentage Missing');
 }
 
-// Find matching column name in dataset
-function findMatchingColumn(expectedName) {
-    const actualColumns = Object.keys(dataset[0]);
-    
-    // Exact match
-    if (actualColumns.includes(expectedName)) {
-        return expectedName;
-    }
-    
-    // Case insensitive match
-    const lowerExpected = expectedName.toLowerCase();
-    for (const actualCol of actualColumns) {
-        if (actualCol.toLowerCase() === lowerExpected) {
-            return actualCol;
-        }
-    }
-    
-    // Partial match for common variations
-    for (const actualCol of actualColumns) {
-        const lowerActual = actualCol.toLowerCase();
-        if (lowerActual.includes(lowerExpected) || lowerExpected.includes(lowerActual)) {
-            return actualCol;
-        }
-    }
-    
-    return null;
-}
-
-// Generate statistical summary - FIXED: Use actual column names
+// Generate statistical summary - FIXED: No infinite loop
 function generateStatsSummary() {
     const statsDiv = document.getElementById('statsSummary');
     let statsHTML = '<div class="stats-section">';
@@ -241,21 +214,17 @@ function generateStatsSummary() {
     statsHTML += '<div><h4>Numeric Features Summary:</h4>';
     statsHTML += '<table class="stats-table"><thead><tr><th>Feature</th><th>Mean</th><th>Median</th><th>Std Dev</th><th>Min</th><th>Max</th></tr></thead><tbody>';
     
-    NUMERIC_FEATURES.forEach(expectedFeature => {
-        const actualFeature = findMatchingColumn(expectedFeature);
-        
-        if (!actualFeature) {
-            statsHTML += `<tr><td>${expectedFeature}</td><td colspan="5">Column not found in dataset</td></tr>`;
-            return;
-        }
-        
+    NUMERIC_FEATURES.forEach(feature => {
+        // Simple numeric processing without complex logging
         const values = dataset.map(row => {
-            const val = row[actualFeature];
-            return val && val.trim() !== '' ? parseFloat(val) : NaN;
+            const val = row[feature];
+            if (val === '' || val === null || val === undefined) return NaN;
+            const num = parseFloat(val);
+            return isNaN(num) ? NaN : num;
         }).filter(v => !isNaN(v));
         
         if (values.length === 0) {
-            statsHTML += `<tr><td>${actualFeature}</td><td colspan="5">No numeric data found</td></tr>`;
+            statsHTML += `<tr><td>${feature}</td><td colspan="5">No numeric data found</td></tr>`;
             return;
         }
         
@@ -267,7 +236,7 @@ function generateStatsSummary() {
         const max = Math.max(...values).toFixed(2);
         
         statsHTML += `<tr>
-            <td>${actualFeature}</td>
+            <td>${feature}</td>
             <td>${mean}</td>
             <td>${median}</td>
             <td>${std}</td>
@@ -279,24 +248,17 @@ function generateStatsSummary() {
     
     // Categorical features in table
     statsHTML += '<div><h4>Categorical Features Counts:</h4>';
-    CATEGORICAL_FEATURES.forEach(expectedFeature => {
-        const actualFeature = findMatchingColumn(expectedFeature);
-        
-        if (!actualFeature) {
-            statsHTML += `<h5>${expectedFeature}:</h5><p>Column not found in dataset</p>`;
-            return;
-        }
-        
+    CATEGORICAL_FEATURES.forEach(feature => {
         const counts = {};
         dataset.forEach(row => {
-            const val = row[actualFeature];
+            const val = row[feature];
             if (val && val.trim() !== '') {
                 counts[val] = (counts[val] || 0) + 1;
             }
         });
         
         if (Object.keys(counts).length > 0) {
-            statsHTML += `<h5>${actualFeature}:</h5>`;
+            statsHTML += `<h5>${feature}:</h5>`;
             statsHTML += '<table class="stats-table"><thead><tr><th>Value</th><th>Count</th><th>Percentage</th></tr></thead><tbody>';
             Object.entries(counts).forEach(([value, count]) => {
                 const percentage = ((count / dataset.length) * 100).toFixed(1);
@@ -304,15 +266,15 @@ function generateStatsSummary() {
             });
             statsHTML += '</tbody></table>';
         } else {
-            statsHTML += `<h5>${actualFeature}:</h5><p>No data found</p>`;
+            statsHTML += `<h5>${feature}:</h5><p>No data found</p>`;
         }
     });
     statsHTML += '</div>';
     
     // Target variable analysis
-    const targetCol = findMatchingColumn(TARGET_COLUMN);
+    const targetCol = TARGET_COLUMN;
     
-    if (targetCol) {
+    if (dataset[0].hasOwnProperty(targetCol)) {
         statsHTML += '<div><h4>Target Variable Analysis:</h4>';
         statsHTML += `<p><strong>Target Column:</strong> ${targetCol}</p>`;
         statsHTML += '<table class="stats-table"><thead><tr><th>Value</th><th>Count</th><th>Percentage</th></tr></thead><tbody>';
@@ -337,37 +299,26 @@ function generateStatsSummary() {
         statsHTML += '</tbody></table></div>';
     } else {
         statsHTML += '<div><h4>Target Variable Analysis:</h4>';
-        statsHTML += `<p>Target column "${TARGET_COLUMN}" not found in dataset</p></div>`;
+        statsHTML += `<p>Target column "${targetCol}" not found in dataset</p></div>`;
     }
     
     statsHTML += '</div>';
     statsDiv.innerHTML = statsHTML;
+    console.log('Statistical summary generated');
 }
 
-// Create all visualizations - FIXED: Use actual column names
+// Create all visualizations
 function createVisualizations() {
     console.log('Creating visualizations...');
     
     // Create categorical feature charts
-    CATEGORICAL_FEATURES.forEach(expectedFeature => {
-        const actualFeature = findMatchingColumn(expectedFeature);
-        if (actualFeature) {
-            console.log(`Creating chart for: ${actualFeature}`);
-            createCategoricalChart(actualFeature);
-        } else {
-            console.log(`Column not found for chart: ${expectedFeature}`);
-        }
+    CATEGORICAL_FEATURES.forEach(feature => {
+        createCategoricalChart(feature);
     });
     
     // Create numeric feature histograms
-    NUMERIC_FEATURES.forEach(expectedFeature => {
-        const actualFeature = findMatchingColumn(expectedFeature);
-        if (actualFeature) {
-            console.log(`Creating histogram for: ${actualFeature}`);
-            createHistogram(actualFeature);
-        } else {
-            console.log(`Column not found for histogram: ${expectedFeature}`);
-        }
+    NUMERIC_FEATURES.forEach(feature => {
+        createHistogram(feature);
     });
     
     console.log('All visualizations created');
@@ -385,7 +336,6 @@ function createCategoricalChart(feature) {
     
     const categories = Object.keys(counts);
     if (categories.length === 0) {
-        console.log(`No data for feature: ${feature}`);
         return;
     }
     
@@ -398,23 +348,28 @@ function createCategoricalChart(feature) {
     chartContainer.innerHTML = `<canvas id="${chartId}"></canvas>`;
     vizDiv.appendChild(chartContainer);
     
-    const ctx = document.getElementById(chartId).getContext('2d');
+    const ctx = document.getElementById(chartId);
+    if (!ctx) {
+        return;
+    }
     
-    // Generate colors for each category
-    const backgroundColors = categories.map(() => 
-        `hsl(${Math.random() * 360}, 70%, 60%)`
-    );
+    const context = ctx.getContext('2d');
     
     try {
-        charts[chartId] = new Chart(ctx, {
+        // Destroy existing chart if it exists
+        if (charts[chartId]) {
+            charts[chartId].destroy();
+        }
+        
+        charts[chartId] = new Chart(context, {
             type: 'bar',
             data: {
                 labels: categories,
                 datasets: [{
                     label: `Count by ${feature}`,
                     data: Object.values(counts),
-                    backgroundColor: backgroundColors,
-                    borderColor: backgroundColors.map(color => color.replace('60%)', '40%)')),
+                    backgroundColor: categories.map(() => `hsl(${Math.random() * 360}, 70%, 60%)`),
+                    borderColor: categories.map(() => `hsl(${Math.random() * 360}, 70%, 40%)`),
                     borderWidth: 2
                 }]
             },
@@ -454,7 +409,6 @@ function createCategoricalChart(feature) {
                 }
             }
         });
-        console.log(`Chart created successfully for: ${feature}`);
     } catch (error) {
         console.error(`Error creating chart for ${feature}:`, error);
     }
@@ -464,11 +418,12 @@ function createCategoricalChart(feature) {
 function createHistogram(feature) {
     const values = dataset.map(row => {
         const val = row[feature];
-        return val && val.trim() !== '' ? parseFloat(val) : NaN;
+        if (val === '' || val === null || val === undefined) return NaN;
+        const num = parseFloat(val);
+        return isNaN(num) ? NaN : num;
     }).filter(v => !isNaN(v));
     
     if (values.length === 0) {
-        console.log(`No numeric data for feature: ${feature}`);
         return;
     }
     
@@ -499,10 +454,20 @@ function createHistogram(feature) {
     chartContainer.innerHTML = `<canvas id="${chartId}"></canvas>`;
     vizDiv.appendChild(chartContainer);
     
-    const ctx = document.getElementById(chartId).getContext('2d');
+    const ctx = document.getElementById(chartId);
+    if (!ctx) {
+        return;
+    }
+    
+    const context = ctx.getContext('2d');
     
     try {
-        charts[chartId] = new Chart(ctx, {
+        // Destroy existing chart if it exists
+        if (charts[chartId]) {
+            charts[chartId].destroy();
+        }
+        
+        charts[chartId] = new Chart(context, {
             type: 'bar',
             data: {
                 labels: labels,
@@ -547,7 +512,6 @@ function createHistogram(feature) {
                 }
             }
         });
-        console.log(`Histogram created successfully for: ${feature}`);
     } catch (error) {
         console.error(`Error creating histogram for ${feature}:`, error);
     }
@@ -555,10 +519,20 @@ function createHistogram(feature) {
 
 // Create generic bar chart
 function createBarChart(canvasId, title, labels, data, yLabel) {
-    const ctx = document.getElementById(canvasId).getContext('2d');
+    const ctx = document.getElementById(canvasId);
+    if (!ctx) {
+        return;
+    }
+    
+    const context = ctx.getContext('2d');
     
     try {
-        charts[canvasId] = new Chart(ctx, {
+        // Destroy existing chart if it exists
+        if (charts[canvasId]) {
+            charts[canvasId].destroy();
+        }
+        
+        charts[canvasId] = new Chart(context, {
             type: 'bar',
             data: {
                 labels: labels,
