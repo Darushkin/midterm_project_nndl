@@ -1,135 +1,111 @@
-<!-- index.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mental Health EDA & Prediction</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 0;
-            padding: 20px;
-            background-color: #f5f5f5;
-        }
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            background: white;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-        .section {
-            margin: 20px 0;
-            padding: 15px;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-        }
-        .controls {
-            display: flex;
-            gap: 10px;
-            margin: 15px 0;
-            flex-wrap: wrap;
-        }
-        button {
-            padding: 10px 15px;
-            background: #007cba;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-        }
-        button:hover {
-            background: #005a87;
-        }
-        button:disabled {
-            background: #ccc;
-            cursor: not-allowed;
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin: 10px 0;
-        }
-        th, td {
-            border: 1px solid #ddd;
-            padding: 8px;
-            text-align: left;
-        }
-        th {
-            background-color: #f2f2f2;
-        }
-        .chart-container {
-            position: relative;
-            height: 300px;
-            margin: 20px 0;
-        }
-        .deployment-note {
-            background: #fff3cd;
-            border: 1px solid #ffeaa7;
-            padding: 15px;
-            margin: 20px 0;
-            border-radius: 4px;
-            font-size: 14px;
-        }
-        @media (max-width: 768px) {
-            .container {
-                padding: 10px;
-            }
-            .controls {
-                flex-direction: column;
-            }
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mental Illness Prediction App</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.10.0/dist/tf.min.js"></script>
+  <script src="https://cdn.plot.ly/plotly-2.32.1.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+  <script src="app.js" defer></script>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@3.3.2/dist/tailwind.min.css" rel="stylesheet">
 </head>
-<body>
-    <div class="container">
-        <h1>Mental Health EDA & Prediction Analysis</h1>
-        
-        <!-- Deployment Instructions -->
-        <div class="deployment-note">
-            <strong>Deployment Note:</strong> Create public GitHub repo, commit index.html and app.js, 
-            enable Pages (main/root), test URL.
-        </div>
+<body class="bg-gray-100 text-gray-800">
+  <div class="container mx-auto p-4 space-y-8">
 
-        <!-- Data Load Section -->
-        <div class="section">
-            <h2>1. Data Load</h2>
-            <input type="file" id="fileInput" accept=".csv">
-            <div class="controls">
-                <button id="loadBtn">Load Data</button>
-                <button id="edaBtn" disabled>Run EDA</button>
-                <button id="exportBtn" disabled>Export Results</button>
-            </div>
-        </div>
+    <!-- Data Load Section -->
+    <section class="bg-white shadow rounded p-4">
+      <h2 class="text-xl font-bold mb-2">📂 Data Load</h2>
+      <input type="file" id="csvFileInput" class="mb-2">
+      <div id="dataPreview" class="overflow-x-auto"></div>
+      <p id="dataShape" class="mt-2"></p>
+    </section>
 
-        <!-- Overview Section -->
-        <div class="section">
-            <h2>2. Data Overview</h2>
-            <div id="overviewContent"></div>
-        </div>
+    <!-- Preprocessing Section -->
+    <section class="bg-white shadow rounded p-4">
+      <h2 class="text-xl font-bold mb-2">🔍 Preprocessing</h2>
+      <button id="preprocessBtn" class="bg-blue-500 text-white px-4 py-2 rounded">Preprocess Data</button>
+      <p id="preprocessStatus" class="mt-2"></p>
+    </section>
 
-        <!-- Missing Values Section -->
-        <div class="section">
-            <h2>3. Missing Values Analysis</h2>
-            <div id="missingContent"></div>
-        </div>
+    <!-- EDA Section -->
+    <section class="bg-white shadow rounded p-4">
+      <h2 class="text-xl font-bold mb-2">📊 Exploratory Data Analysis</h2>
+      <div id="edaPlots" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+    </section>
 
-        <!-- Stats Summary Section -->
-        <div class="section">
-            <h2>4. Statistical Summary</h2>
-            <div id="statsContent"></div>
-        </div>
+    <!-- Model Section -->
+    <section class="bg-white shadow rounded p-4">
+      <h2 class="text-xl font-bold mb-2">🧠 Neural Network Model</h2>
+      <div class="space-y-2">
+        <label>Epochs: <input type="number" id="epochsInput" value="50" class="border px-2 py-1 rounded"></label>
+        <label>Batch Size: <input type="number" id="batchSizeInput" value="16" class="border px-2 py-1 rounded"></label>
+        <label>Learning Rate: <input type="number" step="0.001" id="lrInput" value="0.01" class="border px-2 py-1 rounded"></label>
+      </div>
+      <button id="trainBtn" class="bg-green-500 text-white px-4 py-2 rounded mt-2">Train Model</button>
+      <div id="trainingChart" class="mt-4"></div>
+    </section>
 
-        <!-- Visualizations Section -->
-        <div class="section">
-            <h2>5. Data Visualizations</h2>
-            <div id="vizContent"></div>
-        </div>
-    </div>
+    <!-- Metrics Section -->
+    <section class="bg-white shadow rounded p-4">
+      <h2 class="text-xl font-bold mb-2">📈 Metrics & ROC</h2>
+      <div id="metrics"></div>
+      <div id="rocCurve" class="mt-4"></div>
+      <label>Classification Threshold: <input type="range" id="thresholdSlider" min="0" max="1" step="0.01" value="0.5" class="w-full"></label>
+    </section>
 
-    <script src="app.js"></script>
+    <!-- Prediction Section -->
+    <section class="bg-white shadow rounded p-4">
+      <h2 class="text-xl font-bold mb-2">🔮 Predict New Individual</h2>
+      <form id="predictForm" class="grid grid-cols-1 md:grid-cols-2 gap-2">
+        <input type="number" name="Age" placeholder="Age" class="border px-2 py-1 rounded">
+        <select name="Marital Status" class="border px-2 py-1 rounded">
+          <option>Single</option><option>Married</option><option>Divorced</option><option>Widowed</option>
+        </select>
+        <select name="Education Level" class="border px-2 py-1 rounded">
+          <option>High School</option><option>Associate Degree</option><option>Bachelor's Degree</option><option>Master's Degree</option><option>PhD</option>
+        </select>
+        <input type="number" name="Number of Children" placeholder="Number of Children" class="border px-2 py-1 rounded">
+        <select name="Smoking Status" class="border px-2 py-1 rounded">
+          <option>Smoker</option><option>Former</option><option>Non-smoker</option>
+        </select>
+        <select name="Physical Activity Level" class="border px-2 py-1 rounded">
+          <option>Sedentary</option><option>Moderate</option><option>Active</option>
+        </select>
+        <select name="Employment Status" class="border px-2 py-1 rounded">
+          <option>Employed</option><option>Unemployed</option>
+        </select>
+        <input type="number" name="Income" placeholder="Income" class="border px-2 py-1 rounded">
+        <select name="Alcohol Consumption" class="border px-2 py-1 rounded">
+          <option>Low</option><option>Moderate</option><option>High</option>
+        </select>
+        <select name="Dietary Habits" class="border px-2 py-1 rounded">
+          <option>Healthy</option><option>Moderate</option><option>Unhealthy</option>
+        </select>
+        <select name="Sleep Patterns" class="border px-2 py-1 rounded">
+          <option>Good</option><option>Fair</option><option>Poor</option>
+        </select>
+        <select name="History of Substance Abuse" class="border px-2 py-1 rounded">
+          <option>Yes</option><option>No</option>
+        </select>
+        <select name="Family History of Depression" class="border px-2 py-1 rounded">
+          <option>Yes</option><option>No</option>
+        </select>
+        <select name="Chronic Medical Conditions" class="border px-2 py-1 rounded">
+          <option>Yes</option><option>No</option>
+        </select>
+        <button type="submit" class="bg-purple-500 text-white px-4 py-2 rounded col-span-2">Predict</button>
+      </form>
+      <p id="predictionResult" class="mt-2 font-bold"></p>
+    </section>
+
+    <!-- Export Section -->
+    <section class="bg-white shadow rounded p-4">
+      <h2 class="text-xl font-bold mb-2">💾 Export</h2>
+      <button id="exportDataBtn" class="bg-indigo-500 text-white px-4 py-2 rounded">Export Preprocessed Data</button>
+      <button id="exportModelBtn" class="bg-indigo-700 text-white px-4 py-2 rounded">Export Model</button>
+    </section>
+
+  </div>
 </body>
 </html>
