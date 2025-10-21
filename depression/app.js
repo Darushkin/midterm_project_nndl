@@ -35,11 +35,17 @@ function loadData() {
         return;
     }
 
+    console.log('Loading file:', file.name); // Debug log
+
     const reader = new FileReader();
     reader.onload = function(e) {
         try {
             const csvText = e.target.result;
+            console.log('CSV loaded, first 200 chars:', csvText.substring(0, 200)); // Debug log
+            
             dataset = parseCSV(csvText);
+            
+            console.log('Parsed dataset:', dataset.slice(0, 3)); // Debug log
             
             if (dataset.length === 0) {
                 alert('The CSV file appears to be empty.');
@@ -48,8 +54,15 @@ function loadData() {
 
             // Check if required columns exist
             const columns = Object.keys(dataset[0]);
-            if (!columns.includes(TARGET_COLUMN)) {
-                alert(`Required column "${TARGET_COLUMN}" not found in dataset.`);
+            console.log('Columns found:', columns); // Debug log
+            
+            // Check for target column with flexible matching
+            const targetColumnFound = columns.find(col => 
+                col.toLowerCase().includes('mental') || col === TARGET_COLUMN
+            );
+            
+            if (!targetColumnFound) {
+                alert(`Required column "${TARGET_COLUMN}" not found in dataset. Found columns: ${columns.join(', ')}`);
                 return;
             }
 
@@ -57,7 +70,10 @@ function loadData() {
             runEDABtn.disabled = false;
             exportBtn.disabled = false;
             
+            alert(`Data loaded successfully! ${dataset.length} records found.`);
+            
         } catch (error) {
+            console.error('Error loading data:', error);
             alert('Error parsing CSV file: ' + error.message);
         }
     };
@@ -67,19 +83,63 @@ function loadData() {
     reader.readAsText(file);
 }
 
-// Parse CSV text into array of objects
+// Parse CSV text into array of objects - IMPROVED VERSION
 function parseCSV(csvText) {
     const lines = csvText.trim().split('\n');
-    const headers = lines[0].split(',').map(h => h.trim());
+    console.log('Total lines:', lines.length); // Debug log
     
-    return lines.slice(1).map(line => {
-        const values = line.split(',').map(v => v.trim());
+    // Handle different line endings and clean up
+    const cleanedLines = lines.map(line => line.trim()).filter(line => line.length > 0);
+    
+    if (cleanedLines.length === 0) {
+        return [];
+    }
+
+    // Parse headers - handle quoted fields and commas within quotes
+    const headers = parseCSVLine(cleanedLines[0]);
+    console.log('Headers:', headers); // Debug log
+    
+    const data = [];
+    
+    for (let i = 1; i < cleanedLines.length; i++) {
+        const values = parseCSVLine(cleanedLines[i]);
         const obj = {};
+        
         headers.forEach((header, index) => {
-            obj[header] = values[index] || '';
+            // Clean header names by removing extra spaces
+            const cleanHeader = header.trim();
+            obj[cleanHeader] = values[index] ? values[index].trim() : '';
         });
-        return obj;
-    });
+        
+        data.push(obj);
+    }
+    
+    return data;
+}
+
+// Improved CSV line parsing to handle quoted fields
+function parseCSVLine(line) {
+    const result = [];
+    let current = '';
+    let inQuotes = false;
+    
+    for (let i = 0; i < line.length; i++) {
+        const char = line[i];
+        
+        if (char === '"') {
+            inQuotes = !inQuotes;
+        } else if (char === ',' && !inQuotes) {
+            result.push(current);
+            current = '';
+        } else {
+            current += char;
+        }
+    }
+    
+    // Push the last field
+    result.push(current);
+    
+    return result;
 }
 
 // Display data overview
@@ -116,12 +176,18 @@ function runEDA() {
     }
 
     // Clear previous charts
-    Object.values(charts).forEach(chart => chart.destroy());
+    Object.values(charts).forEach(chart => {
+        if (chart && typeof chart.destroy === 'function') {
+            chart.destroy();
+        }
+    });
     charts = {};
 
     analyzeMissingValues();
     generateStatsSummary();
     createVisualizations();
+    
+    alert('EDA analysis completed!');
 }
 
 // Analyze and display missing values
@@ -153,8 +219,15 @@ function generateStatsSummary() {
     let statsHTML = '<h4>Numeric Features Summary:</h4>';
     
     NUMERIC_FEATURES.forEach(feature => {
-        const values = dataset.map(row => parseFloat(row[feature])).filter(v => !isNaN(v));
-        if (values.length === 0) return;
+        const values = dataset.map(row => {
+            const val = row[feature];
+            return val ? parseFloat(val) : NaN;
+        }).filter(v => !isNaN(v));
+        
+        if (values.length === 0) {
+            statsHTML += `<p><strong>${feature}:</strong> No valid numeric data found</p>`;
+            return;
+        }
         
         const mean = (values.reduce((a, b) => a + b, 0) / values.length).toFixed(2);
         const sorted = values.slice().sort((a, b) => a - b);
@@ -169,24 +242,36 @@ function generateStatsSummary() {
         const counts = {};
         dataset.forEach(row => {
             const val = row[feature];
-            counts[val] = (counts[val] || 0) + 1;
+            if (val) {
+                counts[val] = (counts[val] || 0) + 1;
+            }
         });
         
-        statsHTML += `<p><strong>${feature}:</strong> ${Object.entries(counts).map(([k, v]) => `${k}(${v})`).join(', ')}</p>`;
+        if (Object.keys(counts).length > 0) {
+            statsHTML += `<p><strong>${feature}:</strong> ${Object.entries(counts).map(([k, v]) => `${k}(${v})`).join(', ')}</p>`;
+        } else {
+            statsHTML += `<p><strong>${feature}:</strong> No data found</p>`;
+        }
     });
     
     // Group by target if available
-    if (dataset.some(row => row[TARGET_COLUMN])) {
-        statsHTML += `<h4>Grouped by ${TARGET_COLUMN}:</h4>`;
+    const targetCol = Object.keys(dataset[0]).find(col => 
+        col.toLowerCase().includes('mental') || col === TARGET_COLUMN
+    );
+    
+    if (targetCol && dataset.some(row => row[targetCol])) {
+        statsHTML += `<h4>Grouped by ${targetCol}:</h4>`;
         const groups = {};
         dataset.forEach(row => {
-            const group = row[TARGET_COLUMN];
-            if (!groups[group]) groups[group] = [];
-            groups[group].push(row);
+            const group = row[targetCol];
+            if (group) {
+                if (!groups[group]) groups[group] = [];
+                groups[group].push(row);
+            }
         });
         
         Object.entries(groups).forEach(([group, data]) => {
-            statsHTML += `<p><strong>${TARGET_COLUMN} = ${group}:</strong> ${data.length} records (${(data.length/dataset.length*100).toFixed(1)}%)</p>`;
+            statsHTML += `<p><strong>${targetCol} = ${group}:</strong> ${data.length} records (${(data.length/dataset.length*100).toFixed(1)}%)</p>`;
         });
     }
     
@@ -212,7 +297,10 @@ function createVisualizations() {
 function createCorrelationHeatmap() {
     const numericData = {};
     NUMERIC_FEATURES.forEach(feature => {
-        numericData[feature] = dataset.map(row => parseFloat(row[feature])).filter(v => !isNaN(v));
+        numericData[feature] = dataset.map(row => {
+            const val = row[feature];
+            return val ? parseFloat(val) : NaN;
+        }).filter(v => !isNaN(v));
     });
     
     const features = Object.keys(numericData);
@@ -258,6 +346,8 @@ function createCorrelationHeatmap() {
 // Calculate correlation between two arrays
 function calculateCorrelation(x, y) {
     const n = Math.min(x.length, y.length);
+    if (n === 0) return 0;
+    
     const xSlice = x.slice(0, n);
     const ySlice = y.slice(0, n);
     
@@ -278,8 +368,12 @@ function createCategoricalChart(feature) {
     const counts = {};
     dataset.forEach(row => {
         const val = row[feature];
-        counts[val] = (counts[val] || 0) + 1;
+        if (val) {
+            counts[val] = (counts[val] || 0) + 1;
+        }
     });
+    
+    if (Object.keys(counts).length === 0) return;
     
     const chartId = `chart-${feature.replace(/\s+/g, '-')}`;
     const vizDiv = document.getElementById('visualizations');
@@ -310,7 +404,11 @@ function createCategoricalChart(feature) {
 
 // Create histogram for numeric feature
 function createHistogram(feature) {
-    const values = dataset.map(row => parseFloat(row[feature])).filter(v => !isNaN(v));
+    const values = dataset.map(row => {
+        const val = row[feature];
+        return val ? parseFloat(val) : NaN;
+    }).filter(v => !isNaN(v));
+    
     if (values.length === 0) return;
     
     const min = Math.min(...values);
@@ -417,7 +515,11 @@ function exportResults() {
     
     // Numeric statistics
     NUMERIC_FEATURES.forEach(feature => {
-        const values = dataset.map(row => parseFloat(row[feature])).filter(v => !isNaN(v));
+        const values = dataset.map(row => {
+            const val = row[feature];
+            return val ? parseFloat(val) : NaN;
+        }).filter(v => !isNaN(v));
+        
         if (values.length > 0) {
             const mean = values.reduce((a, b) => a + b, 0) / values.length;
             const sorted = values.slice().sort((a, b) => a - b);
@@ -439,21 +541,30 @@ function exportResults() {
         const counts = {};
         dataset.forEach(row => {
             const val = row[feature];
-            counts[val] = (counts[val] || 0) + 1;
+            if (val) {
+                counts[val] = (counts[val] || 0) + 1;
+            }
         });
         results.statistics.categorical[feature] = counts;
     });
     
     // Target variable analysis
-    if (dataset.some(row => row[TARGET_COLUMN])) {
+    const targetCol = Object.keys(dataset[0]).find(col => 
+        col.toLowerCase().includes('mental') || col === TARGET_COLUMN
+    );
+    
+    if (targetCol && dataset.some(row => row[targetCol])) {
         const groups = {};
         dataset.forEach(row => {
-            const group = row[TARGET_COLUMN];
-            if (!groups[group]) groups[group] = [];
-            groups[group].push(row);
+            const group = row[targetCol];
+            if (group) {
+                if (!groups[group]) groups[group] = [];
+                groups[group].push(row);
+            }
         });
         
         results.targetAnalysis = {
+            targetColumn: targetCol,
             groups: Object.keys(groups),
             counts: Object.fromEntries(
                 Object.entries(groups).map(([k, v]) => [k, v.length])
