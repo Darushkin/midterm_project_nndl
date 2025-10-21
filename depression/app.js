@@ -95,8 +95,7 @@ function displayOverview() {
     Object.keys(dataset[0]).forEach(col => {
         previewHTML += `<th>${col}</th>`;
     });
-    previewHTML += '</tr></thead><tbody>';
-    
+    previewHTML += '</tr></thead><tbody>';    
     // Table rows
     dataset.slice(0, 5).forEach(row => {
         previewHTML += '<tr>';
@@ -105,8 +104,7 @@ function displayOverview() {
         });
         previewHTML += '</tr>';
     });
-    previewHTML += '</tbody></table>';
-    
+    previewHTML += '</tbody></table>';    
     overviewDiv.innerHTML = previewHTML;
 }
 
@@ -130,8 +128,7 @@ function runEDA() {
 function analyzeMissingValues() {
     const missingDiv = document.getElementById('missingValues');
     const columns = Object.keys(dataset[0]);
-    const missingData = {};
-    
+    const missingData = {};    
     columns.forEach(col => {
         const missingCount = dataset.filter(row => !row[col] || row[col].trim() === '').length;
         missingData[col] = (missingCount / dataset.length * 100).toFixed(2);
@@ -386,30 +383,103 @@ function createBarChart(canvasId, title, labels, data, yLabel) {
     });
 }
 
-// Export results as JSON
+// Export results as JSON - FIXED VERSION
 function exportResults() {
     if (!dataset) {
         alert('No data to export.');
         return;
     }
     
+    // Calculate comprehensive statistics for export
     const results = {
         overview: {
             rows: dataset.length,
             columns: Object.keys(dataset[0]).length,
-            columnNames: Object.keys(dataset[0])
+            columnNames: Object.keys(dataset[0]),
+            timestamp: new Date().toISOString()
         },
-        generated: new Date().toISOString()
+        missingValues: {},
+        statistics: {
+            numeric: {},
+            categorical: {}
+        },
+        targetAnalysis: {}
     };
     
+    // Missing values
+    Object.keys(dataset[0]).forEach(col => {
+        const missingCount = dataset.filter(row => !row[col] || row[col].trim() === '').length;
+        results.missingValues[col] = {
+            missingCount: missingCount,
+            missingPercentage: (missingCount / dataset.length * 100).toFixed(2)
+        };
+    });
+    
+    // Numeric statistics
+    NUMERIC_FEATURES.forEach(feature => {
+        const values = dataset.map(row => parseFloat(row[feature])).filter(v => !isNaN(v));
+        if (values.length > 0) {
+            const mean = values.reduce((a, b) => a + b, 0) / values.length;
+            const sorted = values.slice().sort((a, b) => a - b);
+            const median = sorted[Math.floor(sorted.length / 2)];
+            const std = Math.sqrt(values.reduce((sq, n) => sq + Math.pow(n - mean, 2), 0) / values.length);
+            
+            results.statistics.numeric[feature] = {
+                mean: mean.toFixed(2),
+                median: median.toFixed(2),
+                std: std.toFixed(2),
+                min: Math.min(...values).toFixed(2),
+                max: Math.max(...values).toFixed(2)
+            };
+        }
+    });
+    
+    // Categorical counts
+    CATEGORICAL_FEATURES.forEach(feature => {
+        const counts = {};
+        dataset.forEach(row => {
+            const val = row[feature];
+            counts[val] = (counts[val] || 0) + 1;
+        });
+        results.statistics.categorical[feature] = counts;
+    });
+    
+    // Target variable analysis
+    if (dataset.some(row => row[TARGET_COLUMN])) {
+        const groups = {};
+        dataset.forEach(row => {
+            const group = row[TARGET_COLUMN];
+            if (!groups[group]) groups[group] = [];
+            groups[group].push(row);
+        });
+        
+        results.targetAnalysis = {
+            groups: Object.keys(groups),
+            counts: Object.fromEntries(
+                Object.entries(groups).map(([k, v]) => [k, v.length])
+            ),
+            percentages: Object.fromEntries(
+                Object.entries(groups).map(([k, v]) => [
+                    k, 
+                    (v.length / dataset.length * 100).toFixed(1) + '%'
+                ])
+            )
+        };
+    }
+    
+    // Create and trigger download
     const dataStr = JSON.stringify(results, null, 2);
     const dataBlob = new Blob([dataStr], {type: 'application/json'});
     
+    // Create download link and trigger click
     const url = URL.createObjectURL(dataBlob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = 'eda_results.json';
+    link.download = `eda_results_${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(link); // Required for Firefox
     link.click();
-    
+    document.body.removeChild(link);
     URL.revokeObjectURL(url);
+    
+    alert('Results exported successfully!');
 }
