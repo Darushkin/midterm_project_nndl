@@ -132,7 +132,7 @@ function parseCSVLine(line) {
     return result;
 }
 
-// Display data overview - FIXED: Scrollable table
+// Display data overview - FIXED: Scrollable table with proper width
 function displayOverview() {
     const overviewDiv = document.getElementById('overview');
     const shape = `${dataset.length} rows × ${Object.keys(dataset[0]).length} columns`;
@@ -140,6 +140,7 @@ function displayOverview() {
     let previewHTML = `<p><strong>Dataset Shape:</strong> ${shape}</p>`;
     previewHTML += `<p><strong>Columns:</strong> ${Object.keys(dataset[0]).join(', ')}</p>`;
     previewHTML += '<h4>First 5 Rows:</h4>';
+    previewHTML += '<div class="table-wrapper">'; // Added table wrapper for horizontal scroll
     previewHTML += '<div class="scrollable-table">';
     previewHTML += '<table><thead><tr>';
     
@@ -152,11 +153,13 @@ function displayOverview() {
     dataset.slice(0, 5).forEach(row => {
         previewHTML += '<tr>';
         Object.values(row).forEach(val => {
-            previewHTML += `<td>${val}</td>`;
+            // Truncate long values for better display
+            const displayVal = val && val.length > 50 ? val.substring(0, 47) + '...' : val;
+            previewHTML += `<td title="${val}">${displayVal}</td>`;
         });
         previewHTML += '</tr>';
     });
-    previewHTML += '</tbody></table></div>';    
+    previewHTML += '</tbody></table></div></div>';    
     overviewDiv.innerHTML = previewHTML;
 }
 
@@ -176,13 +179,14 @@ function runEDA() {
     charts = {};
 
     // Clear previous visualizations
-    document.getElementById('visualizations').innerHTML = '';
+    const vizDiv = document.getElementById('visualizations');
+    vizDiv.innerHTML = '<div class="chart-container"><canvas id="missingChart"></canvas></div>';
 
     analyzeMissingValues();
     generateStatsSummary();
     createVisualizations();
     
-    alert('EDA analysis completed!');
+    alert('EDA analysis completed! Check the Visualizations section.');
 }
 
 // Analyze and display missing values
@@ -204,11 +208,12 @@ function analyzeMissingValues() {
     
     // Create missing values chart
     createBarChart('missingChart', 'Missing Values by Column', 
-                 Object.keys(missingData), Object.values(missingData), 
+                 Object.keys(missingData), 
+                 Object.values(missingData).map(val => parseFloat(val)), 
                  'Percentage Missing');
 }
 
-// Generate statistical summary - FIXED: Tables for stats
+// Generate statistical summary
 function generateStatsSummary() {
     const statsDiv = document.getElementById('statsSummary');
     let statsHTML = '<div class="stats-section">';
@@ -252,7 +257,7 @@ function generateStatsSummary() {
         const counts = {};
         dataset.forEach(row => {
             const val = row[feature];
-            if (val) {
+            if (val && val.trim() !== '') {
                 counts[val] = (counts[val] || 0) + 1;
             }
         });
@@ -282,7 +287,7 @@ function generateStatsSummary() {
         const groups = {};
         dataset.forEach(row => {
             const group = row[targetCol];
-            if (group) {
+            if (group && group.trim() !== '') {
                 if (!groups[group]) groups[group] = [];
                 groups[group].push(row);
             }
@@ -301,119 +306,21 @@ function generateStatsSummary() {
 
 // Create all visualizations - FIXED: Proper chart creation
 function createVisualizations() {
-    createCorrelationHeatmap();
+    console.log('Creating visualizations...');
     
     // Create categorical feature charts
     CATEGORICAL_FEATURES.forEach(feature => {
+        console.log(`Creating chart for: ${feature}`);
         createCategoricalChart(feature);
     });
     
     // Create numeric feature histograms
     NUMERIC_FEATURES.forEach(feature => {
+        console.log(`Creating histogram for: ${feature}`);
         createHistogram(feature);
     });
-}
-
-// Create correlation heatmap
-function createCorrelationHeatmap() {
-    const numericData = {};
-    NUMERIC_FEATURES.forEach(feature => {
-        numericData[feature] = dataset.map(row => {
-            const val = row[feature];
-            return val ? parseFloat(val) : NaN;
-        }).filter(v => !isNaN(v));
-    });
     
-    const features = Object.keys(numericData);
-    const correlations = [];
-    
-    for (let i = 0; i < features.length; i++) {
-        correlations[i] = [];
-        for (let j = 0; j < features.length; j++) {
-            if (i === j) {
-                correlations[i][j] = 1;
-            } else {
-                const corr = calculateCorrelation(
-                    numericData[features[i]], 
-                    numericData[features[j]]
-                );
-                correlations[i][j] = isNaN(corr) ? 0 : parseFloat(corr.toFixed(2));
-            }
-        }
-    }
-    
-    // Create heatmap data
-    const heatmapData = {
-        labels: features,
-        datasets: []
-    };
-    
-    for (let i = 0; i < features.length; i++) {
-        heatmapData.datasets.push({
-            label: features[i],
-            data: correlations[i],
-            backgroundColor: correlations[i].map(value => {
-                // Color scale from red (negative) to green (positive)
-                const colorValue = Math.max(0, Math.min(1, (value + 1) / 2));
-                return `rgba(${255 * (1 - colorValue)}, ${255 * colorValue}, 0, 0.6)`;
-            })
-        });
-    }
-    
-    const ctx = document.getElementById('correlationHeatmap').getContext('2d');
-    charts.correlationHeatmap = new Chart(ctx, {
-        type: 'bar',
-        data: {
-            labels: features,
-            datasets: [{
-                label: 'Average Correlation',
-                data: correlations.map(row => row.reduce((a, b) => a + b, 0) / row.length),
-                backgroundColor: 'rgba(75, 192, 192, 0.6)'
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                title: {
-                    display: true,
-                    text: 'Numeric Features Average Correlation'
-                },
-                legend: {
-                    display: true
-                }
-            },
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    title: {
-                        display: true,
-                        text: 'Correlation'
-                    }
-                }
-            }
-        }
-    });
-}
-
-// Calculate correlation between two arrays
-function calculateCorrelation(x, y) {
-    const n = Math.min(x.length, y.length);
-    if (n === 0) return NaN;
-    
-    const xSlice = x.slice(0, n);
-    const ySlice = y.slice(0, n);
-    
-    const sumX = xSlice.reduce((a, b) => a + b, 0);
-    const sumY = ySlice.reduce((a, b) => a + b, 0);
-    const sumXY = xSlice.reduce((sum, val, i) => sum + val * ySlice[i], 0);
-    const sumX2 = xSlice.reduce((sum, val) => sum + val * val, 0);
-    const sumY2 = ySlice.reduce((sum, val) => sum + val * val, 0);
-    
-    const numerator = n * sumXY - sumX * sumY;
-    const denominator = Math.sqrt((n * sumX2 - sumX * sumX) * (n * sumY2 - sumY * sumY));
-    
-    return denominator === 0 ? NaN : numerator / denominator;
+    console.log('All visualizations created');
 }
 
 // Create chart for categorical feature - FIXED: Proper chart creation
@@ -426,7 +333,8 @@ function createCategoricalChart(feature) {
         }
     });
     
-    if (Object.keys(counts).length === 0) {
+    const categories = Object.keys(counts);
+    if (categories.length === 0) {
         console.log(`No data for feature: ${feature}`);
         return;
     }
@@ -442,55 +350,64 @@ function createCategoricalChart(feature) {
     
     const ctx = document.getElementById(chartId).getContext('2d');
     
-    // Generate random colors for each category
-    const backgroundColors = Object.keys(counts).map(() => 
-        `rgba(${Math.floor(Math.random() * 255)}, ${Math.floor(Math.random() * 255)}, ${Math.floor(Math.random() * 255)}, 0.6)`
+    // Generate colors for each category
+    const backgroundColors = categories.map(() => 
+        `hsl(${Math.random() * 360}, 70%, 60%)`
     );
     
-    charts[chartId] = new Chart(ctx, {
-        type: 'bar',
-        data: {
-            labels: Object.keys(counts),
-            datasets: [{
-                label: `Count by ${feature}`,
-                data: Object.values(counts),
-                backgroundColor: backgroundColors,
-                borderColor: backgroundColors.map(color => color.replace('0.6', '1')),
-                borderWidth: 1
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                title: {
-                    display: true,
-                    text: `Distribution: ${feature}`,
-                    font: {
-                        size: 14
-                    }
-                },
-                legend: {
-                    display: false
-                }
+    try {
+        charts[chartId] = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: categories,
+                datasets: [{
+                    label: `Count by ${feature}`,
+                    data: Object.values(counts),
+                    backgroundColor: backgroundColors,
+                    borderColor: backgroundColors.map(color => color.replace('60%)', '40%)')),
+                    borderWidth: 2
+                }]
             },
-            scales: {
-                y: {
-                    beginAtZero: true,
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
                     title: {
                         display: true,
-                        text: 'Count'
+                        text: `Distribution: ${feature}`,
+                        font: {
+                            size: 16
+                        }
+                    },
+                    legend: {
+                        display: false
                     }
                 },
-                x: {
-                    title: {
-                        display: true,
-                        text: feature
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: 'Count'
+                        }
+                    },
+                    x: {
+                        title: {
+                            display: true,
+                            text: feature
+                        },
+                        ticks: {
+                            maxRotation: 45,
+                            minRotation: 45
+                        }
                     }
                 }
             }
-        }
-    });
+        });
+        console.log(`Chart created successfully for: ${feature}`);
+    } catch (error) {
+        console.error(`Error creating chart for ${feature}:`, error);
+    }
 }
 
 // Create histogram for numeric feature - FIXED: Proper histogram creation
@@ -533,91 +450,108 @@ function createHistogram(feature) {
     vizDiv.appendChild(chartContainer);
     
     const ctx = document.getElementById(chartId).getContext('2d');
-    charts[chartId] = new Chart(ctx, {
-        type: 'bar',
-        data: {
-            labels: labels,
-            datasets: [{
-                label: `Frequency of ${feature}`,
-                data: bins,
-                backgroundColor: 'rgba(255, 99, 132, 0.6)',
-                borderColor: 'rgba(255, 99, 132, 1)',
-                borderWidth: 1
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                title: {
-                    display: true,
-                    text: `Histogram: ${feature}`,
-                    font: {
-                        size: 14
-                    }
-                }
+    
+    try {
+        charts[chartId] = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: `Frequency of ${feature}`,
+                    data: bins,
+                    backgroundColor: 'rgba(54, 162, 235, 0.6)',
+                    borderColor: 'rgba(54, 162, 235, 1)',
+                    borderWidth: 1
+                }]
             },
-            scales: {
-                y: {
-                    beginAtZero: true,
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
                     title: {
                         display: true,
-                        text: 'Frequency'
+                        text: `Histogram: ${feature}`,
+                        font: {
+                            size: 16
+                        }
                     }
                 },
-                x: {
-                    title: {
-                        display: true,
-                        text: feature
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: 'Frequency'
+                        }
+                    },
+                    x: {
+                        title: {
+                            display: true,
+                            text: `${feature} Ranges`
+                        },
+                        ticks: {
+                            maxRotation: 45,
+                            minRotation: 45
+                        }
                     }
                 }
             }
-        }
-    });
+        });
+        console.log(`Histogram created successfully for: ${feature}`);
+    } catch (error) {
+        console.error(`Error creating histogram for ${feature}:`, error);
+    }
 }
 
 // Create generic bar chart
 function createBarChart(canvasId, title, labels, data, yLabel) {
     const ctx = document.getElementById(canvasId).getContext('2d');
     
-    // Generate colors based on values
-    const backgroundColors = data.map(value => {
-        const intensity = Math.min(1, value / 100);
-        return `rgba(153, 102, 255, ${0.3 + intensity * 0.7})`;
-    });
-    
-    charts[canvasId] = new Chart(ctx, {
-        type: 'bar',
-        data: {
-            labels: labels,
-            datasets: [{
-                label: yLabel,
-                data: data,
-                backgroundColor: backgroundColors,
-                borderColor: 'rgba(153, 102, 255, 1)',
-                borderWidth: 1
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                title: {
-                    display: true,
-                    text: title
-                }
+    try {
+        charts[canvasId] = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: yLabel,
+                    data: data,
+                    backgroundColor: 'rgba(75, 192, 192, 0.6)',
+                    borderColor: 'rgba(75, 192, 192, 1)',
+                    borderWidth: 1
+                }]
             },
-            scales: {
-                y: {
-                    beginAtZero: true,
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
                     title: {
                         display: true,
-                        text: yLabel
+                        text: title,
+                        font: {
+                            size: 16
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: yLabel
+                        }
+                    },
+                    x: {
+                        ticks: {
+                            maxRotation: 45,
+                            minRotation: 45
+                        }
                     }
                 }
             }
-        }
-    });
+        });
+    } catch (error) {
+        console.error(`Error creating bar chart ${canvasId}:`, error);
+    }
 }
 
 // Export results as JSON
