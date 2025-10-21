@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mental Illness Prediction Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.10.0/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.plot.ly/plotly-2.24.1.min.js"></script>
+    <style>
+        .section {
+            margin-bottom: 2rem;
+            padding: 1.5rem;
+            border-radius: 0.5rem;
+            background-color: white;
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+        }
+        
+        .chart-container {
+            position: relative;
+            height: 300px;
+            width: 100%;
+        }
+        
+        .loading {
+            display: none;
+        }
+        
+        .loading.active {
+            display: flex;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 p-4">
+    <div class="max-w-7xl mx-auto">
+        <header class="text-center mb-8">
+            <h1 class="text-3xl font-bold text-gray-800">Mental Illness Prediction Dashboard</h1>
+            <p class="text-gray-600">Explore depression data and predict mental illness using neural networks</p>
+        </header>
+
+        <!-- Data Load Section -->
+        <div class="section">
+            <h2 class="text-xl font-semibold mb-4">📂 Data Load</h2>
+            <div class="mb-4">
+                <input type="file" id="csvFile" accept=".csv" class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+            </div>
+            <div class="loading" id="fileLoading">
+                <div class="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-current border-r-transparent align-[-0.125em] motion-reduce:animate-[spin_1.5s_linear_infinite]" role="status"></div>
+                <span class="ml-2">Loading data...</span>
+            </div>
+            <div id="dataPreview" class="overflow-x-auto"></div>
+            <div id="datasetInfo" class="mt-4"></div>
+        </div>
+
+        <!-- Preprocessing Section -->
+        <div class="section">
+            <h2 class="text-xl font-semibold mb-4">🔍 Preprocessing</h2>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Missing Values</label>
+                    <select id="missingValues" class="w-full p-2 border border-gray-300 rounded-md">
+                        <option value="drop">Drop rows with missing values</option>
+                        <option value="impute">Impute with mode/mean</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Normalization</label>
+                    <select id="normalization" class="w-full p-2 border border-gray-300 rounded-md">
+                        <option value="minmax">Min-Max Scaling</option>
+                        <option value="standard">Standard Scaling</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Test Split</label>
+                    <input type="range" id="testSplit" min="0.1" max="0.5" step="0.05" value="0.2" class="w-full">
+                    <span id="testSplitValue">20%</span>
+                </div>
+            </div>
+            <button id="preprocessBtn" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
+                Preprocess Data
+            </button>
+            <div id="preprocessingInfo" class="mt-4"></div>
+        </div>
+
+        <!-- EDA Section -->
+        <div class="section">
+            <h2 class="text-xl font-semibold mb-4">📊 Exploratory Data Analysis</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <h3 class="font-medium mb-2">Target Distribution</h3>
+                    <div class="chart-container">
+                        <canvas id="targetDistribution"></canvas>
+                    </div>
+                </div>
+                <div>
+                    <h3 class="font-medium mb-2">Age Distribution</h3>
+                    <div class="chart-container">
+                        <canvas id="ageDistribution"></canvas>
+                    </div>
+                </div>
+                <div class="md:col-span-2">
+                    <h3 class="font-medium mb-2">Correlation Matrix</h3>
+                    <div class="chart-container">
+                        <div id="correlationMatrix"></div>
+                    </div>
+                </div>
+                <div class="md:col-span-2">
+                    <h3 class="font-medium mb-2">Feature Importance</h3>
+                    <div class="chart-container">
+                        <canvas id="featureImportance"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Model Section -->
+        <div class="section">
+            <h2 class="text-xl font-semibold mb-4">🧠 Neural Network Model</h2>
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Hidden Layer 1</label>
+                    <input type="number" id="hidden1" value="64" min="8" max="256" class="w-full p-2 border border-gray-300 rounded-md">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Hidden Layer 2</label>
+                    <input type="number" id="hidden2" value="32" min="4" max="128" class="w-full p-2 border border-gray-300 rounded-md">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Learning Rate</label>
+                    <input type="number" id="learningRate" value="0.001" step="0.0001" min="0.0001" max="0.1" class="w-full p-2 border border-gray-300 rounded-md">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Epochs</label>
+                    <input type="number" id="epochs" value="100" min="10" max="500" class="w-full p-2 border border-gray-300 rounded-md">
+                </div>
+            </div>
+            <button id="trainBtn" class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded">
+                Train Model
+            </button>
+            <div class="loading" id="trainingLoading">
+                <div class="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-current border-r-transparent align-[-0.125em] motion-reduce:animate-[spin_1.5s_linear_infinite]" role="status"></div>
+                <span class="ml-2">Training model...</span>
+            </div>
+            <div class="mt-4">
+                <h3 class="font-medium mb-2">Training Progress</h3>
+                <div class="chart-container">
+                    <canvas id="trainingProgress"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Metrics Section -->
+        <div class="section">
+            <h2 class="text-xl font-semibold mb-4">📈 Model Metrics</h2>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                <div class="bg-blue-50 p-4 rounded-lg text-center">
+                    <div class="text-2xl font-bold" id="accuracy">-</div>
+                    <div class="text-sm text-gray-600">Accuracy</div>
+                </div>
+                <div class="bg-green-50 p-4 rounded-lg text-center">
+                    <div class="text-2xl font-bold" id="precision">-</div>
+                    <div class="text-sm text-gray-600">Precision</div>
+                </div>
+                <div class="bg-yellow-50 p-4 rounded-lg text-center">
+                    <div class="text-2xl font-bold" id="recall">-</div>
+                    <div class="text-sm text-gray-600">Recall</div>
+                </div>
+                <div class="bg-purple-50 p-4 rounded-lg text-center">
+                    <div class="text-2xl font-bold" id="f1">-</div>
+                    <div class="text-sm text-gray-600">F1-Score</div>
+                </div>
+            </div>
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Classification Threshold</label>
+                <input type="range" id="threshold" min="0" max="1" step="0.01" value="0.5" class="w-full">
+                <span id="thresholdValue">0.50</span>
+            </div>
+            <div class="chart-container">
+                <div id="rocCurve"></div>
+            </div>
+        </div>
+
+        <!-- Prediction Section -->
+        <div class="section">
+            <h2 class="text-xl font-semibold mb-4">🔮 Prediction</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                    <h3 class="font-medium mb-2">Input Features</h3>
+                    <div class="space-y-4" id="predictionInputs">
+                        <!-- Input fields will be generated dynamically -->
+                    </div>
+                    <button id="predictBtn" class="mt-4 bg-purple-500 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded">
+                        Predict
+                    </button>
+                </div>
+                <div>
+                    <h3 class="font-medium mb-2">Prediction Result</h3>
+                    <div id="predictionResult" class="p-4 bg-gray-100 rounded-lg min-h-[200px]">
+                        <p class="text-gray-500">Enter values and click "Predict" to see results</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Export Section -->
+        <div class="section">
+            <h2 class="text-xl font-semibold mb-4">💾 Export</h2>
+            <div class="flex space-x-4">
+                <button id="exportModel" class="bg-indigo-500 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded">
+                    Export Model
+                </button>
+                <button id="exportData" class="bg-indigo-500 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded">
+                    Export Preprocessed Data
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
