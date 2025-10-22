@@ -660,13 +660,69 @@
             background: white;
             border-radius: 5px;
         }
+        
+        /* Styles for hyperparameter optimization */
+        .hyperparam-section {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 5px;
+            padding: 15px;
+            margin-top: 15px;
+        }
+        
+        .param-control {
+            margin: 10px 0;
+        }
+        
+        .param-slider {
+            width: 100%;
+            margin: 5px 0;
+        }
+        
+        .param-value {
+            font-weight: bold;
+            color: #3498db;
+        }
+        
+        .optimization-results {
+            margin-top: 15px;
+        }
+        
+        .best-params {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            border-radius: 5px;
+            padding: 10px;
+            margin: 10px 0;
+        }
+        
+        .cv-results {
+            max-height: 300px;
+            overflow-y: auto;
+            margin-top: 10px;
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background: #e9ecef;
+            border-radius: 10px;
+            margin: 10px 0;
+            overflow: hidden;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #3498db, #2ecc71);
+            transition: width 0.3s ease;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <header>
             <h1>Machine Failure Prediction System</h1>
-            <p class="subtitle">Complete ML Pipeline with SMOTE for Class Imbalance</p>
+            <p class="subtitle">Complete ML Pipeline with Hyperparameter Optimization</p>
         </header>
         
         <div class="ml-pipeline">
@@ -1010,12 +1066,12 @@
         </div>
         
         <footer>
-            <p>Machine Failure Prediction System &copy; 2023 | Complete ML Pipeline with SMOTE</p>
+            <p>Machine Failure Prediction System &copy; 2023 | Complete ML Pipeline with Hyperparameter Optimization</p>
         </footer>
     </div>
 
     <script>
-        // Enhanced ML Pipeline with SMOTE for Class Imbalance
+        // Enhanced ML Pipeline with Hyperparameter Optimization
         class MLPipeline {
             constructor() {
                 this.csvParser = new FlexibleCSVParser();
@@ -1052,7 +1108,8 @@
                 this.missingValues = {};
                 this.hasMissingValues = false;
                 this.predictionThreshold = 0.5;
-                this.samplingMethod = 'smote'; // По умолчанию используем SMOTE
+                this.samplingMethod = 'smote';
+                this.bestHyperparams = null;
             }
             
             loadData(csvText) {
@@ -1669,14 +1726,113 @@
                 this.samplingMethod = method;
             }
             
-            trainModel() {
-                // Балансируем данные перед обучением
-                const balanceInfo = this.balanceTrainingData(this.samplingMethod);
-                console.log("Balance info:", balanceInfo);
+            // Новый метод для оптимизации гиперпараметров
+            optimizeHyperparameters() {
+                const paramGrid = {
+                    hiddenSize: [4, 8, 16, 32],
+                    learningRate: [0.001, 0.01, 0.1],
+                    epochs: [50, 100, 200],
+                    batchSize: [32, 64, 128]
+                };
                 
-                // Simple neural network implementation
-                const inputSize = this.processedData.X_train_processed[0].length;
-                const hiddenSize = 8;
+                let bestScore = -1;
+                let bestParams = null;
+                const results = [];
+                
+                // Простой поиск по сетке с кросс-валидацией
+                for (const hiddenSize of paramGrid.hiddenSize) {
+                    for (const learningRate of paramGrid.learningRate) {
+                        for (const epochs of paramGrid.epochs) {
+                            for (const batchSize of paramGrid.batchSize) {
+                                // 3-fold кросс-валидация
+                                const cvScores = [];
+                                
+                                for (let fold = 0; fold < 3; fold++) {
+                                    const score = this.crossValidate(
+                                        hiddenSize, learningRate, epochs, batchSize, fold
+                                    );
+                                    cvScores.push(score);
+                                }
+                                
+                                const avgScore = cvScores.reduce((a, b) => a + b, 0) / cvScores.length;
+                                
+                                results.push({
+                                    hiddenSize,
+                                    learningRate,
+                                    epochs,
+                                    batchSize,
+                                    score: avgScore,
+                                    cvScores
+                                });
+                                
+                                if (avgScore > bestScore) {
+                                    bestScore = avgScore;
+                                    bestParams = {
+                                        hiddenSize,
+                                        learningRate,
+                                        epochs,
+                                        batchSize,
+                                        score: avgScore
+                                    };
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                this.bestHyperparams = bestParams;
+                return {
+                    bestParams,
+                    allResults: results
+                };
+            }
+            
+            // Кросс-валидация для одного набора параметров
+            crossValidate(hiddenSize, learningRate, epochs, batchSize, fold) {
+                // Разделяем данные на train/validation
+                const splitIndex = Math.floor(this.X_train_balanced.length * 0.8);
+                let X_train_fold, X_val_fold, y_train_fold, y_val_fold;
+                
+                if (fold === 0) {
+                    X_train_fold = this.X_train_balanced.slice(splitIndex);
+                    X_val_fold = this.X_train_balanced.slice(0, splitIndex);
+                    y_train_fold = this.y_train_balanced.slice(splitIndex);
+                    y_val_fold = this.y_train_balanced.slice(0, splitIndex);
+                } else if (fold === 1) {
+                    const firstPart = Math.floor(this.X_train_balanced.length * 0.4);
+                    const secondPart = Math.floor(this.X_train_balanced.length * 0.8);
+                    X_train_fold = [
+                        ...this.X_train_balanced.slice(0, firstPart),
+                        ...this.X_train_balanced.slice(secondPart)
+                    ];
+                    X_val_fold = this.X_train_balanced.slice(firstPart, secondPart);
+                    y_train_fold = [
+                        ...this.y_train_balanced.slice(0, firstPart),
+                        ...this.y_train_balanced.slice(secondPart)
+                    ];
+                    y_val_fold = this.y_train_balanced.slice(firstPart, secondPart);
+                } else {
+                    X_train_fold = this.X_train_balanced.slice(0, splitIndex);
+                    X_val_fold = this.X_train_balanced.slice(splitIndex);
+                    y_train_fold = this.y_train_balanced.slice(0, splitIndex);
+                    y_val_fold = this.y_train_balanced.slice(splitIndex);
+                }
+                
+                // Обучаем модель с текущими параметрами
+                const model = this.trainModelWithParams(
+                    X_train_fold, y_train_fold, hiddenSize, learningRate, epochs, batchSize
+                );
+                
+                // Оцениваем на validation set
+                const metrics = this.evaluateModelOnData(model, X_val_fold, y_val_fold);
+                
+                // Используем F1-score как метрику для оптимизации
+                return metrics.f1;
+            }
+            
+            // Обучение модели с конкретными параметрами
+            trainModelWithParams(X_train, y_train, hiddenSize, learningRate, epochs, batchSize) {
+                const inputSize = X_train[0].length;
                 const outputSize = 1;
                 
                 // Initialize weights
@@ -1690,81 +1846,98 @@
                 const biases1 = Array(hiddenSize).fill(0);
                 const biases2 = Array(outputSize).fill(0);
                 
-                // Training parameters
-                const learningRate = 0.01;
-                const epochs = 100;
-                
-                // Training loop - используем сбалансированные данные
-                const trainingData = this.X_train_balanced;
-                const trainingLabels = this.y_train_balanced;
-                
+                // Training with mini-batches
                 for (let epoch = 0; epoch < epochs; epoch++) {
-                    let totalLoss = 0;
+                    // Shuffle data
+                    const shuffledIndices = [...Array(X_train.length).keys()].sort(() => Math.random() - 0.5);
                     
-                    for (let i = 0; i < trainingData.length; i++) {
-                        const input = trainingData[i];
-                        const target = trainingLabels[i];
+                    for (let i = 0; i < X_train.length; i += batchSize) {
+                        const batchIndices = shuffledIndices.slice(i, i + batchSize);
                         
-                        // Forward pass
-                        const hidden = Array(hiddenSize).fill(0);
-                        for (let j = 0; j < hiddenSize; j++) {
-                            let sum = biases1[j];
-                            for (let k = 0; k < inputSize; k++) {
-                                sum += input[k] * weights1[k][j];
+                        // Batch gradients
+                        let batchWeights1Grad = Array(inputSize).fill().map(() => Array(hiddenSize).fill(0));
+                        let batchWeights2Grad = Array(hiddenSize).fill().map(() => Array(outputSize).fill(0));
+                        let batchBiases1Grad = Array(hiddenSize).fill(0);
+                        let batchBiases2Grad = Array(outputSize).fill(0);
+                        
+                        for (const idx of batchIndices) {
+                            const input = X_train[idx];
+                            const target = y_train[idx];
+                            
+                            // Forward pass
+                            const hidden = Array(hiddenSize).fill(0);
+                            for (let j = 0; j < hiddenSize; j++) {
+                                let sum = biases1[j];
+                                for (let k = 0; k < inputSize; k++) {
+                                    sum += input[k] * weights1[k][j];
+                                }
+                                hidden[j] = Math.max(0, sum); // ReLU
                             }
-                            hidden[j] = Math.max(0, sum); // ReLU activation
+                            
+                            const output = Array(outputSize).fill(0);
+                            for (let j = 0; j < outputSize; j++) {
+                                let sum = biases2[j];
+                                for (let k = 0; k < hiddenSize; k++) {
+                                    sum += hidden[k] * weights2[k][j];
+                                }
+                                output[j] = 1 / (1 + Math.exp(-sum)); // Sigmoid
+                            }
+                            
+                            // Backward pass
+                            const outputError = output[0] - target;
+                            
+                            // Accumulate gradients
+                            for (let j = 0; j < hiddenSize; j++) {
+                                for (let k = 0; k < outputSize; k++) {
+                                    batchWeights2Grad[j][k] += outputError * hidden[j];
+                                }
+                            }
+                            for (let j = 0; j < outputSize; j++) {
+                                batchBiases2Grad[j] += outputError;
+                            }
+                            
+                            // Hidden layer errors
+                            const hiddenErrors = Array(hiddenSize).fill(0);
+                            for (let j = 0; j < hiddenSize; j++) {
+                                let error = 0;
+                                for (let k = 0; k < outputSize; k++) {
+                                    error += outputError * weights2[j][k];
+                                }
+                                hiddenErrors[j] = error * (hidden[j] > 0 ? 1 : 0);
+                            }
+                            
+                            for (let j = 0; j < inputSize; j++) {
+                                for (let k = 0; k < hiddenSize; k++) {
+                                    batchWeights1Grad[j][k] += hiddenErrors[k] * input[j];
+                                }
+                            }
+                            for (let j = 0; j < hiddenSize; j++) {
+                                batchBiases1Grad[j] += hiddenErrors[j];
+                            }
                         }
                         
-                        const output = Array(outputSize).fill(0);
-                        for (let j = 0; j < outputSize; j++) {
-                            let sum = biases2[j];
-                            for (let k = 0; k < hiddenSize; k++) {
-                                sum += hidden[k] * weights2[k][j];
-                            }
-                            output[j] = 1 / (1 + Math.exp(-sum)); // Sigmoid activation
-                        }
-                        
-                        // Calculate loss (binary cross-entropy)
-                        const loss = -target * Math.log(output[0]) - (1 - target) * Math.log(1 - output[0]);
-                        totalLoss += loss;
-                        
-                        // Backward pass
-                        const outputError = output[0] - target;
-                        
-                        // Update weights and biases for output layer
+                        // Update weights with average gradients
+                        const batchSizeActual = batchIndices.length;
                         for (let j = 0; j < hiddenSize; j++) {
                             for (let k = 0; k < outputSize; k++) {
-                                weights2[j][k] -= learningRate * outputError * hidden[j];
+                                weights2[j][k] -= learningRate * batchWeights2Grad[j][k] / batchSizeActual;
                             }
                         }
                         for (let j = 0; j < outputSize; j++) {
-                            biases2[j] -= learningRate * outputError;
+                            biases2[j] -= learningRate * batchBiases2Grad[j] / batchSizeActual;
                         }
-                        
-                        // Calculate hidden layer errors
-                        const hiddenErrors = Array(hiddenSize).fill(0);
-                        for (let j = 0; j < hiddenSize; j++) {
-                            let error = 0;
-                            for (let k = 0; k < outputSize; k++) {
-                                error += outputError * weights2[j][k];
-                            }
-                            hiddenErrors[j] = error * (hidden[j] > 0 ? 1 : 0); // ReLU derivative
-                        }
-                        
-                        // Update weights and biases for hidden layer
                         for (let j = 0; j < inputSize; j++) {
                             for (let k = 0; k < hiddenSize; k++) {
-                                weights1[j][k] -= learningRate * hiddenErrors[k] * input[j];
+                                weights1[j][k] -= learningRate * batchWeights1Grad[j][k] / batchSizeActual;
                             }
                         }
                         for (let j = 0; j < hiddenSize; j++) {
-                            biases1[j] -= learningRate * hiddenErrors[j];
+                            biases1[j] -= learningRate * batchBiases1Grad[j] / batchSizeActual;
                         }
                     }
                 }
                 
-                // Store the trained model
-                this.model = {
+                return {
                     weights1,
                     weights2,
                     biases1,
@@ -1773,13 +1946,122 @@
                     hiddenSize,
                     outputSize
                 };
+            }
+            
+            // Оценка модели на данных
+            evaluateModelOnData(model, X_data, y_data) {
+                const { weights1, weights2, biases1, biases2, hiddenSize, outputSize } = model;
                 
-                // Calculate feature importance (simplified)
+                let correct = 0;
+                let truePositives = 0, falsePositives = 0, trueNegatives = 0, falseNegatives = 0;
+                
+                for (let i = 0; i < X_data.length; i++) {
+                    const input = X_data[i];
+                    const target = y_data[i];
+                    
+                    // Forward pass
+                    const hidden = Array(hiddenSize).fill(0);
+                    for (let j = 0; j < hiddenSize; j++) {
+                        let sum = biases1[j];
+                        for (let k = 0; k < input.length; k++) {
+                            sum += input[k] * weights1[k][j];
+                        }
+                        hidden[j] = Math.max(0, sum);
+                    }
+                    
+                    const output = Array(outputSize).fill(0);
+                    for (let j = 0; j < outputSize; j++) {
+                        let sum = biases2[j];
+                        for (let k = 0; k < hiddenSize; k++) {
+                            sum += hidden[k] * weights2[k][j];
+                        }
+                        output[j] = 1 / (1 + Math.exp(-sum));
+                    }
+                    
+                    const prediction = output[0] > this.predictionThreshold ? 1 : 0;
+                    
+                    if (prediction === target) {
+                        correct++;
+                        if (prediction === 1) {
+                            truePositives++;
+                        } else {
+                            trueNegatives++;
+                        }
+                    } else {
+                        if (prediction === 1) {
+                            falsePositives++;
+                        } else {
+                            falseNegatives++;
+                        }
+                    }
+                }
+                
+                const accuracy = correct / X_data.length;
+                const precision = truePositives / (truePositives + falsePositives) || 0;
+                const recall = truePositives / (truePositives + falseNegatives) || 0;
+                const f1 = 2 * (precision * recall) / (precision + recall) || 0;
+                
+                return {
+                    accuracy,
+                    precision,
+                    recall,
+                    f1,
+                    confusionMatrix: [truePositives, falsePositives, falseNegatives, trueNegatives]
+                };
+            }
+            
+            trainModel(useOptimization = true) {
+                // Балансируем данные
+                const balanceInfo = this.balanceTrainingData(this.samplingMethod);
+                
+                let model;
+                let optimizationResults = null;
+                
+                if (useOptimization && this.bestHyperparams === null) {
+                    // Оптимизируем гиперпараметры
+                    optimizationResults = this.optimizeHyperparameters();
+                    const best = optimizationResults.bestParams;
+                    
+                    model = this.trainModelWithParams(
+                        this.X_train_balanced,
+                        this.y_train_balanced,
+                        best.hiddenSize,
+                        best.learningRate,
+                        best.epochs,
+                        best.batchSize
+                    );
+                } else if (useOptimization && this.bestHyperparams !== null) {
+                    // Используем ранее найденные лучшие параметры
+                    const best = this.bestHyperparams;
+                    model = this.trainModelWithParams(
+                        this.X_train_balanced,
+                        this.y_train_balanced,
+                        best.hiddenSize,
+                        best.learningRate,
+                        best.epochs,
+                        best.batchSize
+                    );
+                } else {
+                    // Обычное обучение с параметрами по умолчанию
+                    model = this.trainModelWithParams(
+                        this.X_train_balanced,
+                        this.y_train_balanced,
+                        8,  // hiddenSize
+                        0.01, // learningRate
+                        100, // epochs
+                        32   // batchSize
+                    );
+                }
+                
+                this.model = model;
+                
+                // Calculate feature importance
                 this.calculateFeatureImportance();
                 
                 return {
                     model: this.model,
-                    balanceInfo: balanceInfo
+                    balanceInfo,
+                    optimizationResults
                 };
             }
             
@@ -2055,7 +2337,7 @@
             }
         }
 
-        // Enhanced UIController with ROC-AUC and Feature Importance
+        // Enhanced UIController with Hyperparameter Optimization
         class UIController {
             constructor() {
                 this.pipeline = new MLPipeline();
@@ -2125,7 +2407,7 @@
                 });
                 
                 document.getElementById('train-btn').addEventListener('click', () => {
-                    this.trainModel();
+                    this.trainModel(true);
                 });
                 
                 document.getElementById('evaluate-btn').addEventListener('click', () => {
@@ -2164,6 +2446,19 @@
                         this.showSamplingInfo(method);
                     }
                 });
+                
+                // Добавляем обработчики для оптимизации гиперпараметров
+                document.addEventListener('click', (e) => {
+                    if (e.target.id === 'optimize-hyperparams-btn') {
+                        this.optimizeHyperparameters();
+                    }
+                    if (e.target.id === 'train-with-optimization-btn') {
+                        this.trainModel(true);
+                    }
+                    if (e.target.id === 'train-without-optimization-btn') {
+                        this.trainModel(false);
+                    }
+                });
             }
             
             // Добавляем метод для отображения информации о балансировке
@@ -2185,6 +2480,68 @@
                 }
                 
                 infoContainer.innerHTML = info;
+            }
+            
+            // Новый метод для оптимизации гиперпараметров
+            optimizeHyperparameters() {
+                this.showLoading('Optimizing hyperparameters... This may take a while.');
+                
+                setTimeout(() => {
+                    const results = this.pipeline.optimizeHyperparameters();
+                    
+                    const trainingContent = document.getElementById('training-content');
+                    trainingContent.innerHTML = `
+                        <h4>Hyperparameter Optimization Complete</h4>
+                        <div class="best-params">
+                            <h5>Best Parameters Found:</h5>
+                            <p><strong>Hidden Size:</strong> ${results.bestParams.hiddenSize}</p>
+                            <p><strong>Learning Rate:</strong> ${results.bestParams.learningRate}</p>
+                            <p><strong>Epochs:</strong> ${results.bestParams.epochs}</p>
+                            <p><strong>Batch Size:</strong> ${results.bestParams.batchSize}</p>
+                            <p><strong>Best F1-Score:</strong> ${results.bestParams.score.toFixed(3)}</p>
+                        </div>
+                        
+                        <div class="optimization-results">
+                            <h5>All Results (Top 10):</h5>
+                            <div class="cv-results">
+                                <table class="stats-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Hidden Size</th>
+                                            <th>Learning Rate</th>
+                                            <th>Epochs</th>
+                                            <th>Batch Size</th>
+                                            <th>F1-Score</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${results.allResults
+                                            .sort((a, b) => b.score - a.score)
+                                            .slice(0, 10)
+                                            .map(r => `
+                                                <tr>
+                                                    <td>${r.hiddenSize}</td>
+                                                    <td>${r.learningRate}</td>
+                                                    <td>${r.epochs}</td>
+                                                    <td>${r.batchSize}</td>
+                                                    <td>${r.score.toFixed(3)}</td>
+                                                </tr>
+                                            `).join('')}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        
+                        <button class="btn btn-success" id="train-with-optimization-btn" style="margin-top: 15px;">
+                            Train Model with Best Parameters
+                        </button>
+                        <button class="btn btn-warning" id="train-without-optimization-btn" style="margin-top: 15px; margin-left: 10px;">
+                            Train with Default Parameters
+                        </button>
+                    `;
+                    
+                    this.hideLoading();
+                }, 100);
             }
             
             handleFileUpload(file) {
@@ -2736,6 +3093,27 @@
                     </div>
                 `;
                 
+                // Секция оптимизации гиперпараметров
+                html += `
+                    <div class="hyperparam-section">
+                        <h4>Hyperparameter Optimization</h4>
+                        <p>Optimize model parameters for better performance:</p>
+                        <button class="btn btn-success" id="optimize-hyperparams-btn">
+                            Optimize Hyperparameters
+                        </button>
+                        <div class="optimization-info" style="margin-top: 10px;">
+                            <p><strong>Note:</strong> This will test different combinations of:</p>
+                            <ul>
+                                <li>Hidden layer size (4, 8, 16, 32 neurons)</li>
+                                <li>Learning rate (0.001, 0.01, 0.1)</li>
+                                <li>Training epochs (50, 100, 200)</li>
+                                <li>Batch size (32, 64, 128)</li>
+                            </ul>
+                            <p>Uses 3-fold cross-validation to find the best combination.</p>
+                        </div>
+                    </div>
+                `;
+                
                 preprocessingContent.innerHTML = html;
                 
                 // Инициализируем информацию о балансировке
@@ -2779,18 +3157,20 @@
                 document.getElementById('preprocessed-preview').style.display = 'block';
             }
             
-            trainModel() {
-                this.showLoading('Training neural network model...');
+            trainModel(useOptimization = true) {
+                this.showLoading(useOptimization ? 
+                    'Training model with optimized hyperparameters...' : 
+                    'Training model with default parameters...');
                 
                 // Switch to training tab
                 this.switchTab('training');
                 
                 setTimeout(() => {
-                    const result = this.pipeline.trainModel();
+                    const result = this.pipeline.trainModel(useOptimization);
                     const balanceInfo = result.balanceInfo;
+                    const optimizationResults = result.optimizationResults;
                     
-                    const trainingContent = document.getElementById('training-content');
-                    trainingContent.innerHTML = `
+                    let trainingContentHTML = `
                         <h4>Model Training Complete</h4>
                         <p>The neural network has been successfully trained with the following architecture:</p>
                         <ul>
@@ -2798,8 +3178,21 @@
                             <li>Hidden Layer: ${result.model.hiddenSize} neurons (ReLU activation)</li>
                             <li>Output Layer: ${result.model.outputSize} neuron (Sigmoid activation)</li>
                         </ul>
-                        <p>Training completed with 100 epochs using binary cross-entropy loss.</p>
-                        
+                    `;
+                    
+                    if (useOptimization && this.pipeline.bestHyperparams) {
+                        trainingContentHTML += `
+                            <div class="best-params">
+                                <h5>Hyperparameters Used:</h5>
+                                <p><strong>Hidden Size:</strong> ${this.pipeline.bestHyperparams.hiddenSize}</p>
+                                <p><strong>Learning Rate:</strong> ${this.pipeline.bestHyperparams.learningRate}</p>
+                                <p><strong>Epochs:</strong> ${this.pipeline.bestHyperparams.epochs}</p>
+                                <p><strong>Batch Size:</strong> ${this.pipeline.bestHyperparams.batchSize}</p>
+                            </div>
+                        `;
+                    }
+                    
+                    trainingContentHTML += `
                         <div class="sampling-info">
                             <h5>Data Balancing Information</h5>
                             <p><strong>Method:</strong> ${balanceInfo.method.toUpperCase()}</p>
@@ -2808,14 +3201,10 @@
                             ${balanceInfo.minorityCount !== undefined ? 
                                 `<p><strong>Minority class samples:</strong> ${balanceInfo.minorityCount} → ${balanceInfo.minorityCount + (balanceInfo.samplesGenerated || balanceInfo.samplesAdded || 0)}</p>` : 
                                 ''}
-                            ${balanceInfo.samplesGenerated !== undefined ? 
-                                `<p><strong>Synthetic samples generated:</strong> ${balanceInfo.samplesGenerated}</p>` : 
-                                ''}
-                            ${balanceInfo.samplesAdded !== undefined ? 
-                                `<p><strong>Samples added:</strong> ${balanceInfo.samplesAdded}</p>` : 
-                                ''}
                         </div>
                     `;
+                    
+                    document.getElementById('training-content').innerHTML = trainingContentHTML;
                     
                     // Update step 5 status
                     this.updateStepStatus(5, 'complete');
