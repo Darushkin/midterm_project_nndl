@@ -1,0 +1,2660 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Depression Risk Prediction</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.18.0/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.1/dist/chart.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/papaparse@5.3.2/papaparse.min.js"></script>
+    <style>
+        :root {
+            --primary-color: #3498db;
+            --secondary-color: #2c3e50;
+            --success-color: #2ecc71;
+            --danger-color: #e74c3c;
+            --warning-color: #f39c12;
+            --light-color: #ecf0f1;
+            --dark-color: #34495e;
+            --text-color: #333;
+            --border-radius: 8px;
+            --box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            --transition: all 0.3s ease;
+        }
+
+        [data-theme="dark"] {
+            --primary-color: #2980b9;
+            --secondary-color: #1c2833;
+            --light-color: #2c3e50;
+            --dark-color: #ecf0f1;
+            --text-color: #ecf0f1;
+            --box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background-color: var(--light-color);
+            color: var(--text-color);
+            transition: var(--transition);
+        }
+
+        .container {
+            display: flex;
+            min-height: 100vh;
+        }
+
+        .sidebar {
+            width: 250px;
+            background-color: var(--secondary-color);
+            color: white;
+            padding: 20px 0;
+            transition: var(--transition);
+            box-shadow: var(--box-shadow);
+            z-index: 100;
+        }
+
+        .sidebar.collapsed {
+            width: 60px;
+        }
+
+        .sidebar-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 20px 20px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .sidebar-header h2 {
+            font-size: 1.2rem;
+            white-space: nowrap;
+            overflow: hidden;
+        }
+
+        .sidebar.collapsed .sidebar-header h2 {
+            display: none;
+        }
+
+        .toggle-sidebar {
+            background: none;
+            border: none;
+            color: white;
+            cursor: pointer;
+            font-size: 1.2rem;
+        }
+
+        .sidebar.collapsed .toggle-sidebar {
+            transform: rotate(180deg);
+        }
+
+        .nav-menu {
+            list-style: none;
+            margin-top: 20px;
+        }
+
+        .nav-item {
+            padding: 12px 20px;
+            cursor: pointer;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+        }
+
+        .nav-item:hover {
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+
+        .nav-item.active {
+            background-color: var(--primary-color);
+        }
+
+        .nav-item i {
+            margin-right: 10px;
+            font-size: 1.2rem;
+            width: 20px;
+            text-align: center;
+        }
+
+        .sidebar.collapsed .nav-item span {
+            display: none;
+        }
+
+        .main-content {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+        }
+
+        .theme-toggle {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 1.5rem;
+            color: var(--text-color);
+        }
+
+        .section {
+            background-color: white;
+            border-radius: var(--border-radius);
+            box-shadow: var(--box-shadow);
+            padding: 20px;
+            margin-bottom: 20px;
+            transition: var(--transition);
+        }
+
+        [data-theme="dark"] .section {
+            background-color: var(--secondary-color);
+        }
+
+        .section-title {
+            margin-bottom: 15px;
+            color: var(--secondary-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        [data-theme="dark"] .section-title {
+            color: var(--light-color);
+        }
+
+        .section.collapsed .section-content {
+            display: none;
+        }
+
+        .toggle-section {
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: var(--text-color);
+            font-size: 1.2rem;
+        }
+
+        .tab-container {
+            margin-top: 20px;
+        }
+
+        .tabs {
+            display: flex;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+            margin-bottom: 15px;
+        }
+
+        .tab {
+            padding: 10px 20px;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .tab.active {
+            border-bottom: 2px solid var(--primary-color);
+            color: var(--primary-color);
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .file-upload-area {
+            border: 2px dashed var(--primary-color);
+            border-radius: var(--border-radius);
+            padding: 40px 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: var(--transition);
+            margin-bottom: 20px;
+        }
+
+        .file-upload-area:hover {
+            background-color: rgba(52, 152, 219, 0.1);
+        }
+
+        .file-upload-area.dragover {
+            background-color: rgba(52, 152, 219, 0.2);
+            border-color: var(--success-color);
+        }
+
+        .file-input {
+            display: none;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: var(--border-radius);
+            cursor: pointer;
+            transition: var(--transition);
+            font-weight: 500;
+        }
+
+        .btn:hover {
+            background-color: #2980b9;
+        }
+
+        .btn-secondary {
+            background-color: var(--secondary-color);
+        }
+
+        .btn-secondary:hover {
+            background-color: #1c2833;
+        }
+
+        .btn-success {
+            background-color: var(--success-color);
+        }
+
+        .btn-success:hover {
+            background-color: #27ae60;
+        }
+
+        .btn-danger {
+            background-color: var(--danger-color);
+        }
+
+        .btn-danger:hover {
+            background-color: #c0392b;
+        }
+
+        .btn-warning {
+            background-color: var(--warning-color);
+        }
+
+        .btn-warning:hover {
+            background-color: #d35400;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: var(--border-radius);
+            transition: var(--transition);
+        }
+
+        .form-control:focus {
+            border-color: var(--primary-color);
+            outline: none;
+            box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
+        }
+
+        .grid {
+            display: grid;
+            gap: 20px;
+        }
+
+        .grid-2 {
+            grid-template-columns: repeat(2, 1fr);
+        }
+
+        .grid-3 {
+            grid-template-columns: repeat(3, 1fr);
+        }
+
+        .grid-4 {
+            grid-template-columns: repeat(4, 1fr);
+        }
+
+        .stats-card {
+            background-color: var(--light-color);
+            border-radius: var(--border-radius);
+            padding: 15px;
+            text-align: center;
+            box-shadow: var(--box-shadow);
+        }
+
+        .stats-value {
+            font-size: 1.8rem;
+            font-weight: bold;
+            color: var(--primary-color);
+        }
+
+        .stats-label {
+            font-size: 0.9rem;
+            color: var(--text-color);
+            margin-top: 5px;
+        }
+
+        .chart-container {
+            position: relative;
+            height: 300px;
+            margin-bottom: 20px;
+        }
+
+        .table-container {
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th, td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+
+        th {
+            background-color: var(--light-color);
+            font-weight: 600;
+        }
+
+        [data-theme="dark"] th {
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+
+        tr:hover {
+            background-color: rgba(0, 0, 0, 0.05);
+        }
+
+        [data-theme="dark"] tr:hover {
+            background-color: rgba(255, 255, 255, 0.05);
+        }
+
+        .slider-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .slider {
+            flex: 1;
+            -webkit-appearance: none;
+            height: 8px;
+            border-radius: 4px;
+            background: #ddd;
+            outline: none;
+        }
+
+        .slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: var(--primary-color);
+            cursor: pointer;
+        }
+
+        .slider-value {
+            min-width: 40px;
+            text-align: center;
+        }
+
+        .progress-bar {
+            height: 10px;
+            background-color: #ddd;
+            border-radius: 5px;
+            overflow: hidden;
+            margin-top: 5px;
+        }
+
+        .progress {
+            height: 100%;
+            background-color: var(--primary-color);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+
+        .metric-card {
+            background-color: var(--light-color);
+            border-radius: var(--border-radius);
+            padding: 15px;
+            text-align: center;
+            box-shadow: var(--box-shadow);
+        }
+
+        .metric-value {
+            font-size: 2rem;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .metric-label {
+            font-size: 0.9rem;
+            color: var(--text-color);
+        }
+
+        .confusion-matrix {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1px;
+            background-color: #ddd;
+            border: 1px solid #ddd;
+            max-width: 300px;
+            margin: 0 auto;
+        }
+
+        .matrix-cell {
+            background-color: white;
+            padding: 15px;
+            text-align: center;
+            font-weight: bold;
+        }
+
+        .matrix-header {
+            background-color: var(--light-color);
+            font-weight: 600;
+        }
+
+        .prediction-result {
+            text-align: center;
+            padding: 20px;
+            border-radius: var(--border-radius);
+            margin-top: 20px;
+        }
+
+        .risk-low {
+            background-color: rgba(46, 204, 113, 0.2);
+            border: 1px solid var(--success-color);
+        }
+
+        .risk-high {
+            background-color: rgba(231, 76, 60, 0.2);
+            border: 1px solid var(--danger-color);
+        }
+
+        .risk-percentage {
+            font-size: 3rem;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+
+        .risk-label {
+            font-size: 1.5rem;
+            font-weight: 600;
+        }
+
+        .export-options {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .spinner {
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            border-left-color: var(--primary-color);
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .alert {
+            padding: 15px;
+            border-radius: var(--border-radius);
+            margin-bottom: 20px;
+        }
+
+        .alert-success {
+            background-color: rgba(46, 204, 113, 0.2);
+            border: 1px solid var(--success-color);
+            color: #27ae60;
+        }
+
+        .alert-danger {
+            background-color: rgba(231, 76, 60, 0.2);
+            border: 1px solid var(--danger-color);
+            color: #c0392b;
+        }
+
+        .alert-warning {
+            background-color: rgba(243, 156, 18, 0.2);
+            border: 1px solid var(--warning-color);
+            color: #d35400;
+        }
+
+        .alert-info {
+            background-color: rgba(52, 152, 219, 0.2);
+            border: 1px solid var(--primary-color);
+            color: #2980b9;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                flex-direction: column;
+            }
+
+            .sidebar {
+                width: 100%;
+                height: auto;
+            }
+
+            .sidebar.collapsed {
+                width: 100%;
+                height: 60px;
+            }
+
+            .sidebar.collapsed .nav-menu {
+                display: none;
+            }
+
+            .grid-2, .grid-3, .grid-4 {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body data-theme="light">
+    <div class="container">
+        <!-- Sidebar Navigation -->
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <h2>Depression Risk Prediction</h2>
+                <button class="toggle-sidebar">←</button>
+            </div>
+            <ul class="nav-menu">
+                <li class="nav-item active" data-section="data-load">
+                    <i>📁</i><span>Data Load</span>
+                </li>
+                <li class="nav-item" data-section="preprocessing">
+                    <i>⚙️</i><span>Preprocessing</span>
+                </li>
+                <li class="nav-item" data-section="statistics">
+                    <i>📊</i><span>Statistical Summary</span>
+                </li>
+                <li class="nav-item" data-section="eda">
+                    <i>📈</i><span>EDA</span>
+                </li>
+                <li class="nav-item" data-section="model">
+                    <i>🧠</i><span>Model Training</span>
+                </li>
+                <li class="nav-item" data-section="evaluation">
+                    <i>✅</i><span>Model Evaluation</span>
+                </li>
+                <li class="nav-item" data-section="prediction">
+                    <i>🔮</i><span>Prediction</span>
+                </li>
+                <li class="nav-item" data-section="export">
+                    <i>💾</i><span>Export</span>
+                </li>
+            </ul>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <div class="header">
+                <h1>Depression Risk Prediction</h1>
+                <button class="theme-toggle">🌙</button>
+            </div>
+
+            <!-- Data Load Section -->
+            <div class="section" id="data-load">
+                <div class="section-title">
+                    <h2>Data Load</h2>
+                    <button class="toggle-section">−</button>
+                </div>
+                <div class="section-content">
+                    <div class="file-upload-area" id="drop-area">
+                        <p>Drag & Drop your CSV file here</p>
+                        <p>or</p>
+                        <button class="btn" id="browse-btn">Browse Files</button>
+                        <input type="file" id="file-input" class="file-input" accept=".csv">
+                    </div>
+                    <div id="file-info" class="hidden">
+                        <div class="grid grid-2">
+                            <div class="stats-card">
+                                <div class="stats-value" id="file-rows">0</div>
+                                <div class="stats-label">Rows</div>
+                            </div>
+                            <div class="stats-card">
+                                <div class="stats-value" id="file-cols">0</div>
+                                <div class="stats-label">Columns</div>
+                            </div>
+                        </div>
+                        <div class="table-container">
+                            <h3>Data Preview</h3>
+                            <table id="preview-table">
+                                <thead></thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Preprocessing Section -->
+            <div class="section hidden" id="preprocessing">
+                <div class="section-title">
+                    <h2>Data Preprocessing</h2>
+                    <button class="toggle-section">−</button>
+                </div>
+                <div class="section-content">
+                    <div class="grid grid-2">
+                        <div>
+                            <h3>Missing Values</h3>
+                            <div class="form-group">
+                                <label class="form-label">Handling Method</label>
+                                <select class="form-control" id="missing-values-method">
+                                    <option value="drop">Drop rows with missing values</option>
+                                    <option value="mean">Impute with mean/mode</option>
+                                </select>
+                            </div>
+                            <div id="missing-values-info" class="alert alert-warning">
+                                No missing values detected.
+                            </div>
+                        </div>
+                        <div>
+                            <h3>Duplicate Removal</h3>
+                            <div class="form-group">
+                                <label class="form-label">
+                                    <input type="checkbox" id="remove-duplicates"> Remove duplicate rows
+                                </label>
+                            </div>
+                            <div id="duplicates-info" class="alert alert-info">
+                                No duplicates detected.
+                            </div>
+                        </div>
+                    </div>
+                    <button class="btn btn-success" id="apply-preprocessing">Apply Preprocessing</button>
+                </div>
+            </div>
+
+            <!-- Statistical Summary Section -->
+            <div class="section hidden" id="statistics">
+                <div class="section-title">
+                    <h2>Statistical Summary</h2>
+                    <button class="toggle-section">−</button>
+                </div>
+                <div class="section-content">
+                    <div class="tab-container">
+                        <div class="tabs">
+                            <div class="tab active" data-tab="overview">Overview</div>
+                            <div class="tab" data-tab="numeric">Numeric Features</div>
+                            <div class="tab" data-tab="categorical">Categorical Features</div>
+                        </div>
+                        <div class="tab-content active" id="overview-tab">
+                            <div class="grid grid-3">
+                                <div class="stats-card">
+                                    <div class="stats-value" id="total-rows">0</div>
+                                    <div class="stats-label">Total Rows</div>
+                                </div>
+                                <div class="stats-card">
+                                    <div class="stats-value" id="total-cols">0</div>
+                                    <div class="stats-label">Total Columns</div>
+                                </div>
+                                <div class="stats-card">
+                                    <div class="stats-value" id="memory-usage">0 MB</div>
+                                    <div class="stats-label">Memory Usage</div>
+                                </div>
+                            </div>
+                            <div class="table-container">
+                                <h3>Data Types</h3>
+                                <table id="data-types-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Column</th>
+                                            <th>Data Type</th>
+                                            <th>Non-Null Count</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody></tbody>
+                                </table>
+                            </div>
+                        </div>
+                        <div class="tab-content" id="numeric-tab">
+                            <div class="table-container">
+                                <table id="numeric-stats-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Feature</th>
+                                            <th>Mean</th>
+                                            <th>Std</th>
+                                            <th>Min</th>
+                                            <th>25%</th>
+                                            <th>50%</th>
+                                            <th>75%</th>
+                                            <th>Max</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody></tbody>
+                                </table>
+                            </div>
+                        </div>
+                        <div class="tab-content" id="categorical-tab">
+                            <div class="table-container">
+                                <table id="categorical-stats-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Feature</th>
+                                            <th>Count</th>
+                                            <th>Unique</th>
+                                            <th>Top</th>
+                                            <th>Freq</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- EDA Section -->
+            <div class="section hidden" id="eda">
+                <div class="section-title">
+                    <h2>Exploratory Data Analysis</h2>
+                    <button class="toggle-section">−</button>
+                </div>
+                <div class="section-content">
+                    <div class="tab-container">
+                        <div class="tabs">
+                            <div class="tab active" data-tab="distributions">Distributions</div>
+                            <div class="tab" data-tab="correlations">Correlations</div>
+                            <div class="tab" data-tab="relationships">Relationships</div>
+                        </div>
+                        <div class="tab-content active" id="distributions-tab">
+                            <div class="form-group">
+                                <label class="form-label">Select Feature</label>
+                                <select class="form-control" id="distribution-feature">
+                                    <option value="">Select a feature</option>
+                                </select>
+                            </div>
+                            <div class="chart-container">
+                                <canvas id="distribution-chart"></canvas>
+                            </div>
+                        </div>
+                        <div class="tab-content" id="correlations-tab">
+                            <div class="chart-container">
+                                <canvas id="correlation-chart"></canvas>
+                            </div>
+                        </div>
+                        <div class="tab-content" id="relationships-tab">
+                            <div class="grid grid-2">
+                                <div class="form-group">
+                                    <label class="form-label">X-Axis</label>
+                                    <select class="form-control" id="scatter-x">
+                                        <option value="">Select X feature</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Y-Axis</label>
+                                    <select class="form-control" id="scatter-y">
+                                        <option value="">Select Y feature</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="chart-container">
+                                <canvas id="scatter-chart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Model Training Section -->
+            <div class="section hidden" id="model">
+                <div class="section-title">
+                    <h2>Model Training</h2>
+                    <button class="toggle-section">−</button>
+                </div>
+                <div class="section-content">
+                    <div class="grid grid-2">
+                        <div>
+                            <h3>Model Architecture</h3>
+                            <div class="alert alert-info">
+                                <p>Neural Network with 4 layers:</p>
+                                <ul>
+                                    <li>Input: Dense (64 units, ReLU)</li>
+                                    <li>Hidden 1: Dense (32 units, ReLU)</li>
+                                    <li>Hidden 2: Dense (16 units, ReLU)</li>
+                                    <li>Output: Dense (1 unit, Sigmoid)</li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div>
+                            <h3>Hyperparameters</h3>
+                            <div class="form-group">
+                                <label class="form-label">Epochs</label>
+                                <div class="slider-container">
+                                    <input type="range" min="10" max="500" value="100" class="slider" id="epochs-slider">
+                                    <span class="slider-value" id="epochs-value">100</span>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Batch Size</label>
+                                <select class="form-control" id="batch-size">
+                                    <option value="16">16</option>
+                                    <option value="32" selected>32</option>
+                                    <option value="64">64</option>
+                                    <option value="128">128</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Learning Rate</label>
+                                <div class="slider-container">
+                                    <input type="range" min="1" max="1000" value="100" class="slider" id="learning-rate-slider">
+                                    <span class="slider-value" id="learning-rate-value">0.01</span>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Validation Split</label>
+                                <div class="slider-container">
+                                    <input type="range" min="10" max="30" value="20" class="slider" id="validation-slider">
+                                    <span class="slider-value" id="validation-value">0.2</span>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">
+                                    <input type="checkbox" id="early-stopping" checked> Enable Early Stopping
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    <button class="btn btn-success" id="train-model">Train Model</button>
+                    <div id="training-progress" class="hidden">
+                        <h3>Training Progress</h3>
+                        <div class="progress-bar">
+                            <div class="progress" id="training-progress-bar"></div>
+                        </div>
+                        <p id="training-status">Initializing...</p>
+                        <div class="chart-container">
+                            <canvas id="training-chart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Model Evaluation Section -->
+            <div class="section hidden" id="evaluation">
+                <div class="section-title">
+                    <h2>Model Evaluation</h2>
+                    <button class="toggle-section">−</button>
+                </div>
+                <div class="section-content">
+                    <div class="grid grid-4">
+                        <div class="metric-card">
+                            <div class="metric-value" id="accuracy">0.00</div>
+                            <div class="metric-label">Accuracy</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-value" id="precision">0.00</div>
+                            <div class="metric-label">Precision</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-value" id="recall">0.00</div>
+                            <div class="metric-label">Recall</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-value" id="f1">0.00</div>
+                            <div class="metric-label">F1-Score</div>
+                        </div>
+                    </div>
+                    <div class="grid grid-2">
+                        <div>
+                            <h3>Confusion Matrix</h3>
+                            <div class="confusion-matrix">
+                                <div class="matrix-cell matrix-header"></div>
+                                <div class="matrix-cell matrix-header">Predicted 0</div>
+                                <div class="matrix-cell matrix-header">Predicted 1</div>
+                                <div class="matrix-cell matrix-header">Actual 0</div>
+                                <div class="matrix-cell" id="tn">0</div>
+                                <div class="matrix-cell" id="fp">0</div>
+                                <div class="matrix-cell matrix-header">Actual 1</div>
+                                <div class="matrix-cell" id="fn">0</div>
+                                <div class="matrix-cell" id="tp">0</div>
+                            </div>
+                        </div>
+                        <div>
+                            <h3>ROC Curve</h3>
+                            <div class="chart-container">
+                                <canvas id="roc-chart"></canvas>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Threshold: <span id="threshold-value">0.5</span></label>
+                                <input type="range" min="0" max="100" value="50" class="slider" id="threshold-slider">
+                            </div>
+                            <p>AUC: <span id="auc-value">0.00</span></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Prediction Section -->
+            <div class="section hidden" id="prediction">
+                <div class="section-title">
+                    <h2>Prediction</h2>
+                    <button class="toggle-section">−</button>
+                </div>
+                <div class="section-content">
+                    <div class="grid grid-2">
+                        <div>
+                            <h3>Input Features</h3>
+                            <form id="prediction-form">
+                                <div class="form-group">
+                                    <label class="form-label">Age</label>
+                                    <input type="number" class="form-control" id="age" min="18" max="100" value="30">
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Marital Status</label>
+                                    <select class="form-control" id="marital-status">
+                                        <option value="Single">Single</option>
+                                        <option value="Married">Married</option>
+                                        <option value="Divorced">Divorced</option>
+                                        <option value="Widowed">Widowed</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Education Level</label>
+                                    <select class="form-control" id="education">
+                                        <option value="High School">High School</option>
+                                        <option value="Associate">Associate</option>
+                                        <option value="Bachelor's">Bachelor's</option>
+                                        <option value="Master's">Master's</option>
+                                        <option value="PhD">PhD</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Number of Children</label>
+                                    <input type="number" class="form-control" id="children" min="0" max="10" value="0">
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Smoking Status</label>
+                                    <select class="form-control" id="smoking">
+                                        <option value="Non-smoker">Non-smoker</option>
+                                        <option value="Former">Former</option>
+                                        <option value="Current">Current</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Physical Activity</label>
+                                    <select class="form-control" id="activity">
+                                        <option value="Sedentary">Sedentary</option>
+                                        <option value="Moderate">Moderate</option>
+                                        <option value="Active">Active</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Employment Status</label>
+                                    <select class="form-control" id="employment">
+                                        <option value="Employed">Employed</option>
+                                        <option value="Unemployed">Unemployed</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Income</label>
+                                    <input type="number" class="form-control" id="income" min="0" value="50000">
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Alcohol Consumption</label>
+                                    <select class="form-control" id="alcohol">
+                                        <option value="Low">Low</option>
+                                        <option value="Moderate">Moderate</option>
+                                        <option value="High">High</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Dietary Habits</label>
+                                    <select class="form-control" id="diet">
+                                        <option value="Healthy">Healthy</option>
+                                        <option value="Moderate">Moderate</option>
+                                        <option value="Unhealthy">Unhealthy</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Sleep Patterns</label>
+                                    <select class="form-control" id="sleep">
+                                        <option value="Good">Good</option>
+                                        <option value="Fair">Fair</option>
+                                        <option value="Poor">Poor</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">History of Mental Illness</label>
+                                    <div>
+                                        <label><input type="radio" name="mental-illness" value="Yes"> Yes</label>
+                                        <label><input type="radio" name="mental-illness" value="No" checked> No</label>
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">History of Substance Abuse</label>
+                                    <div>
+                                        <label><input type="radio" name="substance-abuse" value="Yes"> Yes</label>
+                                        <label><input type="radio" name="substance-abuse" value="No" checked> No</label>
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Family History of Depression</label>
+                                    <div>
+                                        <label><input type="radio" name="family-history" value="Yes"> Yes</label>
+                                        <label><input type="radio" name="family-history" value="No" checked> No</label>
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Chronic Medical Conditions</label>
+                                    <div>
+                                        <label><input type="radio" name="chronic-conditions" value="Yes"> Yes</label>
+                                        <label><input type="radio" name="chronic-conditions" value="No" checked> No</label>
+                                    </div>
+                                </div>
+                                <button type="button" class="btn btn-success" id="predict-btn">Predict Risk</button>
+                            </form>
+                        </div>
+                        <div>
+                            <h3>Prediction Result</h3>
+                            <div id="prediction-result" class="prediction-result risk-low">
+                                <div class="risk-percentage">0%</div>
+                                <div class="risk-label">Low Risk</div>
+                                <p>Based on the input features, this individual has a low risk of depression.</p>
+                            </div>
+                            <div class="chart-container">
+                                <canvas id="feature-importance-chart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Export Section -->
+            <div class="section hidden" id="export">
+                <div class="section-title">
+                    <h2>Export</h2>
+                    <button class="toggle-section">−</button>
+                </div>
+                <div class="section-content">
+                    <div class="export-options">
+                        <button class="btn" id="export-data">Export Preprocessed Data (CSV)</button>
+                        <button class="btn" id="export-model-weights">Export Model Weights (JSON)</button>
+                        <button class="btn" id="export-model-architecture">Export Model Architecture (JSON)</button>
+                        <button class="btn" id="export-training-history">Export Training History (CSV)</button>
+                        <button class="btn" id="export-predictions">Export Predictions (CSV)</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        let dataset = null;
+        let preprocessedData = null;
+        let model = null;
+        let trainingHistory = null;
+        let evaluationResults = null;
+        let featureNames = [];
+        let isTraining = false;
+
+        // DOM elements
+        const sidebar = document.querySelector('.sidebar');
+        const toggleSidebar = document.querySelector('.toggle-sidebar');
+        const navItems = document.querySelectorAll('.nav-item');
+        const sections = document.querySelectorAll('.section');
+        const toggleSections = document.querySelectorAll('.toggle-section');
+        const themeToggle = document.querySelector('.theme-toggle');
+        const fileInput = document.getElementById('file-input');
+        const browseBtn = document.getElementById('browse-btn');
+        const dropArea = document.getElementById('drop-area');
+        const fileInfo = document.getElementById('file-info');
+        const previewTable = document.getElementById('preview-table');
+
+        // Initialize the application
+        document.addEventListener('DOMContentLoaded', function() {
+            // Sidebar toggle
+            toggleSidebar.addEventListener('click', function() {
+                sidebar.classList.toggle('collapsed');
+            });
+
+            // Navigation
+            navItems.forEach(item => {
+                item.addEventListener('click', function() {
+                    const sectionId = this.getAttribute('data-section');
+                    
+                    // Update active nav item
+                    navItems.forEach(nav => nav.classList.remove('active'));
+                    this.classList.add('active');
+                    
+                    // Show selected section
+                    sections.forEach(section => {
+                        if (section.id === sectionId) {
+                            section.classList.remove('hidden');
+                        } else {
+                            section.classList.add('hidden');
+                        }
+                    });
+                });
+            });
+
+            // Section collapse/expand
+            toggleSections.forEach(button => {
+                button.addEventListener('click', function() {
+                    const section = this.closest('.section');
+                    section.classList.toggle('collapsed');
+                    this.textContent = section.classList.contains('collapsed') ? '+' : '−';
+                });
+            });
+
+            // Theme toggle
+            themeToggle.addEventListener('click', function() {
+                const currentTheme = document.body.getAttribute('data-theme');
+                const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+                document.body.setAttribute('data-theme', newTheme);
+                this.textContent = newTheme === 'light' ? '🌙' : '☀️';
+            });
+
+            // File upload handling
+            browseBtn.addEventListener('click', function() {
+                fileInput.click();
+            });
+
+            fileInput.addEventListener('change', handleFileUpload);
+
+            // Drag and drop handling
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                dropArea.addEventListener(eventName, preventDefaults, false);
+            });
+
+            function preventDefaults(e) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+
+            ['dragenter', 'dragover'].forEach(eventName => {
+                dropArea.addEventListener(eventName, highlight, false);
+            });
+
+            ['dragleave', 'drop'].forEach(eventName => {
+                dropArea.addEventListener(eventName, unhighlight, false);
+            });
+
+            function highlight() {
+                dropArea.classList.add('dragover');
+            }
+
+            function unhighlight() {
+                dropArea.classList.remove('dragover');
+            }
+
+            dropArea.addEventListener('drop', handleDrop, false);
+
+            function handleDrop(e) {
+                const dt = e.dataTransfer;
+                const files = dt.files;
+                fileInput.files = files;
+                handleFileUpload();
+            }
+
+            // Tab functionality
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.addEventListener('click', function() {
+                    const tabContainer = this.closest('.tab-container');
+                    const tabId = this.getAttribute('data-tab');
+                    
+                    // Update active tab
+                    tabContainer.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                    this.classList.add('active');
+                    
+                    // Show selected tab content
+                    tabContainer.querySelectorAll('.tab-content').forEach(content => {
+                        if (content.id === `${tabId}-tab`) {
+                            content.classList.add('active');
+                        } else {
+                            content.classList.remove('active');
+                        }
+                    });
+                });
+            });
+
+            // Initialize sliders
+            initializeSliders();
+
+            // Initialize prediction form
+            initializePredictionForm();
+
+            // Initialize export buttons
+            initializeExportButtons();
+        });
+
+        // File upload handler
+        function handleFileUpload() {
+            const file = fileInput.files[0];
+            if (!file) return;
+
+            // Validate file type
+            if (!file.name.endsWith('.csv')) {
+                alert('Please upload a CSV file.');
+                return;
+            }
+
+            // Show loading spinner
+            dropArea.innerHTML = '<div class="spinner"></div>';
+
+            // Parse CSV file
+            Papa.parse(file, {
+                header: true,
+                dynamicTyping: true,
+                complete: function(results) {
+                    dataset = results.data;
+                    featureNames = results.meta.fields;
+                    
+                    // Update UI with file info
+                    document.getElementById('file-rows').textContent = dataset.length;
+                    document.getElementById('file-cols').textContent = featureNames.length;
+                    
+                    // Show preview table
+                    showDataPreview(dataset, featureNames);
+                    
+                    // Show file info section
+                    fileInfo.classList.remove('hidden');
+                    
+                    // Reset drop area
+                    dropArea.innerHTML = `
+                        <p>Drag & Drop your CSV file here</p>
+                        <p>or</p>
+                        <button class="btn" id="browse-btn">Browse Files</button>
+                        <input type="file" id="file-input" class="file-input" accept=".csv">
+                    `;
+                    
+                    // Reattach event listeners
+                    document.getElementById('browse-btn').addEventListener('click', function() {
+                        fileInput.click();
+                    });
+                    
+                    // Enable preprocessing section
+                    document.querySelector('.nav-item[data-section="preprocessing"]').classList.remove('disabled');
+                    
+                    // Initialize preprocessing with the dataset
+                    initializePreprocessing(dataset, featureNames);
+                },
+                error: function(error) {
+                    console.error('Error parsing CSV:', error);
+                    alert('Error parsing CSV file. Please check the file format.');
+                    
+                    // Reset drop area
+                    dropArea.innerHTML = `
+                        <p>Drag & Drop your CSV file here</p>
+                        <p>or</p>
+                        <button class="btn" id="browse-btn">Browse Files</button>
+                        <input type="file" id="file-input" class="file-input" accept=".csv">
+                    `;
+                    
+                    // Reattach event listeners
+                    document.getElementById('browse-btn').addEventListener('click', function() {
+                        fileInput.click();
+                    });
+                }
+            });
+        }
+
+        // Show data preview in table
+        function showDataPreview(data, features) {
+            const thead = previewTable.querySelector('thead');
+            const tbody = previewTable.querySelector('tbody');
+            
+            // Clear existing content
+            thead.innerHTML = '';
+            tbody.innerHTML = '';
+            
+            // Create header row
+            const headerRow = document.createElement('tr');
+            features.forEach(feature => {
+                const th = document.createElement('th');
+                th.textContent = feature;
+                headerRow.appendChild(th);
+            });
+            thead.appendChild(headerRow);
+            
+            // Create data rows (first 10)
+            const previewData = data.slice(0, 10);
+            previewData.forEach(row => {
+                const tr = document.createElement('tr');
+                features.forEach(feature => {
+                    const td = document.createElement('td');
+                    td.textContent = row[feature] !== undefined ? row[feature] : '';
+                    tr.appendChild(td);
+                });
+                tbody.appendChild(tr);
+            });
+        }
+
+        // Initialize preprocessing section
+        function initializePreprocessing(data, features) {
+            // Analyze dataset for missing values and duplicates
+            const missingValues = analyzeMissingValues(data, features);
+            const duplicateCount = analyzeDuplicates(data);
+            
+            // Update UI with analysis results
+            const missingValuesInfo = document.getElementById('missing-values-info');
+            if (missingValues.total > 0) {
+                missingValuesInfo.innerHTML = `
+                    Found ${missingValues.total} missing values across ${missingValues.columns.length} columns.
+                    <br>Columns with missing values: ${missingValues.columns.join(', ')}
+                `;
+                missingValuesInfo.className = 'alert alert-warning';
+            } else {
+                missingValuesInfo.innerHTML = 'No missing values detected.';
+                missingValuesInfo.className = 'alert alert-success';
+            }
+            
+            const duplicatesInfo = document.getElementById('duplicates-info');
+            if (duplicateCount > 0) {
+                duplicatesInfo.innerHTML = `Found ${duplicateCount} duplicate rows.`;
+                duplicatesInfo.className = 'alert alert-warning';
+            } else {
+                duplicatesInfo.innerHTML = 'No duplicates detected.';
+                duplicatesInfo.className = 'alert alert-success';
+            }
+            
+            // Apply preprocessing button
+            document.getElementById('apply-preprocessing').addEventListener('click', function() {
+                applyPreprocessing(data, features, missingValues);
+            });
+        }
+
+        // Analyze missing values in dataset
+        function analyzeMissingValues(data, features) {
+            const result = {
+                total: 0,
+                columns: []
+            };
+            
+            features.forEach(feature => {
+                let missingCount = 0;
+                data.forEach(row => {
+                    if (row[feature] === null || row[feature] === undefined || row[feature] === '') {
+                        missingCount++;
+                    }
+                });
+                
+                if (missingCount > 0) {
+                    result.total += missingCount;
+                    result.columns.push(feature);
+                }
+            });
+            
+            return result;
+        }
+
+        // Analyze duplicates in dataset
+        function analyzeDuplicates(data) {
+            const uniqueRows = new Set();
+            let duplicateCount = 0;
+            
+            data.forEach(row => {
+                const rowString = JSON.stringify(row);
+                if (uniqueRows.has(rowString)) {
+                    duplicateCount++;
+                } else {
+                    uniqueRows.add(rowString);
+                }
+            });
+            
+            return duplicateCount;
+        }
+
+        // Apply preprocessing to dataset
+        function applyPreprocessing(data, features, missingValues) {
+            let processedData = [...data];
+            
+            // Handle missing values
+            const missingMethod = document.getElementById('missing-values-method').value;
+            if (missingMethod === 'drop') {
+                // Remove rows with any missing values
+                processedData = processedData.filter(row => {
+                    return features.every(feature => 
+                        row[feature] !== null && row[feature] !== undefined && row[feature] !== ''
+                    );
+                });
+            } else if (missingMethod === 'mean') {
+                // Impute missing values with mean (numeric) or mode (categorical)
+                features.forEach(feature => {
+                    // Check if feature is numeric
+                    const isNumeric = processedData.some(row => 
+                        row[feature] !== null && row[feature] !== undefined && !isNaN(row[feature])
+                    );
+                    
+                    if (isNumeric) {
+                        // Calculate mean for numeric features
+                        const values = processedData
+                            .map(row => row[feature])
+                            .filter(val => val !== null && val !== undefined && !isNaN(val));
+                        
+                        if (values.length > 0) {
+                            const mean = values.reduce((sum, val) => sum + val, 0) / values.length;
+                            
+                            // Replace missing values with mean
+                            processedData.forEach(row => {
+                                if (row[feature] === null || row[feature] === undefined || isNaN(row[feature])) {
+                                    row[feature] = mean;
+                                }
+                            });
+                        }
+                    } else {
+                        // Calculate mode for categorical features
+                        const valueCounts = {};
+                        processedData.forEach(row => {
+                            if (row[feature] !== null && row[feature] !== undefined) {
+                                valueCounts[row[feature]] = (valueCounts[row[feature]] || 0) + 1;
+                            }
+                        });
+                        
+                        let mode = null;
+                        let maxCount = 0;
+                        for (const [value, count] of Object.entries(valueCounts)) {
+                            if (count > maxCount) {
+                                maxCount = count;
+                                mode = value;
+                            }
+                        }
+                        
+                        // Replace missing values with mode
+                        processedData.forEach(row => {
+                            if (row[feature] === null || row[feature] === undefined || row[feature] === '') {
+                                row[feature] = mode;
+                            }
+                        });
+                    }
+                });
+            }
+            
+            // Handle duplicates
+            const removeDuplicates = document.getElementById('remove-duplicates').checked;
+            if (removeDuplicates) {
+                const uniqueRows = new Map();
+                processedData = processedData.filter(row => {
+                    const rowString = JSON.stringify(row);
+                    if (uniqueRows.has(rowString)) {
+                        return false;
+                    } else {
+                        uniqueRows.set(rowString, true);
+                        return true;
+                    }
+                });
+            }
+            
+            // Store preprocessed data
+            preprocessedData = processedData;
+            
+            // Update UI
+            document.getElementById('file-rows').textContent = processedData.length;
+            showDataPreview(processedData, features);
+            
+            // Initialize statistical summary with preprocessed data
+            initializeStatisticalSummary(processedData, features);
+            
+            // Show success message
+            alert('Preprocessing applied successfully!');
+        }
+
+        // Initialize statistical summary section
+        function initializeStatisticalSummary(data, features) {
+            // Update overview
+            document.getElementById('total-rows').textContent = data.length;
+            document.getElementById('total-cols').textContent = features.length;
+            document.getElementById('memory-usage').textContent = 
+                (JSON.stringify(data).length / (1024 * 1024)).toFixed(2) + ' MB';
+            
+            // Data types table
+            const dataTypesTable = document.getElementById('data-types-table').querySelector('tbody');
+            dataTypesTable.innerHTML = '';
+            
+            features.forEach(feature => {
+                const row = document.createElement('tr');
+                
+                // Column name
+                const nameCell = document.createElement('td');
+                nameCell.textContent = feature;
+                row.appendChild(nameCell);
+                
+                // Data type
+                const typeCell = document.createElement('td');
+                // Simple type detection
+                const sampleValue = data[0][feature];
+                if (typeof sampleValue === 'number') {
+                    typeCell.textContent = 'Numeric';
+                } else {
+                    typeCell.textContent = 'Categorical';
+                }
+                row.appendChild(typeCell);
+                
+                // Non-null count
+                const countCell = document.createElement('td');
+                const nonNullCount = data.filter(row => 
+                    row[feature] !== null && row[feature] !== undefined && row[feature] !== ''
+                ).length;
+                countCell.textContent = nonNullCount;
+                row.appendChild(countCell);
+                
+                dataTypesTable.appendChild(row);
+            });
+            
+            // Numeric statistics
+            const numericStatsTable = document.getElementById('numeric-stats-table').querySelector('tbody');
+            numericStatsTable.innerHTML = '';
+            
+            // Categorical statistics
+            const categoricalStatsTable = document.getElementById('categorical-stats-table').querySelector('tbody');
+            categoricalStatsTable.innerHTML = '';
+            
+            features.forEach(feature => {
+                const values = data.map(row => row[feature]).filter(val => 
+                    val !== null && val !== undefined && val !== ''
+                );
+                
+                if (values.length === 0) return;
+                
+                // Check if feature is numeric
+                const isNumeric = values.every(val => !isNaN(val));
+                
+                if (isNumeric) {
+                    // Calculate numeric statistics
+                    const numericValues = values.map(Number);
+                    const sorted = numericValues.sort((a, b) => a - b);
+                    
+                    const mean = numericValues.reduce((sum, val) => sum + val, 0) / numericValues.length;
+                    const std = Math.sqrt(
+                        numericValues.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / numericValues.length
+                    );
+                    const min = sorted[0];
+                    const max = sorted[sorted.length - 1];
+                    const q1 = sorted[Math.floor(sorted.length * 0.25)];
+                    const median = sorted[Math.floor(sorted.length * 0.5)];
+                    const q3 = sorted[Math.floor(sorted.length * 0.75)];
+                    
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${feature}</td>
+                        <td>${mean.toFixed(2)}</td>
+                        <td>${std.toFixed(2)}</td>
+                        <td>${min}</td>
+                        <td>${q1}</td>
+                        <td>${median}</td>
+                        <td>${q3}</td>
+                        <td>${max}</td>
+                    `;
+                    numericStatsTable.appendChild(row);
+                } else {
+                    // Calculate categorical statistics
+                    const valueCounts = {};
+                    values.forEach(val => {
+                        valueCounts[val] = (valueCounts[val] || 0) + 1;
+                    });
+                    
+                    let topValue = null;
+                    let topCount = 0;
+                    for (const [value, count] of Object.entries(valueCounts)) {
+                        if (count > topCount) {
+                            topCount = count;
+                            topValue = value;
+                        }
+                    }
+                    
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${feature}</td>
+                        <td>${values.length}</td>
+                        <td>${Object.keys(valueCounts).length}</td>
+                        <td>${topValue}</td>
+                        <td>${topCount}</td>
+                    `;
+                    categoricalStatsTable.appendChild(row);
+                }
+            });
+            
+            // Initialize EDA with the data
+            initializeEDA(data, features);
+        }
+
+        // Initialize EDA section
+        function initializeEDA(data, features) {
+            // Populate feature selectors
+            const distributionFeature = document.getElementById('distribution-feature');
+            const scatterX = document.getElementById('scatter-x');
+            const scatterY = document.getElementById('scatter-y');
+            
+            distributionFeature.innerHTML = '<option value="">Select a feature</option>';
+            scatterX.innerHTML = '<option value="">Select X feature</option>';
+            scatterY.innerHTML = '<option value="">Select Y feature</option>';
+            
+            features.forEach(feature => {
+                const option1 = document.createElement('option');
+                option1.value = feature;
+                option1.textContent = feature;
+                distributionFeature.appendChild(option1);
+                
+                const option2 = document.createElement('option');
+                option2.value = feature;
+                option2.textContent = feature;
+                scatterX.appendChild(option2);
+                
+                const option3 = document.createElement('option');
+                option3.value = feature;
+                option3.textContent = feature;
+                scatterY.appendChild(option3);
+            });
+            
+            // Set up distribution chart
+            distributionFeature.addEventListener('change', function() {
+                const selectedFeature = this.value;
+                if (selectedFeature) {
+                    updateDistributionChart(data, selectedFeature);
+                }
+            });
+            
+            // Set up scatter plot
+            scatterX.addEventListener('change', updateScatterPlot);
+            scatterY.addEventListener('change', updateScatterPlot);
+            
+            // Initialize correlation matrix
+            updateCorrelationMatrix(data, features);
+            
+            // Enable model training section
+            document.querySelector('.nav-item[data-section="model"]').classList.remove('disabled');
+        }
+
+        // Update distribution chart
+        function updateDistributionChart(data, feature) {
+            const values = data.map(row => row[feature]).filter(val => 
+                val !== null && val !== undefined && val !== ''
+            );
+            
+            if (values.length === 0) return;
+            
+            const ctx = document.getElementById('distribution-chart').getContext('2d');
+            
+            // Check if feature is numeric
+            const isNumeric = values.every(val => !isNaN(val));
+            
+            if (isNumeric) {
+                // Create histogram for numeric feature
+                const numericValues = values.map(Number);
+                const min = Math.min(...numericValues);
+                const max = Math.max(...numericValues);
+                const binCount = Math.min(20, Math.ceil(Math.sqrt(numericValues.length)));
+                const binSize = (max - min) / binCount;
+                
+                const bins = Array(binCount).fill(0);
+                numericValues.forEach(val => {
+                    const binIndex = Math.min(Math.floor((val - min) / binSize), binCount - 1);
+                    bins[binIndex]++;
+                });
+                
+                const labels = Array.from({length: binCount}, (_, i) => {
+                    const start = min + i * binSize;
+                    const end = min + (i + 1) * binSize;
+                    return `${start.toFixed(1)}-${end.toFixed(1)}`;
+                });
+                
+                // Destroy existing chart if it exists
+                if (window.distributionChart) {
+                    window.distributionChart.destroy();
+                }
+                
+                window.distributionChart = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: `Distribution of ${feature}`,
+                            data: bins,
+                            backgroundColor: 'rgba(52, 152, 219, 0.7)',
+                            borderColor: 'rgba(52, 152, 219, 1)',
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                title: {
+                                    display: true,
+                                    text: 'Frequency'
+                                }
+                            },
+                            x: {
+                                title: {
+                                    display: true,
+                                    text: feature
+                                }
+                            }
+                        }
+                    }
+                });
+            } else {
+                // Create bar chart for categorical feature
+                const valueCounts = {};
+                values.forEach(val => {
+                    valueCounts[val] = (valueCounts[val] || 0) + 1;
+                });
+                
+                const labels = Object.keys(valueCounts);
+                const counts = Object.values(valueCounts);
+                
+                // Destroy existing chart if it exists
+                if (window.distributionChart) {
+                    window.distributionChart.destroy();
+                }
+                
+                window.distributionChart = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: `Distribution of ${feature}`,
+                            data: counts,
+                            backgroundColor: 'rgba(52, 152, 219, 0.7)',
+                            borderColor: 'rgba(52, 152, 219, 1)',
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                title: {
+                                    display: true,
+                                    text: 'Count'
+                                }
+                            },
+                            x: {
+                                title: {
+                                    display: true,
+                                    text: feature
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+        }
+
+        // Update correlation matrix
+        function updateCorrelationMatrix(data, features) {
+            // Extract numeric features only
+            const numericFeatures = features.filter(feature => {
+                const values = data.map(row => row[feature]).filter(val => 
+                    val !== null && val !== undefined && val !== ''
+                );
+                return values.length > 0 && values.every(val => !isNaN(val));
+            });
+            
+            if (numericFeatures.length === 0) return;
+            
+            // Calculate correlation matrix
+            const correlations = [];
+            for (let i = 0; i < numericFeatures.length; i++) {
+                correlations[i] = [];
+                for (let j = 0; j < numericFeatures.length; j++) {
+                    if (i === j) {
+                        correlations[i][j] = 1;
+                    } else {
+                        const values1 = data.map(row => Number(row[numericFeatures[i]]));
+                        const values2 = data.map(row => Number(row[numericFeatures[j]]));
+                        correlations[i][j] = calculateCorrelation(values1, values2);
+                    }
+                }
+            }
+            
+            const ctx = document.getElementById('correlation-chart').getContext('2d');
+            
+            // Destroy existing chart if it exists
+            if (window.correlationChart) {
+                window.correlationChart.destroy();
+            }
+            
+            window.correlationChart = new Chart(ctx, {
+                type: 'bar', // Using bar chart as a simple placeholder
+                data: {
+                    labels: numericFeatures,
+                    datasets: [{
+                        label: 'Feature Importance (Placeholder)',
+                        data: Array(numericFeatures.length).fill(0.5), // Placeholder data
+                        backgroundColor: 'rgba(52, 152, 219, 0.7)',
+                        borderColor: 'rgba(52, 152, 219, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 1,
+                            title: {
+                                display: true,
+                                text: 'Correlation'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Calculate correlation between two arrays
+        function calculateCorrelation(x, y) {
+            const n = x.length;
+            const sumX = x.reduce((a, b) => a + b, 0);
+            const sumY = y.reduce((a, b) => a + b, 0);
+            const sumXY = x.reduce((sum, val, i) => sum + val * y[i], 0);
+            const sumX2 = x.reduce((sum, val) => sum + val * val, 0);
+            const sumY2 = y.reduce((sum, val) => sum + val * val, 0);
+            
+            const numerator = n * sumXY - sumX * sumY;
+            const denominator = Math.sqrt((n * sumX2 - sumX * sumX) * (n * sumY2 - sumY * sumY));
+            
+            return denominator === 0 ? 0 : numerator / denominator;
+        }
+
+        // Update scatter plot
+        function updateScatterPlot() {
+            const xFeature = document.getElementById('scatter-x').value;
+            const yFeature = document.getElementById('scatter-y').value;
+            
+            if (!xFeature || !yFeature) return;
+            
+            const data = preprocessedData || dataset;
+            if (!data) return;
+            
+            const xValues = data.map(row => row[xFeature]).filter(val => 
+                val !== null && val !== undefined && val !== '' && !isNaN(val)
+            ).map(Number);
+            
+            const yValues = data.map(row => row[yFeature]).filter(val => 
+                val !== null && val !== undefined && val !== '' && !isNaN(val)
+            ).map(Number);
+            
+            // Ensure both arrays have the same length
+            const minLength = Math.min(xValues.length, yValues.length);
+            const finalXValues = xValues.slice(0, minLength);
+            const finalYValues = yValues.slice(0, minLength);
+            
+            const ctx = document.getElementById('scatter-chart').getContext('2d');
+            
+            // Destroy existing chart if it exists
+            if (window.scatterChart) {
+                window.scatterChart.destroy();
+            }
+            
+            window.scatterChart = new Chart(ctx, {
+                type: 'scatter',
+                data: {
+                    datasets: [{
+                        label: `${xFeature} vs ${yFeature}`,
+                        data: finalXValues.map((x, i) => ({x, y: finalYValues[i]})),
+                        backgroundColor: 'rgba(52, 152, 219, 0.7)',
+                        borderColor: 'rgba(52, 152, 219, 1)',
+                        borderWidth: 1,
+                        pointRadius: 3
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            title: {
+                                display: true,
+                                text: xFeature
+                            }
+                        },
+                        y: {
+                            title: {
+                                display: true,
+                                text: yFeature
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Initialize sliders
+        function initializeSliders() {
+            // Epochs slider
+            const epochsSlider = document.getElementById('epochs-slider');
+            const epochsValue = document.getElementById('epochs-value');
+            
+            epochsSlider.addEventListener('input', function() {
+                epochsValue.textContent = this.value;
+            });
+            
+            // Learning rate slider (logarithmic)
+            const learningRateSlider = document.getElementById('learning-rate-slider');
+            const learningRateValue = document.getElementById('learning-rate-value');
+            
+            learningRateSlider.addEventListener('input', function() {
+                // Convert to logarithmic scale (0.0001 to 0.1)
+                const minp = 1;
+                const maxp = 1000;
+                const minv = Math.log(0.0001);
+                const maxv = Math.log(0.1);
+                
+                const scale = (maxv - minv) / (maxp - minp);
+                const value = Math.exp(minv + scale * (this.value - minp));
+                learningRateValue.textContent = value.toFixed(4);
+            });
+            
+            // Validation split slider
+            const validationSlider = document.getElementById('validation-slider');
+            const validationValue = document.getElementById('validation-value');
+            
+            validationSlider.addEventListener('input', function() {
+                validationValue.textContent = (this.value / 100).toFixed(2);
+            });
+            
+            // Threshold slider for ROC curve
+            const thresholdSlider = document.getElementById('threshold-slider');
+            const thresholdValue = document.getElementById('threshold-value');
+            
+            thresholdSlider.addEventListener('input', function() {
+                thresholdValue.textContent = (this.value / 100).toFixed(2);
+            });
+            
+            // Model training button
+            document.getElementById('train-model').addEventListener('click', trainModel);
+        }
+
+        // Train the neural network model
+        async function trainModel() {
+            if (!preprocessedData) {
+                alert('Please load and preprocess data first.');
+                return;
+            }
+            
+            if (isTraining) {
+                alert('Model training is already in progress.');
+                return;
+            }
+            
+            isTraining = true;
+            
+            // Show training progress
+            const trainingProgress = document.getElementById('training-progress');
+            trainingProgress.classList.remove('hidden');
+            
+            const progressBar = document.getElementById('training-progress-bar');
+            const trainingStatus = document.getElementById('training-status');
+            
+            // Get hyperparameters
+            const epochs = parseInt(document.getElementById('epochs-slider').value);
+            const batchSize = parseInt(document.getElementById('batch-size').value);
+            const learningRate = parseFloat(document.getElementById('learning-rate-value').textContent);
+            const validationSplit = parseFloat(document.getElementById('validation-value').textContent);
+            const earlyStopping = document.getElementById('early-stopping').checked;
+            
+            // Prepare data for training
+            // This is a simplified example - in a real application, you would need to:
+            // 1. Identify the target variable
+            // 2. Encode categorical variables
+            // 3. Normalize numeric variables
+            // 4. Split into features and labels
+            
+            // For demonstration, we'll use a simple approach
+            const features = [];
+            const labels = [];
+            
+            // Assume the last column is the target
+            const targetColumn = featureNames[featureNames.length - 1];
+            
+            preprocessedData.forEach(row => {
+                const featureValues = [];
+                
+                // Process each feature (excluding the target)
+                featureNames.slice(0, -1).forEach(feature => {
+                    let value = row[feature];
+                    
+                    // Handle categorical variables (simple encoding)
+                    if (typeof value === 'string') {
+                        // Simple hash-based encoding for demonstration
+                        value = value.split('').reduce((a, b) => {
+                            a = ((a << 5) - a) + b.charCodeAt(0);
+                            return a & a;
+                        }, 0) % 100 / 100;
+                    }
+                    
+                    featureValues.push(value);
+                });
+                
+                features.push(featureValues);
+                labels.push(row[targetColumn] ? 1 : 0); // Assuming binary classification
+            });
+            
+            // Convert to tensors
+            const featureTensor = tf.tensor2d(features);
+            const labelTensor = tf.tensor1d(labels);
+            
+            // Create model
+            model = tf.sequential({
+                layers: [
+                    tf.layers.dense({
+                        inputShape: [features[0].length],
+                        units: 64,
+                        activation: 'relu'
+                    }),
+                    tf.layers.dense({
+                        units: 32,
+                        activation: 'relu'
+                    }),
+                    tf.layers.dense({
+                        units: 16,
+                        activation: 'relu'
+                    }),
+                    tf.layers.dense({
+                        units: 1,
+                        activation: 'sigmoid'
+                    })
+                ]
+            });
+            
+            // Compile model
+            model.compile({
+                optimizer: tf.train.adam(learningRate),
+                loss: 'binaryCrossentropy',
+                metrics: ['accuracy']
+            });
+            
+            // Set up training callbacks
+            const callbacks = {
+                onEpochEnd: (epoch, logs) => {
+                    // Update progress
+                    const progress = ((epoch + 1) / epochs) * 100;
+                    progressBar.style.width = `${progress}%`;
+                    trainingStatus.textContent = `Epoch ${epoch + 1}/${epochs} - Loss: ${logs.loss.toFixed(4)}, Accuracy: ${logs.acc.toFixed(4)}`;
+                    
+                    // Update training chart
+                    updateTrainingChart(epoch, logs);
+                },
+                onTrainEnd: () => {
+                    trainingStatus.textContent = 'Training completed!';
+                    isTraining = false;
+                    
+                    // Enable evaluation section
+                    document.querySelector('.nav-item[data-section="evaluation"]').classList.remove('disabled');
+                    
+                    // Evaluate model
+                    evaluateModel(featureTensor, labelTensor);
+                }
+            };
+            
+            // Initialize training chart
+            initializeTrainingChart();
+            
+            // Train model
+            await model.fit(featureTensor, labelTensor, {
+                epochs: epochs,
+                batchSize: batchSize,
+                validationSplit: validationSplit,
+                callbacks: callbacks,
+                verbose: 0
+            });
+            
+            // Clean up tensors
+            featureTensor.dispose();
+            labelTensor.dispose();
+        }
+
+        // Initialize training chart
+        function initializeTrainingChart() {
+            const ctx = document.getElementById('training-chart').getContext('2d');
+            
+            // Destroy existing chart if it exists
+            if (window.trainingChart) {
+                window.trainingChart.destroy();
+            }
+            
+            window.trainingChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [
+                        {
+                            label: 'Training Loss',
+                            data: [],
+                            borderColor: 'rgba(231, 76, 60, 1)',
+                            backgroundColor: 'rgba(231, 76, 60, 0.1)',
+                            tension: 0.1
+                        },
+                        {
+                            label: 'Validation Loss',
+                            data: [],
+                            borderColor: 'rgba(52, 152, 219, 1)',
+                            backgroundColor: 'rgba(52, 152, 219, 0.1)',
+                            tension: 0.1
+                        },
+                        {
+                            label: 'Training Accuracy',
+                            data: [],
+                            borderColor: 'rgba(46, 204, 113, 1)',
+                            backgroundColor: 'rgba(46, 204, 113, 0.1)',
+                            tension: 0.1,
+                            yAxisID: 'y1'
+                        },
+                        {
+                            label: 'Validation Accuracy',
+                            data: [],
+                            borderColor: 'rgba(243, 156, 18, 1)',
+                            backgroundColor: 'rgba(243, 156, 18, 0.1)',
+                            tension: 0.1,
+                            yAxisID: 'y1'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Epoch'
+                            }
+                        },
+                        y: {
+                            type: 'linear',
+                            display: true,
+                            position: 'left',
+                            title: {
+                                display: true,
+                                text: 'Loss'
+                            }
+                        },
+                        y1: {
+                            type: 'linear',
+                            display: true,
+                            position: 'right',
+                            title: {
+                                display: true,
+                                text: 'Accuracy'
+                            },
+                            grid: {
+                                drawOnChartArea: false
+                            },
+                            min: 0,
+                            max: 1
+                        }
+                    }
+                }
+            });
+            
+            trainingHistory = {
+                epochs: [],
+                loss: [],
+                valLoss: [],
+                acc: [],
+                valAcc: []
+            };
+        }
+
+        // Update training chart with new data
+        function updateTrainingChart(epoch, logs) {
+            trainingHistory.epochs.push(epoch + 1);
+            trainingHistory.loss.push(logs.loss);
+            trainingHistory.valLoss.push(logs.val_loss);
+            trainingHistory.acc.push(logs.acc);
+            trainingHistory.valAcc.push(logs.val_acc);
+            
+            window.trainingChart.data.labels = trainingHistory.epochs;
+            window.trainingChart.data.datasets[0].data = trainingHistory.loss;
+            window.trainingChart.data.datasets[1].data = trainingHistory.valLoss;
+            window.trainingChart.data.datasets[2].data = trainingHistory.acc;
+            window.trainingChart.data.datasets[3].data = trainingHistory.valAcc;
+            
+            window.trainingChart.update();
+        }
+
+        // Evaluate the trained model
+        async function evaluateModel(features, labels) {
+            if (!model) {
+                alert('No model available for evaluation. Please train a model first.');
+                return;
+            }
+            
+            // Make predictions
+            const predictions = model.predict(features);
+            const predictedValues = await predictions.data();
+            
+            // Convert to binary predictions using threshold
+            const threshold = 0.5;
+            const binaryPredictions = predictedValues.map(p => p >= threshold ? 1 : 0);
+            const actualValues = await labels.data();
+            
+            // Calculate metrics
+            let tp = 0, tn = 0, fp = 0, fn = 0;
+            
+            for (let i = 0; i < actualValues.length; i++) {
+                if (actualValues[i] === 1 && binaryPredictions[i] === 1) tp++;
+                else if (actualValues[i] === 0 && binaryPredictions[i] === 0) tn++;
+                else if (actualValues[i] === 0 && binaryPredictions[i] === 1) fp++;
+                else if (actualValues[i] === 1 && binaryPredictions[i] === 0) fn++;
+            }
+            
+            const accuracy = (tp + tn) / (tp + tn + fp + fn);
+            const precision = tp / (tp + fp) || 0;
+            const recall = tp / (tp + fn) || 0;
+            const f1 = 2 * (precision * recall) / (precision + recall) || 0;
+            
+            // Update UI with metrics
+            document.getElementById('accuracy').textContent = accuracy.toFixed(4);
+            document.getElementById('precision').textContent = precision.toFixed(4);
+            document.getElementById('recall').textContent = recall.toFixed(4);
+            document.getElementById('f1').textContent = f1.toFixed(4);
+            
+            // Update confusion matrix
+            document.getElementById('tp').textContent = tp;
+            document.getElementById('tn').textContent = tn;
+            document.getElementById('fp').textContent = fp;
+            document.getElementById('fn').textContent = fn;
+            
+            // Generate ROC curve (simplified)
+            generateROCCurve(actualValues, predictedValues);
+            
+            // Store evaluation results
+            evaluationResults = {
+                accuracy,
+                precision,
+                recall,
+                f1,
+                confusionMatrix: { tp, tn, fp, fn },
+                rocData: { actualValues, predictedValues }
+            };
+            
+            // Enable prediction section
+            document.querySelector('.nav-item[data-section="prediction"]').classList.remove('disabled');
+            
+            // Clean up
+            predictions.dispose();
+        }
+
+        // Generate ROC curve
+        function generateROCCurve(actualValues, predictedValues) {
+            // Calculate ROC points (simplified)
+            const thresholds = Array.from({length: 101}, (_, i) => i / 100);
+            const tpr = []; // True Positive Rate
+            const fpr = []; // False Positive Rate
+            
+            thresholds.forEach(threshold => {
+                let tp = 0, fp = 0, tn = 0, fn = 0;
+                
+                for (let i = 0; i < actualValues.length; i++) {
+                    const prediction = predictedValues[i] >= threshold ? 1 : 0;
+                    
+                    if (actualValues[i] === 1 && prediction === 1) tp++;
+                    else if (actualValues[i] === 0 && prediction === 1) fp++;
+                    else if (actualValues[i] === 0 && prediction === 0) tn++;
+                    else if (actualValues[i] === 1 && prediction === 0) fn++;
+                }
+                
+                tpr.push(tp / (tp + fn) || 0);
+                fpr.push(fp / (fp + tn) || 0);
+            });
+            
+            // Calculate AUC (simplified)
+            let auc = 0;
+            for (let i = 1; i < thresholds.length; i++) {
+                auc += (fpr[i] - fpr[i-1]) * (tpr[i] + tpr[i-1]) / 2;
+            }
+            
+            document.getElementById('auc-value').textContent = auc.toFixed(4);
+            
+            // Create ROC chart
+            const ctx = document.getElementById('roc-chart').getContext('2d');
+            
+            // Destroy existing chart if it exists
+            if (window.rocChart) {
+                window.rocChart.destroy();
+            }
+            
+            window.rocChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: fpr,
+                    datasets: [
+                        {
+                            label: 'ROC Curve',
+                            data: tpr,
+                            borderColor: 'rgba(52, 152, 219, 1)',
+                            backgroundColor: 'rgba(52, 152, 219, 0.1)',
+                            tension: 0.1,
+                            fill: true
+                        },
+                        {
+                            label: 'Random Classifier',
+                            data: fpr,
+                            borderColor: 'rgba(231, 76, 60, 1)',
+                            borderDash: [5, 5],
+                            tension: 0.1,
+                            fill: false
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'False Positive Rate'
+                            },
+                            min: 0,
+                            max: 1
+                        },
+                        y: {
+                            title: {
+                                display: true,
+                                text: 'True Positive Rate'
+                            },
+                            min: 0,
+                            max: 1
+                        }
+                    }
+                }
+            });
+            
+            // Update threshold slider
+            const thresholdSlider = document.getElementById('threshold-slider');
+            thresholdSlider.addEventListener('input', function() {
+                const threshold = this.value / 100;
+                document.getElementById('threshold-value').textContent = threshold.toFixed(2);
+                
+                // Update ROC curve with threshold point
+                updateROCThreshold(threshold, tpr, fpr);
+            });
+        }
+
+        // Update ROC curve with threshold point
+        function updateROCThreshold(threshold, tpr, fpr) {
+            const index = Math.round(threshold * 100);
+            
+            if (window.rocChart.data.datasets.length > 2) {
+                window.rocChart.data.datasets.pop();
+            }
+            
+            window.rocChart.data.datasets.push({
+                label: `Threshold (${threshold.toFixed(2)})`,
+                data: Array(tpr.length).fill(null).map((_, i) => i === index ? tpr[i] : null),
+                pointBackgroundColor: 'rgba(243, 156, 18, 1)',
+                pointBorderColor: 'rgba(243, 156, 18, 1)',
+                pointRadius: 8,
+                showLine: false
+            });
+            
+            window.rocChart.update();
+        }
+
+        // Initialize prediction form
+        function initializePredictionForm() {
+            document.getElementById('predict-btn').addEventListener('click', makePrediction);
+        }
+
+        // Make prediction using the trained model
+        async function makePrediction() {
+            if (!model) {
+                alert('No model available for prediction. Please train a model first.');
+                return;
+            }
+            
+            // Collect form data
+            const formData = {
+                age: parseInt(document.getElementById('age').value),
+                maritalStatus: document.getElementById('marital-status').value,
+                education: document.getElementById('education').value,
+                children: parseInt(document.getElementById('children').value),
+                smoking: document.getElementById('smoking').value,
+                activity: document.getElementById('activity').value,
+                employment: document.getElementById('employment').value,
+                income: parseInt(document.getElementById('income').value),
+                alcohol: document.getElementById('alcohol').value,
+                diet: document.getElementById('diet').value,
+                sleep: document.getElementById('sleep').value,
+                mentalIllness: document.querySelector('input[name="mental-illness"]:checked').value,
+                substanceAbuse: document.querySelector('input[name="substance-abuse"]:checked').value,
+                familyHistory: document.querySelector('input[name="family-history"]:checked').value,
+                chronicConditions: document.querySelector('input[name="chronic-conditions"]:checked').value
+            };
+            
+            // Preprocess form data (similar to training data preprocessing)
+            const featureValues = [];
+            
+            // Process each feature (this should match the training preprocessing)
+            Object.values(formData).forEach(value => {
+                let processedValue = value;
+                
+                // Handle categorical variables (same encoding as during training)
+                if (typeof value === 'string') {
+                    // Simple hash-based encoding (should match training)
+                    processedValue = value.split('').reduce((a, b) => {
+                        a = ((a << 5) - a) + b.charCodeAt(0);
+                        return a & a;
+                    }, 0) % 100 / 100;
+                }
+                
+                // Convert Yes/No to 1/0
+                if (value === 'Yes') processedValue = 1;
+                if (value === 'No') processedValue = 0;
+                
+                featureValues.push(processedValue);
+            });
+            
+            // Convert to tensor and make prediction
+            const inputTensor = tf.tensor2d([featureValues]);
+            const prediction = model.predict(inputTensor);
+            const probability = (await prediction.data())[0];
+            
+            // Update prediction result
+            const riskPercentage = (probability * 100).toFixed(2);
+            const riskLabel = probability >= 0.5 ? 'High Risk' : 'Low Risk';
+            
+            const resultElement = document.getElementById('prediction-result');
+            resultElement.querySelector('.risk-percentage').textContent = `${riskPercentage}%`;
+            resultElement.querySelector('.risk-label').textContent = riskLabel;
+            
+            if (probability >= 0.5) {
+                resultElement.className = 'prediction-result risk-high';
+                resultElement.querySelector('p').textContent = 'Based on the input features, this individual has a high risk of depression.';
+            } else {
+                resultElement.className = 'prediction-result risk-low';
+                resultElement.querySelector('p').textContent = 'Based on the input features, this individual has a low risk of depression.';
+            }
+            
+            // Update feature importance chart (placeholder)
+            updateFeatureImportanceChart(formData, probability);
+            
+            // Clean up
+            inputTensor.dispose();
+            prediction.dispose();
+        }
+
+        // Update feature importance chart
+        function updateFeatureImportanceChart(formData, probability) {
+            // This is a simplified feature importance visualization
+            // In a real application, you would calculate actual feature importance
+            const features = Object.keys(formData);
+            const importance = features.map(() => Math.random() * 100); // Placeholder
+            
+            const ctx = document.getElementById('feature-importance-chart').getContext('2d');
+            
+            // Destroy existing chart if it exists
+            if (window.featureImportanceChart) {
+                window.featureImportanceChart.destroy();
+            }
+            
+            window.featureImportanceChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: features,
+                    datasets: [{
+                        label: 'Feature Importance',
+                        data: importance,
+                        backgroundColor: 'rgba(52, 152, 219, 0.7)',
+                        borderColor: 'rgba(52, 152, 219, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    indexAxis: 'y',
+                    scales: {
+                        x: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Importance'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Initialize export buttons
+        function initializeExportButtons() {
+            document.getElementById('export-data').addEventListener('click', exportData);
+            document.getElementById('export-model-weights').addEventListener('click', exportModelWeights);
+            document.getElementById('export-model-architecture').addEventListener('click', exportModelArchitecture);
+            document.getElementById('export-training-history').addEventListener('click', exportTrainingHistory);
+            document.getElementById('export-predictions').addEventListener('click', exportPredictions);
+        }
+
+        // Export preprocessed data
+        function exportData() {
+            if (!preprocessedData) {
+                alert('No preprocessed data available for export.');
+                return;
+            }
+            
+            const csv = Papa.unparse(preprocessedData);
+            downloadFile(csv, 'preprocessed_data.csv', 'text/csv');
+        }
+
+        // Export model weights
+        function exportModelWeights() {
+            if (!model) {
+                alert('No model available for export.');
+                return;
+            }
+            
+            // Get model weights
+            const weights = [];
+            model.layers.forEach(layer => {
+                const layerWeights = layer.getWeights();
+                layerWeights.forEach(weight => {
+                    weights.push({
+                        name: layer.name,
+                        shape: weight.shape,
+                        values: Array.from(weight.dataSync())
+                    });
+                });
+            });
+            
+            const json = JSON.stringify(weights, null, 2);
+            downloadFile(json, 'model_weights.json', 'application/json');
+        }
+
+        // Export model architecture
+        function exportModelArchitecture() {
+            if (!model) {
+                alert('No model available for export.');
+                return;
+            }
+            
+            const architecture = {
+                layers: model.layers.map(layer => ({
+                    name: layer.name,
+                    type: layer.getClassName(),
+                    config: layer.getConfig()
+                }))
+            };
+            
+            const json = JSON.stringify(architecture, null, 2);
+            downloadFile(json, 'model_architecture.json', 'application/json');
+        }
+
+        // Export training history
+        function exportTrainingHistory() {
+            if (!trainingHistory) {
+                alert('No training history available for export.');
+                return;
+            }
+            
+            const csvData = [];
+            csvData.push(['Epoch', 'Loss', 'Validation Loss', 'Accuracy', 'Validation Accuracy']);
+            
+            trainingHistory.epochs.forEach((epoch, i) => {
+                csvData.push([
+                    epoch,
+                    trainingHistory.loss[i],
+                    trainingHistory.valLoss[i],
+                    trainingHistory.acc[i],
+                    trainingHistory.valAcc[i]
+                ]);
+            });
+            
+            const csv = Papa.unparse(csvData);
+            downloadFile(csv, 'training_history.csv', 'text/csv');
+        }
+
+        // Export predictions
+        function exportPredictions() {
+            if (!evaluationResults) {
+                alert('No prediction results available for export.');
+                return;
+            }
+            
+            // This would export the predictions made during evaluation
+            // In a real application, you might have a separate predictions dataset
+            alert('Prediction export functionality would be implemented here.');
+        }
+
+        // Utility function to download files
+        function downloadFile(content, fileName, contentType) {
+            const blob = new Blob([content], { type: contentType });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = fileName;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+    </script>
+</body>
+</html>
