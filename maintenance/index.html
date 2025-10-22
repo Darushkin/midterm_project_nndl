@@ -639,11 +639,26 @@
             margin: 10px 0;
         }
         
-        .sampling-methods {
+        .sampling-section {
+            background: #e8f4f8;
+            border: 1px solid #b3d9e6;
+            border-radius: 5px;
+            padding: 15px;
+            margin-top: 15px;
+        }
+        
+        .sampling-options {
             display: flex;
             gap: 10px;
-            margin-top: 15px;
+            margin-top: 10px;
             flex-wrap: wrap;
+        }
+        
+        .sampling-info {
+            margin-top: 10px;
+            padding: 10px;
+            background: white;
+            border-radius: 5px;
         }
     </style>
 </head>
@@ -651,7 +666,7 @@
     <div class="container">
         <header>
             <h1>Machine Failure Prediction System</h1>
-            <p class="subtitle">Complete ML Pipeline with Class Imbalance Handling and ROC-AUC Analysis</p>
+            <p class="subtitle">Complete ML Pipeline with SMOTE for Class Imbalance</p>
         </header>
         
         <div class="ml-pipeline">
@@ -995,12 +1010,12 @@
         </div>
         
         <footer>
-            <p>Machine Failure Prediction System &copy; 2023 | Complete ML Pipeline with Class Imbalance Handling</p>
+            <p>Machine Failure Prediction System &copy; 2023 | Complete ML Pipeline with SMOTE</p>
         </footer>
     </div>
 
     <script>
-        // Enhanced ML Pipeline with Class Imbalance Handling and ROC-AUC
+        // Enhanced ML Pipeline with SMOTE for Class Imbalance
         class MLPipeline {
             constructor() {
                 this.csvParser = new FlexibleCSVParser();
@@ -1010,6 +1025,8 @@
                 this.X_test = [];
                 this.y_train = [];
                 this.y_test = [];
+                this.X_train_balanced = [];
+                this.y_train_balanced = [];
                 this.processedData = {
                     X_train_processed: [],
                     X_test_processed: [],
@@ -1034,8 +1051,8 @@
                 this.columnMapping = {};
                 this.missingValues = {};
                 this.hasMissingValues = false;
-                this.classWeights = {0: 1, 1: 1}; // For handling class imbalance
-                this.predictionThreshold = 0.5; // Default threshold
+                this.predictionThreshold = 0.5;
+                this.samplingMethod = 'smote'; // По умолчанию используем SMOTE
             }
             
             loadData(csvText) {
@@ -1447,9 +1464,215 @@
                 };
             }
             
+            // Новый метод для балансировки данных
+            balanceTrainingData(method = 'smote') {
+                this.samplingMethod = method;
+                
+                if (method === 'none') {
+                    // Без балансировки
+                    this.X_train_balanced = this.processedData.X_train_processed;
+                    this.y_train_balanced = this.processedData.y_train;
+                    return {
+                        method: 'none',
+                        originalSize: this.processedData.X_train_processed.length,
+                        balancedSize: this.processedData.X_train_processed.length
+                    };
+                }
+                else if (method === 'smote') {
+                    return this.applySMOTE();
+                }
+                else if (method === 'oversample') {
+                    return this.applyRandomOversampling();
+                }
+            }
+            
+            // Реализация SMOTE
+            applySMOTE() {
+                const minorityClass = 1;
+                const k = 5; // Количество ближайших соседей
+                
+                // Разделяем данные на majority и minority классы
+                const minoritySamples = [];
+                const majoritySamples = [];
+                
+                for (let i = 0; i < this.processedData.X_train_processed.length; i++) {
+                    if (this.processedData.y_train[i] === minorityClass) {
+                        minoritySamples.push(this.processedData.X_train_processed[i]);
+                    } else {
+                        majoritySamples.push(this.processedData.X_train_processed[i]);
+                    }
+                }
+                
+                const minorityCount = minoritySamples.length;
+                const majorityCount = majoritySamples.length;
+                
+                // Вычисляем, сколько синтетических примеров нужно создать
+                const desiredRatio = 0.5; // Баланс 50/50
+                const desiredMinorityCount = Math.floor(majorityCount * desiredRatio / (1 - desiredRatio));
+                const samplesToGenerate = desiredMinorityCount - minorityCount;
+                
+                if (samplesToGenerate <= 0) {
+                    // Если minority класс уже достаточно большой
+                    this.X_train_balanced = this.processedData.X_train_processed;
+                    this.y_train_balanced = this.processedData.y_train;
+                    return {
+                        method: 'smote',
+                        originalSize: this.processedData.X_train_processed.length,
+                        balancedSize: this.processedData.X_train_processed.length,
+                        minorityCount,
+                        majorityCount,
+                        samplesGenerated: 0
+                    };
+                }
+                
+                // Генерируем синтетические примеры
+                const syntheticSamples = [];
+                
+                for (let i = 0; i < samplesToGenerate; i++) {
+                    // Выбираем случайный пример из minority класса
+                    const randomIndex = Math.floor(Math.random() * minorityCount);
+                    const baseSample = minoritySamples[randomIndex];
+                    
+                    // Находим k ближайших соседей
+                    const neighbors = this.findKNearestNeighbors(baseSample, minoritySamples, k);
+                    
+                    // Выбираем случайного соседа
+                    const neighbor = neighbors[Math.floor(Math.random() * k)];
+                    
+                    // Создаем синтетический пример
+                    const syntheticSample = [];
+                    for (let j = 0; j < baseSample.length; j++) {
+                        const diff = neighbor[j] - baseSample[j];
+                        const gap = Math.random();
+                        syntheticSample.push(baseSample[j] + gap * diff);
+                    }
+                    
+                    syntheticSamples.push(syntheticSample);
+                }
+                
+                // Объединяем оригинальные и синтетические данные
+                this.X_train_balanced = [
+                    ...this.processedData.X_train_processed,
+                    ...syntheticSamples
+                ];
+                
+                this.y_train_balanced = [
+                    ...this.processedData.y_train,
+                    ...Array(syntheticSamples.length).fill(minorityClass)
+                ];
+                
+                return {
+                    method: 'smote',
+                    originalSize: this.processedData.X_train_processed.length,
+                    balancedSize: this.X_train_balanced.length,
+                    minorityCount,
+                    majorityCount,
+                    samplesGenerated: syntheticSamples.length
+                };
+            }
+            
+            // Метод для поиска k ближайших соседей
+            findKNearestNeighbors(sample, samples, k) {
+                const distances = [];
+                
+                for (let i = 0; i < samples.length; i++) {
+                    // Пропускаем тот же самый образец
+                    if (samples[i] === sample) continue;
+                    
+                    let distance = 0;
+                    for (let j = 0; j < sample.length; j++) {
+                        distance += Math.pow(sample[j] - samples[i][j], 2);
+                    }
+                    distance = Math.sqrt(distance);
+                    
+                    distances.push({ index: i, distance });
+                }
+                
+                // Сортируем по расстоянию и берем k ближайших
+                distances.sort((a, b) => a.distance - b.distance);
+                return distances.slice(0, k).map(d => samples[d.index]);
+            }
+            
+            // Простой oversampling (дублирование примеров)
+            applyRandomOversampling() {
+                const minorityClass = 1;
+                
+                // Разделяем данные
+                const minoritySamples = [];
+                const majoritySamples = [];
+                const minorityLabels = [];
+                const majorityLabels = [];
+                
+                for (let i = 0; i < this.processedData.X_train_processed.length; i++) {
+                    if (this.processedData.y_train[i] === minorityClass) {
+                        minoritySamples.push(this.processedData.X_train_processed[i]);
+                        minorityLabels.push(minorityClass);
+                    } else {
+                        majoritySamples.push(this.processedData.X_train_processed[i]);
+                        majorityLabels.push(0);
+                    }
+                }
+                
+                const minorityCount = minoritySamples.length;
+                const majorityCount = majoritySamples.length;
+                
+                // Вычисляем, сколько примеров нужно добавить
+                const desiredRatio = 0.5;
+                const desiredMinorityCount = Math.floor(majorityCount * desiredRatio / (1 - desiredRatio));
+                const samplesToAdd = desiredMinorityCount - minorityCount;
+                
+                if (samplesToAdd <= 0) {
+                    this.X_train_balanced = this.processedData.X_train_processed;
+                    this.y_train_balanced = this.processedData.y_train;
+                    return {
+                        method: 'oversample',
+                        originalSize: this.processedData.X_train_processed.length,
+                        balancedSize: this.processedData.X_train_processed.length,
+                        minorityCount,
+                        majorityCount,
+                        samplesAdded: 0
+                    };
+                }
+                
+                // Добавляем случайные дубликаты minority примеров
+                const oversampledMinority = [...minoritySamples];
+                const oversampledMinorityLabels = [...minorityLabels];
+                
+                for (let i = 0; i < samplesToAdd; i++) {
+                    const randomIndex = Math.floor(Math.random() * minorityCount);
+                    oversampledMinority.push([...minoritySamples[randomIndex]]);
+                    oversampledMinorityLabels.push(minorityClass);
+                }
+                
+                // Объединяем данные
+                this.X_train_balanced = [
+                    ...majoritySamples,
+                    ...oversampledMinority
+                ];
+                
+                this.y_train_balanced = [
+                    ...majorityLabels,
+                    ...oversampledMinorityLabels
+                ];
+                
+                return {
+                    method: 'oversample',
+                    originalSize: this.processedData.X_train_processed.length,
+                    balancedSize: this.X_train_balanced.length,
+                    minorityCount,
+                    majorityCount,
+                    samplesAdded: samplesToAdd
+                };
+            }
+            
+            setSamplingMethod(method) {
+                this.samplingMethod = method;
+            }
+            
             trainModel() {
-                // Calculate class weights to handle imbalance
-                this.calculateClassWeights();
+                // Балансируем данные перед обучением
+                const balanceInfo = this.balanceTrainingData(this.samplingMethod);
+                console.log("Balance info:", balanceInfo);
                 
                 // Simple neural network implementation
                 const inputSize = this.processedData.X_train_processed[0].length;
@@ -1471,13 +1694,16 @@
                 const learningRate = 0.01;
                 const epochs = 100;
                 
-                // Training loop
+                // Training loop - используем сбалансированные данные
+                const trainingData = this.X_train_balanced;
+                const trainingLabels = this.y_train_balanced;
+                
                 for (let epoch = 0; epoch < epochs; epoch++) {
                     let totalLoss = 0;
                     
-                    for (let i = 0; i < this.processedData.X_train_processed.length; i++) {
-                        const input = this.processedData.X_train_processed[i];
-                        const target = this.processedData.y_train[i];
+                    for (let i = 0; i < trainingData.length; i++) {
+                        const input = trainingData[i];
+                        const target = trainingLabels[i];
                         
                         // Forward pass
                         const hidden = Array(hiddenSize).fill(0);
@@ -1498,13 +1724,12 @@
                             output[j] = 1 / (1 + Math.exp(-sum)); // Sigmoid activation
                         }
                         
-                        // Calculate weighted loss (binary cross-entropy with class weights)
-                        const weight = target === 1 ? this.classWeights[1] : this.classWeights[0];
-                        const loss = -weight * (target * Math.log(output[0]) + (1 - target) * Math.log(1 - output[0]));
+                        // Calculate loss (binary cross-entropy)
+                        const loss = -target * Math.log(output[0]) - (1 - target) * Math.log(1 - output[0]);
                         totalLoss += loss;
                         
                         // Backward pass
-                        const outputError = (output[0] - target) * weight;
+                        const outputError = output[0] - target;
                         
                         // Update weights and biases for output layer
                         for (let j = 0; j < hiddenSize; j++) {
@@ -1552,33 +1777,15 @@
                 // Calculate feature importance (simplified)
                 this.calculateFeatureImportance();
                 
-                return this.model;
-            }
-            
-            calculateClassWeights() {
-                // Count classes in training data
-                const classCounts = {0: 0, 1: 0};
-                this.processedData.y_train.forEach(label => {
-                    classCounts[label] = (classCounts[label] || 0) + 1;
-                });
-                
-                // Calculate weights inversely proportional to class frequencies
-                const total = this.processedData.y_train.length;
-                this.classWeights = {
-                    0: total / (2 * classCounts[0]),
-                    1: total / (2 * classCounts[1])
+                return {
+                    model: this.model,
+                    balanceInfo: balanceInfo
                 };
-                
-                console.log("Class weights:", this.classWeights);
-                return this.classWeights;
             }
             
             calculateFeatureImportance() {
-                // Simplified feature importance calculation
-                // Based on the magnitude of weights in the first layer
                 const { weights1 } = this.model;
                 
-                // Sum absolute weights for each input feature
                 this.featureImportance = Array(weights1.length).fill(0);
                 for (let i = 0; i < weights1.length; i++) {
                     for (let j = 0; j < weights1[i].length; j++) {
@@ -1586,7 +1793,6 @@
                     }
                 }
                 
-                // Normalize to percentages
                 const total = this.featureImportance.reduce((sum, val) => sum + val, 0);
                 this.featureImportance = this.featureImportance.map(val => (val / total) * 100);
                 
@@ -1939,6 +2145,46 @@
                 document.getElementById('reset-btn').addEventListener('click', () => {
                     this.resetForm();
                 });
+                
+                // Добавляем обработчики для выбора метода балансировки
+                document.addEventListener('click', (e) => {
+                    if (e.target.classList.contains('sampling-method-btn')) {
+                        const method = e.target.getAttribute('data-method');
+                        this.pipeline.setSamplingMethod(method);
+                        
+                        // Обновляем UI выбранного метода
+                        document.querySelectorAll('.sampling-method-btn').forEach(btn => {
+                            btn.classList.remove('btn-success');
+                            btn.classList.add('btn-warning');
+                        });
+                        e.target.classList.remove('btn-warning');
+                        e.target.classList.add('btn-success');
+                        
+                        // Показываем информацию о методе
+                        this.showSamplingInfo(method);
+                    }
+                });
+            }
+            
+            // Добавляем метод для отображения информации о балансировке
+            showSamplingInfo(method) {
+                const infoContainer = document.getElementById('sampling-info');
+                if (!infoContainer) return;
+                
+                let info = '';
+                switch(method) {
+                    case 'none':
+                        info = '<p><strong>Без балансировки:</strong> Используются оригинальные данные. Модель может быть смещена к majority классу.</p>';
+                        break;
+                    case 'oversample':
+                        info = '<p><strong>Random Oversampling:</strong> Дублирование примеров minority класса. Может привести к переобучению.</p>';
+                        break;
+                    case 'smote':
+                        info = '<p><strong>SMOTE:</strong> Создание синтетических примеров minority класса. Лучше сохраняет распределение данных.</p>';
+                        break;
+                }
+                
+                infoContainer.innerHTML = info;
             }
             
             handleFileUpload(file) {
@@ -2474,7 +2720,26 @@
                 html += '<li>Training/test split before preprocessing to avoid data leakage</li>';
                 html += '</ul>';
                 
+                // Добавляем секцию выбора метода балансировки
+                html += `
+                    <div class="sampling-section">
+                        <h4>Class Imbalance Handling</h4>
+                        <p>Your dataset has severe class imbalance. Choose a method to handle it:</p>
+                        <div class="sampling-options">
+                            <button class="btn btn-warning sampling-method-btn" data-method="none">No Balancing</button>
+                            <button class="btn btn-warning sampling-method-btn" data-method="oversample">Random Oversampling</button>
+                            <button class="btn btn-success sampling-method-btn" data-method="smote">SMOTE (Recommended)</button>
+                        </div>
+                        <div id="sampling-info" class="sampling-info">
+                            <p><strong>SMOTE (Recommended):</strong> Creates synthetic minority class examples. Better preserves data distribution.</p>
+                        </div>
+                    </div>
+                `;
+                
                 preprocessingContent.innerHTML = html;
+                
+                // Инициализируем информацию о балансировке
+                this.showSamplingInfo('smote');
                 
                 // Show preprocessed data preview
                 this.displayPreprocessedPreview(processedData.processedData.X_train_processed.slice(0, 10));
@@ -2521,19 +2786,35 @@
                 this.switchTab('training');
                 
                 setTimeout(() => {
-                    const model = this.pipeline.trainModel();
+                    const result = this.pipeline.trainModel();
+                    const balanceInfo = result.balanceInfo;
                     
                     const trainingContent = document.getElementById('training-content');
                     trainingContent.innerHTML = `
                         <h4>Model Training Complete</h4>
                         <p>The neural network has been successfully trained with the following architecture:</p>
                         <ul>
-                            <li>Input Layer: ${model.inputSize} neurons</li>
-                            <li>Hidden Layer: ${model.hiddenSize} neurons (ReLU activation)</li>
-                            <li>Output Layer: ${model.outputSize} neuron (Sigmoid activation)</li>
+                            <li>Input Layer: ${result.model.inputSize} neurons</li>
+                            <li>Hidden Layer: ${result.model.hiddenSize} neurons (ReLU activation)</li>
+                            <li>Output Layer: ${result.model.outputSize} neuron (Sigmoid activation)</li>
                         </ul>
-                        <p>Training completed with 100 epochs using class-weighted binary cross-entropy loss.</p>
-                        <p><strong>Class weights applied:</strong> No Failure: ${this.pipeline.classWeights[0].toFixed(2)}, Failure: ${this.pipeline.classWeights[1].toFixed(2)}</p>
+                        <p>Training completed with 100 epochs using binary cross-entropy loss.</p>
+                        
+                        <div class="sampling-info">
+                            <h5>Data Balancing Information</h5>
+                            <p><strong>Method:</strong> ${balanceInfo.method.toUpperCase()}</p>
+                            <p><strong>Original training size:</strong> ${balanceInfo.originalSize} samples</p>
+                            <p><strong>Balanced training size:</strong> ${balanceInfo.balancedSize} samples</p>
+                            ${balanceInfo.minorityCount !== undefined ? 
+                                `<p><strong>Minority class samples:</strong> ${balanceInfo.minorityCount} → ${balanceInfo.minorityCount + (balanceInfo.samplesGenerated || balanceInfo.samplesAdded || 0)}</p>` : 
+                                ''}
+                            ${balanceInfo.samplesGenerated !== undefined ? 
+                                `<p><strong>Synthetic samples generated:</strong> ${balanceInfo.samplesGenerated}</p>` : 
+                                ''}
+                            ${balanceInfo.samplesAdded !== undefined ? 
+                                `<p><strong>Samples added:</strong> ${balanceInfo.samplesAdded}</p>` : 
+                                ''}
+                        </div>
                     `;
                     
                     // Update step 5 status
@@ -2606,10 +2887,7 @@
                 // Add class imbalance handling info
                 html += '<div class="missing-values-section" style="margin-top: 20px;">';
                 html += '<h4>Class Imbalance Handling</h4>';
-                html += '<p>The model uses class-weighted loss function to handle the 96.6%/3.4% class imbalance.</p>';
-                html += '<p>Class weights applied: ';
-                html += `<strong>No Failure: ${this.pipeline.classWeights[0].toFixed(2)}, Failure: ${this.pipeline.classWeights[1].toFixed(2)}</strong>`;
-                html += '</p>';
+                html += '<p>The model uses SMOTE to handle the class imbalance.</p>';
                 html += '<p>You can adjust the classification threshold to balance precision and recall.</p>';
                 html += '</div>';
                 
