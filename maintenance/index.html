@@ -589,6 +589,27 @@
             border-radius: 5px;
             margin-top: 15px;
         }
+        
+        .missing-values-table {
+            width: 100%;
+            margin: 15px 0;
+        }
+        
+        .missing-values-table th {
+            background: var(--light);
+            padding: 10px;
+            text-align: left;
+        }
+        
+        .missing-values-table td {
+            padding: 10px;
+            border-bottom: 1px solid #ddd;
+        }
+        
+        .missing-count {
+            font-weight: bold;
+            color: var(--danger);
+        }
     </style>
 </head>
 <body>
@@ -927,7 +948,7 @@
     </div>
 
     <script>
-        // Enhanced ML Pipeline with Proper Train/Test Split BEFORE Preprocessing
+        // Enhanced ML Pipeline with Missing Values Handling
         class MLPipeline {
             constructor() {
                 this.csvParser = new FlexibleCSVParser();
@@ -981,7 +1002,7 @@
                             Failure: row.failure
                         };
                     }).filter(record => {
-                        // Remove records with critical missing values
+                        // Remove records with critical missing values in Type or Failure
                         return record.Type !== null && record.Failure !== null;
                     });
                     
@@ -1001,13 +1022,19 @@
                 this.missingValues = {};
                 this.hasMissingValues = false;
                 
-                for (const [key, actualHeader] of Object.entries(this.columnMapping)) {
-                    const missingCount = this.rawData.filter(row => row[key] === null).length;
-                    this.missingValues[key] = missingCount;
+                // Calculate missing values for each column
+                const columns = ['type', 'airtemp', 'processtemp', 'rotationalspeed', 'torque', 'toolwear', 'failure'];
+                
+                columns.forEach(col => {
+                    const missingCount = this.rawData.filter(row => 
+                        row[col] === null || row[col] === undefined || row[col] === ''
+                    ).length;
+                    
+                    this.missingValues[col] = missingCount;
                     if (missingCount > 0) {
                         this.hasMissingValues = true;
                     }
-                }
+                });
             }
             
             handleMissingValues(strategy) {
@@ -1016,41 +1043,50 @@
                 if (strategy === 'delete') {
                     // Delete rows with any missing values
                     this.rawData = this.rawData.filter(row => {
-                        return Object.values(row).every(value => value !== null);
+                        return Object.values(row).every(value => 
+                            value !== null && value !== undefined && value !== ''
+                        );
                     });
                 } else if (strategy === 'fill') {
                     // Fill missing values with median for numeric, mode for categorical
-                    for (const [key, actualHeader] of Object.entries(this.columnMapping)) {
-                        const values = this.rawData.map(row => row[key]).filter(val => val !== null);
+                    const columns = ['type', 'airtemp', 'processtemp', 'rotationalspeed', 'torque', 'toolwear', 'failure'];
+                    
+                    columns.forEach(col => {
+                        const values = this.rawData
+                            .map(row => row[col])
+                            .filter(val => val !== null && val !== undefined && val !== '');
                         
-                        if (values.length === 0) continue;
+                        if (values.length === 0) return;
                         
                         let fillValue;
-                        if (['airtemp', 'processtemp', 'rotationalspeed', 'torque', 'toolwear'].includes(key)) {
+                        
+                        if (['airtemp', 'processtemp', 'rotationalspeed', 'torque', 'toolwear'].includes(col)) {
                             // Numeric - use median
-                            values.sort((a, b) => a - b);
-                            fillValue = values[Math.floor(values.length / 2)];
-                        } else if (key === 'type') {
+                            const sorted = [...values].sort((a, b) => a - b);
+                            fillValue = sorted[Math.floor(sorted.length / 2)];
+                        } else if (col === 'type') {
                             // Categorical - use mode
                             const frequency = {};
                             values.forEach(val => {
                                 frequency[val] = (frequency[val] || 0) + 1;
                             });
-                            fillValue = Object.keys(frequency).reduce((a, b) => frequency[a] > frequency[b] ? a : b);
-                        } else if (key === 'failure') {
+                            fillValue = Object.keys(frequency).reduce((a, b) => 
+                                frequency[a] > frequency[b] ? a : b
+                            );
+                        } else if (col === 'failure') {
                             // Binary - use mode
-                            const zeros = values.filter(val => val === 0).length;
-                            const ones = values.filter(val => val === 1).length;
+                            const zeros = values.filter(val => val === 0 || val === '0').length;
+                            const ones = values.filter(val => val === 1 || val === '1').length;
                             fillValue = zeros > ones ? 0 : 1;
                         }
                         
                         // Fill missing values
                         this.rawData.forEach(row => {
-                            if (row[key] === null) {
-                                row[key] = fillValue;
+                            if (row[col] === null || row[col] === undefined || row[col] === '') {
+                                row[col] = fillValue;
                             }
                         });
-                    }
+                    });
                 }
                 
                 // Recalculate missing values
@@ -1070,6 +1106,21 @@
                 }).filter(record => {
                     return record.Type !== null && record.Failure !== null;
                 });
+            }
+            
+            getDatasetInfo() {
+                const totalRecords = this.dataset.length;
+                const failureCount = this.dataset.filter(d => d.Failure === 1).length;
+                const failureRate = totalRecords > 0 ? (failureCount / totalRecords * 100).toFixed(2) : '0.00';
+                
+                return {
+                    totalRecords,
+                    failureCount,
+                    failureRate,
+                    features: 6,
+                    missingValues: this.missingValues,
+                    hasMissingValues: this.hasMissingValues
+                };
             }
             
             // Split data into train/test sets BEFORE preprocessing
@@ -1107,14 +1158,180 @@
                 };
             }
             
+            performEDA() {
+                // Calculate numeric statistics
+                this.calculateNumericStats();
+                
+                // Calculate categorical statistics
+                this.calculateCategoricalStats();
+                
+                // Calculate correlation matrix
+                this.calculateCorrelationMatrix();
+                
+                return {
+                    numericStats: this.numericStats,
+                    categoricalStats: this.categoricalStats,
+                    correlationMatrix: this.correlationMatrix
+                };
+            }
+            
+            calculateNumericStats() {
+                const numericFeatures = ['AirTemp', 'ProcessTemp', 'RotationalSpeed', 'Torque', 'ToolWear'];
+                this.numericStats = {};
+                
+                numericFeatures.forEach(feature => {
+                    const values = this.dataset.map(d => d[feature]).filter(val => val !== null);
+                    if (values.length === 0) return;
+                    
+                    values.sort((a, b) => a - b);
+                    const mean = values.reduce((a, b) => a + b, 0) / values.length;
+                    const median = values[Math.floor(values.length / 2)];
+                    const min = values[0];
+                    const max = values[values.length - 1];
+                    const std = Math.sqrt(values.reduce((sq, n) => sq + Math.pow(n - mean, 2), 0) / values.length);
+                    
+                    this.numericStats[feature] = {
+                        mean: mean.toFixed(2),
+                        median: median.toFixed(2),
+                        min: min.toFixed(2),
+                        max: max.toFixed(2),
+                        std: std.toFixed(2),
+                        count: values.length
+                    };
+                });
+                
+                return this.numericStats;
+            }
+            
+            calculateCategoricalStats() {
+                const typeValues = this.dataset.map(record => record.Type).filter(val => val !== null);
+                const failureValues = this.dataset.map(record => record.Failure).filter(val => val !== null);
+                
+                // Type distribution
+                const typeCounts = {};
+                typeValues.forEach(type => {
+                    typeCounts[type] = (typeCounts[type] || 0) + 1;
+                });
+                
+                // Failure distribution
+                const failureCounts = { 0: 0, 1: 0 };
+                failureValues.forEach(failure => {
+                    failureCounts[failure] = (failureCounts[failure] || 0) + 1;
+                });
+                
+                this.categoricalStats = {
+                    Type: typeCounts,
+                    Failure: failureCounts
+                };
+                
+                return this.categoricalStats;
+            }
+            
+            calculateCorrelationMatrix() {
+                const numericFeatures = ['AirTemp', 'ProcessTemp', 'RotationalSpeed', 'Torque', 'ToolWear', 'Failure'];
+                const matrix = [];
+                
+                // Initialize matrix
+                for (let i = 0; i < numericFeatures.length; i++) {
+                    matrix[i] = [];
+                    for (let j = 0; j < numericFeatures.length; j++) {
+                        matrix[i][j] = 0;
+                    }
+                }
+                
+                // Calculate correlations
+                for (let i = 0; i < numericFeatures.length; i++) {
+                    for (let j = 0; j < numericFeatures.length; j++) {
+                        if (i === j) {
+                            matrix[i][j] = 1;
+                        } else {
+                            const col1 = numericFeatures[i];
+                            const col2 = numericFeatures[j];
+                            
+                            const values1 = this.dataset.map(record => record[col1]).filter(val => val !== null);
+                            const values2 = this.dataset.map(record => record[col2]).filter(val => val !== null);
+                            
+                            // Ensure we have the same number of values
+                            const minLength = Math.min(values1.length, values2.length);
+                            const v1 = values1.slice(0, minLength);
+                            const v2 = values2.slice(0, minLength);
+                            
+                            if (minLength > 0) {
+                                matrix[i][j] = this.calculateCorrelation(v1, v2);
+                            }
+                        }
+                    }
+                }
+                
+                this.correlationMatrix = {
+                    matrix,
+                    columns: numericFeatures
+                };
+                
+                return this.correlationMatrix;
+            }
+            
+            calculateCorrelation(arr1, arr2) {
+                const n = arr1.length;
+                if (n === 0) return 0;
+                
+                const mean1 = arr1.reduce((sum, val) => sum + val, 0) / n;
+                const mean2 = arr2.reduce((sum, val) => sum + val, 0) / n;
+                
+                let numerator = 0;
+                let denom1 = 0;
+                let denom2 = 0;
+                
+                for (let i = 0; i < n; i++) {
+                    numerator += (arr1[i] - mean1) * (arr2[i] - mean2);
+                    denom1 += Math.pow(arr1[i] - mean1, 2);
+                    denom2 += Math.pow(arr2[i] - mean2, 2);
+                }
+                
+                return numerator / Math.sqrt(denom1 * denom2);
+            }
+            
+            // Create histogram data for numeric features
+            createHistogramData(feature, bins = 10) {
+                const values = this.dataset.map(record => record[feature]).filter(val => val !== null);
+                if (values.length === 0) return { labels: [], data: [] };
+                
+                const min = Math.min(...values);
+                const max = Math.max(...values);
+                const binWidth = (max - min) / bins;
+                
+                const histogram = Array(bins).fill(0);
+                const labels = [];
+                
+                for (let i = 0; i < bins; i++) {
+                    const binStart = min + i * binWidth;
+                    const binEnd = min + (i + 1) * binWidth;
+                    labels.push(`${binStart.toFixed(1)}-${binEnd.toFixed(1)}`);
+                    
+                    histogram[i] = values.filter(val => 
+                        val >= binStart && val < (i === bins - 1 ? binEnd + 0.001 : binEnd)
+                    ).length;
+                }
+                
+                return {
+                    labels,
+                    data: histogram
+                };
+            }
+            
             preprocessData() {
+                // Split data first
+                const splitResult = this.splitData();
+                
                 // Calculate preprocessing parameters from training data only
                 const numericColumns = ['AirTemp', 'ProcessTemp', 'RotationalSpeed', 'Torque', 'ToolWear'];
                 this.preprocessingParams = {};
                 
                 // Calculate min and max for normalization from training data
                 numericColumns.forEach(col => {
-                    const values = this.X_train.map(x => x[col]);
+                    const values = this.X_train.map(x => x[col]).filter(val => val !== null);
+                    if (values.length === 0) return;
+                    
                     this.preprocessingParams[col] = {
                         min: Math.min(...values),
                         max: Math.max(...values)
@@ -1122,7 +1339,7 @@
                 });
                 
                 // One-hot encoding for Type from training data
-                const typeValues = this.X_train.map(x => x.Type);
+                const typeValues = this.X_train.map(x => x.Type).filter(val => val !== null);
                 const uniqueTypes = [...new Set(typeValues)];
                 this.preprocessingParams.Type = uniqueTypes;
                 
@@ -1167,7 +1384,11 @@
                 this.processedData.y_train = this.y_train;
                 this.processedData.y_test = this.y_test;
                 
-                return this.processedData;
+                return {
+                    splitInfo: splitResult,
+                    preprocessingParams: this.preprocessingParams,
+                    processedData: this.processedData
+                };
             }
             
             trainModel() {
@@ -1255,14 +1476,6 @@
                             biases1[j] -= learningRate * hiddenErrors[j];
                         }
                     }
-                    
-                    // Calculate average loss for this epoch
-                    const avgLoss = totalLoss / this.processedData.X_train_processed.length;
-                    
-                    // Update progress every 10 epochs
-                    if (epoch % 10 === 0) {
-                        console.log(`Epoch ${epoch}, Loss: ${avgLoss.toFixed(4)}`);
-                    }
                 }
                 
                 // Store the trained model
@@ -1309,46 +1522,8 @@
                 
                 const { weights1, weights2, biases1, biases2, hiddenSize, outputSize } = this.model;
                 
-                // Test on training set
-                let trainCorrect = 0;
-                const trainPredictions = [];
-                
-                for (let i = 0; i < this.processedData.X_train_processed.length; i++) {
-                    const input = this.processedData.X_train_processed[i];
-                    const target = this.processedData.y_train[i];
-                    
-                    // Forward pass
-                    const hidden = Array(hiddenSize).fill(0);
-                    for (let j = 0; j < hiddenSize; j++) {
-                        let sum = biases1[j];
-                        for (let k = 0; k < input.length; k++) {
-                            sum += input[k] * weights1[k][j];
-                        }
-                        hidden[j] = Math.max(0, sum); // ReLU
-                    }
-                    
-                    const output = Array(outputSize).fill(0);
-                    for (let j = 0; j < outputSize; j++) {
-                        let sum = biases2[j];
-                        for (let k = 0; k < hiddenSize; k++) {
-                            sum += hidden[k] * weights2[k][j];
-                        }
-                        output[j] = 1 / (1 + Math.exp(-sum)); // Sigmoid
-                    }
-                    
-                    const prediction = output[0] > 0.5 ? 1 : 0;
-                    trainPredictions.push(prediction);
-                    
-                    if (prediction === target) {
-                        trainCorrect++;
-                    }
-                }
-                
-                const trainAccuracy = trainCorrect / this.processedData.X_train_processed.length;
-                
                 // Test on test set
                 let testCorrect = 0;
-                const testPredictions = [];
                 let truePositives = 0, falsePositives = 0, trueNegatives = 0, falseNegatives = 0;
                 
                 for (let i = 0; i < this.processedData.X_test_processed.length; i++) {
@@ -1375,7 +1550,6 @@
                     }
                     
                     const prediction = output[0] > 0.5 ? 1 : 0;
-                    testPredictions.push(prediction);
                     
                     if (prediction === target) {
                         testCorrect++;
@@ -1405,8 +1579,7 @@
                     precision,
                     recall,
                     f1,
-                    confusionMatrix: [truePositives, falsePositives, falseNegatives, trueNegatives],
-                    trainAccuracy
+                    confusionMatrix: [truePositives, falsePositives, falseNegatives, trueNegatives]
                 };
                 
                 return this.modelMetrics;
@@ -1455,120 +1628,6 @@
                 }
                 
                 return output[0];
-            }
-            
-            // EDA methods
-            calculateNumericStats() {
-                const numericColumns = ['AirTemp', 'ProcessTemp', 'RotationalSpeed', 'Torque', 'ToolWear'];
-                this.numericStats = {};
-                
-                numericColumns.forEach(col => {
-                    const values = this.dataset.map(record => record[col]).filter(val => val !== null);
-                    if (values.length === 0) return;
-                    
-                    values.sort((a, b) => a - b);
-                    const mean = values.reduce((sum, val) => sum + val, 0) / values.length;
-                    const median = values[Math.floor(values.length / 2)];
-                    const min = values[0];
-                    const max = values[values.length - 1];
-                    const std = Math.sqrt(values.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / values.length);
-                    
-                    this.numericStats[col] = {
-                        mean,
-                        median,
-                        min,
-                        max,
-                        std,
-                        count: values.length
-                    };
-                });
-                
-                return this.numericStats;
-            }
-            
-            calculateCategoricalStats() {
-                const typeValues = this.dataset.map(record => record.Type).filter(val => val !== null);
-                const failureValues = this.dataset.map(record => record.Failure).filter(val => val !== null);
-                
-                // Type distribution
-                const typeCounts = {};
-                typeValues.forEach(type => {
-                    typeCounts[type] = (typeCounts[type] || 0) + 1;
-                });
-                
-                // Failure distribution
-                const failureCounts = { 0: 0, 1: 0 };
-                failureValues.forEach(failure => {
-                    failureCounts[failure] = (failureCounts[failure] || 0) + 1;
-                });
-                
-                this.categoricalStats = {
-                    Type: typeCounts,
-                    Failure: failureCounts
-                };
-                
-                return this.categoricalStats;
-            }
-            
-            calculateCorrelationMatrix() {
-                const numericColumns = ['AirTemp', 'ProcessTemp', 'RotationalSpeed', 'Torque', 'ToolWear', 'Failure'];
-                const matrix = [];
-                
-                // Initialize matrix
-                for (let i = 0; i < numericColumns.length; i++) {
-                    matrix[i] = [];
-                    for (let j = 0; j < numericColumns.length; j++) {
-                        matrix[i][j] = 0;
-                    }
-                }
-                
-                // Calculate correlations
-                for (let i = 0; i < numericColumns.length; i++) {
-                    for (let j = 0; j < numericColumns.length; j++) {
-                        if (i === j) {
-                            matrix[i][j] = 1;
-                        } else {
-                            const col1 = numericColumns[i];
-                            const col2 = numericColumns[j];
-                            
-                            const values1 = this.dataset.map(record => record[col1]).filter(val => val !== null);
-                            const values2 = this.dataset.map(record => record[col2]).filter(val => val !== null);
-                            
-                            // Ensure we have the same number of values
-                            const minLength = Math.min(values1.length, values2.length);
-                            const v1 = values1.slice(0, minLength);
-                            const v2 = values2.slice(0, minLength);
-                            
-                            if (minLength > 0) {
-                                matrix[i][j] = this.calculateCorrelation(v1, v2);
-                            }
-                        }
-                    }
-                }
-                
-                this.correlationMatrix = matrix;
-                return {
-                    matrix,
-                    columns: numericColumns
-                };
-            }
-            
-            calculateCorrelation(arr1, arr2) {
-                const n = arr1.length;
-                const mean1 = arr1.reduce((sum, val) => sum + val, 0) / n;
-                const mean2 = arr2.reduce((sum, val) => sum + val, 0) / n;
-                
-                let numerator = 0;
-                let denom1 = 0;
-                let denom2 = 0;
-                
-                for (let i = 0; i < n; i++) {
-                    numerator += (arr1[i] - mean1) * (arr2[i] - mean2);
-                    denom1 += Math.pow(arr1[i] - mean1, 2);
-                    denom2 += Math.pow(arr2[i] - mean2, 2);
-                }
-                
-                return numerator / Math.sqrt(denom1 * denom2);
             }
         }
 
@@ -1826,22 +1885,31 @@
                 this.switchTab('dataset-info');
                 
                 setTimeout(() => {
-                    const result = this.pipeline.loadData(Papa.unparse(this.pipeline.rawData));
+                    const result = this.pipeline.getDatasetInfo();
                     
                     // Update dataset stats
                     document.getElementById('total-records').textContent = result.totalRecords;
-                    document.getElementById('total-features').textContent = Object.keys(this.pipeline.columnMapping).length;
-                    
-                    // Calculate failure rate
-                    const failureCount = this.pipeline.dataset.filter(record => record.Failure === 1).length;
-                    const failureRate = ((failureCount / result.totalRecords) * 100).toFixed(1);
-                    document.getElementById('failure-rate').textContent = `${failureRate}%`;
+                    document.getElementById('total-features').textContent = result.features;
+                    document.getElementById('failure-rate').textContent = `${result.failureRate}%`;
                     
                     document.getElementById('dataset-stats').style.display = 'grid';
+                    
+                    // Update dataset summary
+                    document.getElementById('dataset-summary').innerHTML = `
+                        <p>The dataset contains <strong>${result.totalRecords}</strong> records with <strong>${result.features}</strong> predictive features.</p>
+                        <p>The failure rate is <strong>${result.failureRate}%</strong> (${result.failureCount} failures out of ${result.totalRecords} records).</p>
+                    `;
                     
                     // Show missing values info if any
                     if (result.hasMissingValues) {
                         this.displayMissingValuesInfo(result.missingValues);
+                    } else {
+                        document.getElementById('missing-values-section').innerHTML = `
+                            <div class="status-badge status-success" style="margin-top: 15px;">
+                                No missing values detected in the dataset.
+                            </div>
+                        `;
+                        document.getElementById('missing-values-section').style.display = 'block';
                     }
                     
                     // Update step 2 status
@@ -1854,29 +1922,35 @@
             
             displayMissingValuesInfo(missingValues) {
                 const section = document.getElementById('missing-values-section');
-                section.innerHTML = '';
-                section.style.display = 'block';
-                
                 let html = '<div class="missing-values-section">';
                 html += '<h4>Missing Values Detected</h4>';
                 html += '<p>The following columns have missing values:</p>';
-                html += '<ul>';
                 
-                for (const [key, count] of Object.entries(missingValues)) {
+                html += '<table class="missing-values-table">';
+                html += '<tr><th>Column</th><th>Missing Values</th></tr>';
+                
+                let totalMissing = 0;
+                for (const [column, count] of Object.entries(missingValues)) {
                     if (count > 0) {
-                        html += `<li><strong>${key}</strong>: ${count} missing values</li>`;
+                        html += `<tr>
+                            <td>${column}</td>
+                            <td class="missing-count">${count}</td>
+                        </tr>`;
+                        totalMissing += count;
                     }
                 }
                 
-                html += '</ul>';
+                html += '</table>';
+                html += `<p><strong>Total missing values:</strong> ${totalMissing}</p>`;
                 html += '<p>How would you like to handle missing values?</p>';
                 html += '<div class="missing-values-options">';
                 html += '<button class="btn btn-warning" id="delete-missing-btn">Delete Rows with Missing Values</button>';
-                html += '<button class="btn btn-success" id="fill-missing-btn">Fill Missing Values</button>';
+                html += '<button class="btn btn-success" id="fill-missing-btn">Fill Missing Values with Median/Mode</button>';
                 html += '</div>';
                 html += '</div>';
                 
                 section.innerHTML = html;
+                section.style.display = 'block';
                 
                 // Add event listeners
                 document.getElementById('delete-missing-btn').addEventListener('click', () => {
@@ -1895,16 +1969,27 @@
                     this.pipeline.handleMissingValues(strategy);
                     
                     // Update dataset stats
-                    const totalRecords = this.pipeline.dataset.length;
-                    document.getElementById('total-records').textContent = totalRecords;
+                    const result = this.pipeline.getDatasetInfo();
+                    document.getElementById('total-records').textContent = result.totalRecords;
                     
                     // Calculate failure rate
                     const failureCount = this.pipeline.dataset.filter(record => record.Failure === 1).length;
-                    const failureRate = ((failureCount / totalRecords) * 100).toFixed(1);
+                    const failureRate = ((failureCount / result.totalRecords) * 100).toFixed(1);
                     document.getElementById('failure-rate').textContent = `${failureRate}%`;
                     
+                    // Update dataset summary
+                    document.getElementById('dataset-summary').innerHTML = `
+                        <p>The dataset contains <strong>${result.totalRecords}</strong> records with <strong>${result.features}</strong> predictive features.</p>
+                        <p>The failure rate is <strong>${failureRate}%</strong> (${failureCount} failures out of ${result.totalRecords} records).</p>
+                        <p><strong>Missing values handled using:</strong> ${strategy === 'delete' ? 'Row deletion' : 'Median/mode imputation'}</p>
+                    `;
+                    
                     // Hide missing values section
-                    document.getElementById('missing-values-section').style.display = 'none';
+                    document.getElementById('missing-values-section').innerHTML = `
+                        <div class="status-badge status-success" style="margin-top: 15px;">
+                            Missing values successfully handled using ${strategy === 'delete' ? 'row deletion' : 'median/mode imputation'}.
+                        </div>
+                    `;
                     
                     this.hideLoading();
                 }, 500);
@@ -1918,12 +2003,10 @@
                 
                 setTimeout(() => {
                     // Calculate statistics
-                    const numericStats = this.pipeline.calculateNumericStats();
-                    const categoricalStats = this.pipeline.calculateCategoricalStats();
-                    const correlation = this.pipeline.calculateCorrelationMatrix();
+                    const edaResults = this.pipeline.performEDA();
                     
                     // Display EDA results
-                    this.displayEDAResults(numericStats, categoricalStats, correlation);
+                    this.displayEDAResults(edaResults);
                     
                     // Update step 3 status
                     this.updateStepStatus(3, 'complete');
@@ -1933,7 +2016,7 @@
                 }, 800);
             }
             
-            displayEDAResults(numericStats, categoricalStats, correlation) {
+            displayEDAResults(edaResults) {
                 const edaContent = document.getElementById('eda-content');
                 let html = '';
                 
@@ -1941,16 +2024,17 @@
                 html += '<div class="eda-section">';
                 html += '<h3>Numeric Features Summary</h3>';
                 html += '<table class="stats-table">';
-                html += '<tr><th>Feature</th><th>Mean</th><th>Median</th><th>Min</th><th>Max</th><th>Std Dev</th></tr>';
+                html += '<tr><th>Feature</th><th>Mean</th><th>Median</th><th>Min</th><th>Max</th><th>Std Dev</th><th>Count</th></tr>';
                 
-                for (const [feature, stats] of Object.entries(numericStats)) {
+                for (const [feature, stats] of Object.entries(edaResults.numericStats)) {
                     html += `<tr>
                         <td>${feature}</td>
-                        <td>${stats.mean.toFixed(2)}</td>
-                        <td>${stats.median.toFixed(2)}</td>
-                        <td>${stats.min.toFixed(2)}</td>
-                        <td>${stats.max.toFixed(2)}</td>
-                        <td>${stats.std.toFixed(2)}</td>
+                        <td>${stats.mean}</td>
+                        <td>${stats.median}</td>
+                        <td>${stats.min}</td>
+                        <td>${stats.max}</td>
+                        <td>${stats.std}</td>
+                        <td>${stats.count}</td>
                     </tr>`;
                 }
                 
@@ -1967,7 +2051,7 @@
                 html += '<tr><th>Type</th><th>Count</th><th>Percentage</th></tr>';
                 
                 const total = this.pipeline.dataset.length;
-                for (const [type, count] of Object.entries(categoricalStats.Type)) {
+                for (const [type, count] of Object.entries(edaResults.categoricalStats.Type)) {
                     const percentage = ((count / total) * 100).toFixed(1);
                     html += `<tr>
                         <td>${type}</td>
@@ -1983,7 +2067,7 @@
                 html += '<table class="stats-table">';
                 html += '<tr><th>Failure</th><th>Count</th><th>Percentage</th></tr>';
                 
-                for (const [failure, count] of Object.entries(categoricalStats.Failure)) {
+                for (const [failure, count] of Object.entries(edaResults.categoricalStats.Failure)) {
                     const label = failure === '1' ? 'Failure' : 'No Failure';
                     const percentage = ((count / total) * 100).toFixed(1);
                     html += `<tr>
@@ -2004,16 +2088,16 @@
                 
                 // Header row
                 html += '<tr><th></th>';
-                correlation.columns.forEach(col => {
+                edaResults.correlationMatrix.columns.forEach(col => {
                     html += `<th>${col}</th>`;
                 });
                 html += '</tr>';
                 
                 // Data rows
-                for (let i = 0; i < correlation.matrix.length; i++) {
-                    html += `<tr><th>${correlation.columns[i]}</th>`;
-                    for (let j = 0; j < correlation.matrix[i].length; j++) {
-                        const value = correlation.matrix[i][j];
+                for (let i = 0; i < edaResults.correlationMatrix.matrix.length; i++) {
+                    html += `<tr><th>${edaResults.correlationMatrix.columns[i]}</th>`;
+                    for (let j = 0; j < edaResults.correlationMatrix.matrix[i].length; j++) {
+                        const value = edaResults.correlationMatrix.matrix[i][j];
                         let cellClass = '';
                         
                         if (Math.abs(value) > 0.7) {
@@ -2033,7 +2117,175 @@
                 html += '</div>';
                 html += '</div>';
                 
+                // Visualizations
+                html += '<div class="eda-section">';
+                html += '<h3>Data Visualizations</h3>';
+                
+                // Histograms for numeric features
+                html += '<h4>Numeric Features Distribution</h4>';
+                html += '<div class="chart-row">';
+                
+                const numericFeatures = ['AirTemp', 'ProcessTemp', 'RotationalSpeed', 'Torque', 'ToolWear'];
+                numericFeatures.forEach(feature => {
+                    html += `<div class="chart-item">
+                        <h5>${feature} Distribution</h5>
+                        <div class="chart-container">
+                            <canvas id="${feature.toLowerCase()}-histogram"></canvas>
+                        </div>
+                    </div>`;
+                });
+                
+                html += '</div>';
+                
+                // Bar charts for categorical features
+                html += '<h4>Categorical Features Distribution</h4>';
+                html += '<div class="chart-row">';
+                
+                html += `<div class="chart-item">
+                    <h5>Product Type Distribution</h5>
+                    <div class="chart-container">
+                        <canvas id="type-barchart"></canvas>
+                    </div>
+                </div>`;
+                
+                html += `<div class="chart-item">
+                    <h5>Failure Distribution</h5>
+                    <div class="chart-container">
+                        <canvas id="failure-barchart"></canvas>
+                    </div>
+                </div>`;
+                
+                html += '</div>';
+                html += '</div>';
+                
                 edaContent.innerHTML = html;
+                
+                // Create visualizations
+                this.createVisualizations(edaResults);
+            }
+            
+            createVisualizations(edaResults) {
+                // Create histograms for numeric features
+                const numericFeatures = ['AirTemp', 'ProcessTemp', 'RotationalSpeed', 'Torque', 'ToolWear'];
+                
+                numericFeatures.forEach(feature => {
+                    const histogramData = this.pipeline.createHistogramData(feature);
+                    const ctx = document.getElementById(`${feature.toLowerCase()}-histogram`).getContext('2d');
+                    
+                    new Chart(ctx, {
+                        type: 'bar',
+                        data: {
+                            labels: histogramData.labels,
+                            datasets: [{
+                                label: 'Frequency',
+                                data: histogramData.data,
+                                backgroundColor: 'rgba(52, 152, 219, 0.7)',
+                                borderColor: 'rgb(52, 152, 219)',
+                                borderWidth: 1
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            scales: {
+                                y: {
+                                    beginAtZero: true,
+                                    title: {
+                                        display: true,
+                                        text: 'Frequency'
+                                    }
+                                },
+                                x: {
+                                    title: {
+                                        display: true,
+                                        text: feature
+                                    }
+                                }
+                            }
+                        }
+                    });
+                });
+                
+                // Create bar chart for Type distribution
+                const typeCtx = document.getElementById('type-barchart').getContext('2d');
+                const typeLabels = Object.keys(edaResults.categoricalStats.Type);
+                const typeData = Object.values(edaResults.categoricalStats.Type);
+                
+                new Chart(typeCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: typeLabels,
+                        datasets: [{
+                            label: 'Count',
+                            data: typeData,
+                            backgroundColor: [
+                                'rgba(52, 152, 219, 0.7)',
+                                'rgba(46, 204, 113, 0.7)',
+                                'rgba(241, 196, 15, 0.7)'
+                            ],
+                            borderColor: [
+                                'rgb(52, 152, 219)',
+                                'rgb(46, 204, 113)',
+                                'rgb(241, 196, 15)'
+                            ],
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                title: {
+                                    display: true,
+                                    text: 'Count'
+                                }
+                            }
+                        }
+                    }
+                });
+                
+                // Create bar chart for Failure distribution
+                const failureCtx = document.getElementById('failure-barchart').getContext('2d');
+                const failureLabels = ['No Failure', 'Failure'];
+                const failureData = [
+                    edaResults.categoricalStats.Failure[0] || 0,
+                    edaResults.categoricalStats.Failure[1] || 0
+                ];
+                
+                new Chart(failureCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: failureLabels,
+                        datasets: [{
+                            label: 'Count',
+                            data: failureData,
+                            backgroundColor: [
+                                'rgba(46, 204, 113, 0.7)',
+                                'rgba(231, 76, 60, 0.7)'
+                            ],
+                            borderColor: [
+                                'rgb(46, 204, 113)',
+                                'rgb(231, 76, 60)'
+                            ],
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                title: {
+                                    display: true,
+                                    text: 'Count'
+                                }
+                            }
+                        }
+                    }
+                });
             }
             
             preprocessData() {
@@ -2080,7 +2332,7 @@
                 preprocessingContent.innerHTML = html;
                 
                 // Show preprocessed data preview
-                this.displayPreprocessedPreview(processedData.X_train_processed.slice(0, 10));
+                this.displayPreprocessedPreview(processedData.processedData.X_train_processed.slice(0, 10));
             }
             
             displayPreprocessedPreview(data) {
