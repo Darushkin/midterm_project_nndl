@@ -7,9 +7,6 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/papaparse@5.3.2/papaparse.min.js"></script>
     <style>
-        /* ALL CSS STYLES FROM PREVIOUS RESPONSE GO HERE */
-        /* [Complete CSS code from previous response] */
-        
         :root {
             --primary: #2c3e50;
             --secondary: #3498db;
@@ -39,47 +36,962 @@
             padding: 20px;
         }
         
-        /* ... [REST OF COMPLETE CSS CODE] ... */
+        header {
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            color: white;
+            padding: 20px 0;
+            text-align: center;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+        }
+        
+        .subtitle {
+            font-size: 1.2rem;
+            opacity: 0.9;
+        }
+        
+        .dashboard {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        @media (max-width: 768px) {
+            .dashboard {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        .card {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+            transition: transform 0.3s ease;
+        }
+        
+        .card:hover {
+            transform: translateY(-5px);
+        }
+        
+        .card h2 {
+            color: var(--primary);
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid var(--light);
+        }
+        
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+        }
+        
+        input, select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 1rem;
+        }
+        
+        input:focus, select:focus {
+            outline: none;
+            border-color: var(--secondary);
+            box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
+        }
+        
+        .btn {
+            display: inline-block;
+            background: var(--secondary);
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 600;
+            transition: background 0.3s ease;
+        }
+        
+        .btn:hover {
+            background: #2980b9;
+        }
+        
+        .btn-danger {
+            background: var(--danger);
+        }
+        
+        .btn-danger:hover {
+            background: #c0392b;
+        }
+        
+        .btn-success {
+            background: var(--success);
+        }
+        
+        .btn-success:hover {
+            background: #27ae60;
+        }
+        
+        .btn-warning {
+            background: var(--warning);
+        }
+        
+        .btn-warning:hover {
+            background: #d68910;
+        }
+        
+        .file-upload {
+            margin-top: 10px;
+            padding: 15px;
+            border: 2px dashed #ddd;
+            border-radius: 5px;
+            text-align: center;
+            cursor: pointer;
+            transition: border-color 0.3s ease;
+        }
+        
+        .file-upload:hover {
+            border-color: var(--secondary);
+        }
+        
+        .prediction-result {
+            text-align: center;
+            padding: 20px;
+            border-radius: 10px;
+            margin-top: 20px;
+            background: var(--light);
+        }
+        
+        .prediction-value {
+            font-size: 2.5rem;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+        
+        .low-risk {
+            color: var(--success);
+        }
+        
+        .medium-risk {
+            color: var(--warning);
+        }
+        
+        .high-risk {
+            color: var(--danger);
+        }
+        
+        .gauge-container {
+            position: relative;
+            width: 200px;
+            height: 100px;
+            margin: 0 auto;
+            overflow: hidden;
+        }
+        
+        .gauge {
+            width: 200px;
+            height: 100px;
+            border-radius: 100px 100px 0 0;
+            position: relative;
+            overflow: hidden;
+            background: conic-gradient(
+                var(--success) 0% 33%,
+                var(--warning) 33% 66%,
+                var(--danger) 66% 100%
+            );
+        }
+        
+        .gauge-inner {
+            position: absolute;
+            width: 160px;
+            height: 80px;
+            background: white;
+            border-radius: 80px 80px 0 0;
+            bottom: 0;
+            left: 20px;
+        }
+        
+        .gauge-needle {
+            position: absolute;
+            width: 4px;
+            height: 90px;
+            background: var(--dark);
+            bottom: 0;
+            left: 50%;
+            transform-origin: bottom center;
+            transform: translateX(-50%) rotate(0deg);
+            transition: transform 1s ease;
+            z-index: 10;
+        }
+        
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+            margin-top: 20px;
+        }
+        
+        .metric {
+            text-align: center;
+            padding: 15px;
+            border-radius: 5px;
+            background: var(--light);
+        }
+        
+        .metric-value {
+            font-size: 1.8rem;
+            font-weight: bold;
+            margin: 5px 0;
+        }
+        
+        .metric-label {
+            font-size: 0.9rem;
+            color: #7f8c8d;
+        }
+        
+        .chart-container {
+            height: 300px;
+            margin-top: 20px;
+        }
+        
+        .tabs {
+            display: flex;
+            margin-bottom: 20px;
+            border-bottom: 1px solid #ddd;
+            flex-wrap: wrap;
+        }
+        
+        .tab {
+            padding: 10px 20px;
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+        }
+        
+        .tab.active {
+            border-bottom: 3px solid var(--secondary);
+            color: var(--secondary);
+            font-weight: 600;
+        }
+        
+        .tab-content {
+            display: none;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        footer {
+            text-align: center;
+            margin-top: 40px;
+            padding: 20px;
+            color: #7f8c8d;
+            font-size: 0.9rem;
+        }
+        
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+        
+        .spinner {
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            border-left-color: var(--secondary);
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .feature-importance {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-top: 15px;
+        }
+        
+        .feature-bar {
+            display: flex;
+            align-items: center;
+        }
+        
+        .feature-name {
+            width: 150px;
+            font-size: 0.9rem;
+        }
+        
+        .feature-value {
+            flex-grow: 1;
+            height: 20px;
+            background: var(--light);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        
+        .feature-fill {
+            height: 100%;
+            background: var(--secondary);
+            border-radius: 10px;
+            transition: width 0.5s ease;
+        }
+        
+        .confusion-matrix {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1px;
+            background: #ddd;
+            border: 1px solid #ddd;
+            margin-top: 20px;
+        }
+        
+        .matrix-cell {
+            background: white;
+            padding: 15px;
+            text-align: center;
+            font-weight: bold;
+        }
+        
+        .matrix-header {
+            background: var(--light);
+            font-weight: bold;
+        }
+        
+        .true-positive {
+            background: rgba(46, 204, 113, 0.2);
+        }
+        
+        .false-positive {
+            background: rgba(231, 76, 60, 0.2);
+        }
+        
+        .false-negative {
+            background: rgba(243, 156, 18, 0.2);
+        }
+        
+        .true-negative {
+            background: rgba(52, 152, 219, 0.2);
+        }
+        
+        .ml-pipeline {
+            margin-top: 30px;
+        }
+        
+        .pipeline-steps {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        
+        .pipeline-step {
+            text-align: center;
+            flex: 1;
+            padding: 15px;
+            background: white;
+            border-radius: 10px;
+            margin: 0 10px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+            min-width: 150px;
+            margin-bottom: 10px;
+        }
+        
+        .step-number {
+            display: inline-block;
+            width: 30px;
+            height: 30px;
+            background: var(--secondary);
+            color: white;
+            border-radius: 50%;
+            line-height: 30px;
+            margin-bottom: 10px;
+        }
+        
+        .step-active .step-number {
+            background: var(--success);
+        }
+        
+        .data-preview {
+            max-height: 300px;
+            overflow-y: auto;
+            margin-top: 15px;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        th, td {
+            padding: 10px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        
+        th {
+            background: var(--light);
+            font-weight: 600;
+        }
+        
+        .status-badge {
+            display: inline-block;
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+        
+        .status-complete {
+            background: rgba(46, 204, 113, 0.2);
+            color: var(--success);
+        }
+        
+        .status-pending {
+            background: rgba(241, 196, 15, 0.2);
+            color: var(--warning);
+        }
+        
+        .status-error {
+            background: rgba(231, 76, 60, 0.2);
+            color: var(--danger);
+        }
+        
+        .dataset-info {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin-top: 20px;
+        }
+        
+        .info-card {
+            background: var(--light);
+            padding: 15px;
+            border-radius: 5px;
+            text-align: center;
+        }
+        
+        .info-value {
+            font-size: 1.5rem;
+            font-weight: bold;
+            margin: 5px 0;
+        }
+        
+        .info-label {
+            font-size: 0.9rem;
+            color: #7f8c8d;
+        }
+        
+        .stats-table {
+            width: 100%;
+            margin-top: 15px;
+        }
+        
+        .stats-table th, .stats-table td {
+            padding: 8px;
+            text-align: center;
+        }
+        
+        .correlation-matrix {
+            width: 100%;
+            margin-top: 15px;
+        }
+        
+        .correlation-matrix th, .correlation-matrix td {
+            padding: 8px;
+            text-align: center;
+        }
+        
+        .high-correlation {
+            background-color: rgba(231, 76, 60, 0.2);
+        }
+        
+        .medium-correlation {
+            background-color: rgba(243, 156, 18, 0.2);
+        }
+        
+        .low-correlation {
+            background-color: rgba(46, 204, 113, 0.2);
+        }
+        
+        .chart-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            margin-top: 20px;
+        }
+        
+        .chart-item {
+            flex: 1;
+            min-width: 300px;
+        }
+        
+        .chart-item-full {
+            flex: 100%;
+        }
+        
+        .eda-section {
+            margin-bottom: 30px;
+        }
+        
+        .eda-section h3 {
+            margin-bottom: 15px;
+            color: var(--primary);
+        }
+        
+        .csv-format-info {
+            background: var(--light);
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 15px;
+        }
+        
+        .missing-values-section {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 5px;
+            padding: 15px;
+            margin-top: 15px;
+        }
+        
+        .missing-values-options {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        
+        .preview-table {
+            max-height: 400px;
+            overflow-y: auto;
+            margin-top: 15px;
+        }
+        
+        .data-split-info {
+            background: var(--light);
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 15px;
+        }
+        
+        .missing-values-table {
+            width: 100%;
+            margin: 15px 0;
+        }
+        
+        .missing-values-table th {
+            background: var(--light);
+            padding: 10px;
+            text-align: left;
+        }
+        
+        .missing-values-table td {
+            padding: 10px;
+            border-bottom: 1px solid #ddd;
+        }
+        
+        .missing-count {
+            font-weight: bold;
+            color: var(--danger);
+        }
+        
+        /* New styles for ROC curve and enhanced feature importance */
+        .roc-container {
+            position: relative;
+            height: 300px;
+            margin-top: 20px;
+        }
+        
+        .auc-value {
+            font-size: 1.2rem;
+            font-weight: bold;
+            text-align: center;
+            margin: 10px 0;
+        }
         
         .feature-importance-chart {
-            height: 450px;
-            margin-top: 25px;
-            background: white;
-            border-radius: 12px;
-            padding: 25px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+            height: 250px;
+            margin-top: 15px;
+        }
+        
+        .threshold-control {
+            margin: 15px 0;
+        }
+        
+        .threshold-slider {
+            width: 100%;
+            margin: 10px 0;
+        }
+        
+        .sampling-methods {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+            flex-wrap: wrap;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <!-- COMPLETE HTML STRUCTURE FROM PREVIOUS RESPONSE -->
         <header>
             <h1>Machine Failure Prediction System</h1>
-            <p class="subtitle">Complete ML Pipeline with Class Imbalance Handling</p>
+            <p class="subtitle">Complete ML Pipeline with Class Imbalance Handling and ROC-AUC Analysis</p>
         </header>
         
         <div class="ml-pipeline">
             <h2>Machine Learning Pipeline</h2>
             <div class="pipeline-steps">
-                <!-- Pipeline steps HTML -->
+                <div class="pipeline-step step-active" id="step1">
+                    <div class="step-number">1</div>
+                    <h3>Data Upload</h3>
+                    <p>Upload your CSV dataset</p>
+                    <div class="status-badge status-pending">Pending</div>
+                </div>
+                <div class="pipeline-step" id="step2">
+                    <div class="step-number">2</div>
+                    <h3>Dataset Info</h3>
+                    <p>Explore dataset characteristics</p>
+                    <div class="status-badge status-pending">Pending</div>
+                </div>
+                <div class="pipeline-step" id="step3">
+                    <div class="step-number">3</div>
+                    <h3>EDA</h3>
+                    <p>Exploratory Data Analysis</p>
+                    <div class="status-badge status-pending">Pending</div>
+                </div>
+                <div class="pipeline-step" id="step4">
+                    <div class="step-number">4</div>
+                    <h3>Preprocessing</h3>
+                    <p>Prepare data for modeling</p>
+                    <div class="status-badge status-pending">Pending</div>
+                </div>
+                <div class="pipeline-step" id="step5">
+                    <div class="step-number">5</div>
+                    <h3>Model Training</h3>
+                    <p>Train neural network</p>
+                    <div class="status-badge status-pending">Pending</div>
+                </div>
+                <div class="pipeline-step" id="step6">
+                    <div class="step-number">6</div>
+                    <h3>Evaluation</h3>
+                    <p>Test model performance</p>
+                    <div class="status-badge status-pending">Pending</div>
+                </div>
             </div>
             
             <div class="card">
                 <div class="tabs">
-                    <!-- Tabs HTML -->
+                    <div class="tab active" data-tab="data-upload">Data Upload</div>
+                    <div class="tab" data-tab="dataset-info">Dataset Info</div>
+                    <div class="tab" data-tab="eda">EDA</div>
+                    <div class="tab" data-tab="preprocessing">Preprocessing</div>
+                    <div class="tab" data-tab="training">Model Training</div>
+                    <div class="tab" data-tab="evaluation">Evaluation</div>
                 </div>
                 
-                <!-- Tab contents HTML -->
+                <div class="tab-content active" id="data-upload">
+                    <h3>Upload Your Dataset</h3>
+                    <p>Upload a CSV file containing machine data. The system will automatically detect the required columns.</p>
+                    
+                    <div class="csv-format-info">
+                        <h4>Expected Columns (case-insensitive):</h4>
+                        <ul>
+                            <li><strong>Type</strong> (categorical: L, M, H)</li>
+                            <li><strong>Air temperature [K]</strong> or similar (numeric)</li>
+                            <li><strong>Process temperature [K]</strong> or similar (numeric)</li>
+                            <li><strong>Rotational speed [rpm]</strong> or similar (numeric)</li>
+                            <li><strong>Torque [Nm]</strong> or similar (numeric)</li>
+                            <li><strong>Tool wear [min]</strong> or similar (numeric)</li>
+                            <li><strong>Machine failure</strong> or similar (binary: 0/1)</li>
+                        </ul>
+                        <p><em>Note: UDI and Product ID columns are optional and will be ignored if present.</em></p>
+                    </div>
+                    
+                    <div class="file-upload" id="file-upload-area">
+                        <p>Drag & drop your CSV file here or click to browse</p>
+                        <input type="file" id="file-input" accept=".csv" style="display: none;">
+                        <button type="button" class="btn btn-success" id="upload-btn">Choose File</button>
+                    </div>
+                    
+                    <div id="upload-status" style="margin-top: 15px;"></div>
+                    
+                    <div class="data-preview" id="data-preview" style="display: none;">
+                        <h4>Data Preview (First 10 rows)</h4>
+                        <table id="data-table">
+                            <thead id="data-table-head">
+                                <!-- Headers will be populated by JavaScript -->
+                            </thead>
+                            <tbody id="data-table-body">
+                                <!-- Data will be populated by JavaScript -->
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <button class="btn btn-warning" id="analyze-btn" style="margin-top: 15px; display: none;">Analyze Dataset</button>
+                </div>
+                
+                <div class="tab-content" id="dataset-info">
+                    <h3>Dataset Information</h3>
+                    <div id="dataset-summary">
+                        <p>Please upload a dataset to see information</p>
+                    </div>
+                    
+                    <div class="dataset-info" id="dataset-stats" style="display: none;">
+                        <div class="info-card">
+                            <div class="info-label">Total Records</div>
+                            <div class="info-value" id="total-records">0</div>
+                        </div>
+                        <div class="info-card">
+                            <div class="info-label">Features</div>
+                            <div class="info-value" id="total-features">0</div>
+                        </div>
+                        <div class="info-card">
+                            <div class="info-label">Failure Rate</div>
+                            <div class="info-value" id="failure-rate">0%</div>
+                        </div>
+                    </div>
+                    
+                    <div id="missing-values-section" style="display: none;">
+                        <!-- Missing values info will be populated here -->
+                    </div>
+                    
+                    <button class="btn btn-warning" id="eda-btn" style="margin-top: 15px; display: none;">Perform EDA</button>
+                </div>
+                
+                <div class="tab-content" id="eda">
+                    <h3>Exploratory Data Analysis</h3>
+                    <div id="eda-content">
+                        <p>Please analyze the dataset first to see EDA results</p>
+                    </div>
+                    
+                    <button class="btn btn-warning" id="preprocess-btn" style="margin-top: 15px; display: none;">Preprocess Data</button>
+                </div>
+                
+                <div class="tab-content" id="preprocessing">
+                    <h3>Data Preprocessing</h3>
+                    <div id="preprocessing-content">
+                        <p>Please complete EDA first to preprocess data</p>
+                    </div>
+                    
+                    <div id="data-split-info" style="display: none;">
+                        <!-- Data split info will be populated here -->
+                    </div>
+                    
+                    <div id="preprocessed-preview" style="display: none;">
+                        <h4>Preprocessed Data Preview (First 10 rows of training set)</h4>
+                        <div class="preview-table">
+                            <table id="preprocessed-table">
+                                <thead id="preprocessed-table-head">
+                                    <!-- Headers will be populated by JavaScript -->
+                                </thead>
+                                <tbody id="preprocessed-table-body">
+                                    <!-- Data will be populated by JavaScript -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    
+                    <button class="btn btn-warning" id="train-btn" style="margin-top: 15px; display: none;">Train Model</button>
+                </div>
+                
+                <div class="tab-content" id="training">
+                    <h3>Model Training</h3>
+                    <div id="training-content">
+                        <p>Please preprocess data first to train the model</p>
+                    </div>
+                    
+                    <button class="btn btn-warning" id="evaluate-btn" style="margin-top: 15px; display: none;">Evaluate Model</button>
+                </div>
+                
+                <div class="tab-content" id="evaluation">
+                    <h3>Model Evaluation</h3>
+                    <div id="evaluation-content">
+                        <p>Please train the model first to see evaluation results</p>
+                    </div>
+                    
+                    <button class="btn btn-success" id="prediction-ready-btn" style="margin-top: 15px; display: none;">Ready for Predictions</button>
+                </div>
             </div>
         </div>
         
         <div class="dashboard">
-            <!-- Prediction form and results HTML -->
+            <div class="card">
+                <h2>Machine Parameters</h2>
+                <form id="prediction-form">
+                    <div class="form-group">
+                        <label for="product-type">Product Type</label>
+                        <select id="product-type" required>
+                            <option value="">Select Product Type</option>
+                            <option value="L">Low (L)</option>
+                            <option value="M">Medium (M)</option>
+                            <option value="H">High (H)</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="air-temperature">Air Temperature (K)</label>
+                        <input type="number" id="air-temperature" min="295" max="305" step="0.1" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="process-temperature">Process Temperature (K)</label>
+                        <input type="number" id="process-temperature" min="305" max="315" step="0.1" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="rotational-speed">Rotational Speed (rpm)</label>
+                        <input type="number" id="rotational-speed" min="1168" max="2886" step="1" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="torque">Torque (Nm)</label>
+                    <input type="number" id="torque" min="3.8" max="76.6" step="0.1" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="tool-wear">Tool Wear (min)</label>
+                        <input type="number" id="tool-wear" min="0" max="253" step="1" required>
+                    </div>
+                    
+                    <button type="submit" class="btn" id="predict-btn" disabled>Predict Failure Risk</button>
+                    <button type="button" class="btn btn-danger" id="reset-btn">Reset Form</button>
+                </form>
+            </div>
+            
+            <div class="card">
+                <h2>Failure Risk Prediction</h2>
+                <div class="prediction-result">
+                    <p>Failure Probability</p>
+                    <div class="gauge-container">
+                        <div class="gauge"></div>
+                        <div class="gauge-inner"></div>
+                        <div class="gauge-needle" id="gauge-needle"></div>
+                    </div>
+                    <div class="prediction-value" id="prediction-value">0%</div>
+                    <p id="risk-level">Model Not Ready</p>
+                </div>
+                
+                <div class="metrics-grid">
+                    <div class="metric">
+                        <div class="metric-label">Model Accuracy</div>
+                        <div class="metric-value" id="accuracy-display">0%</div>
+                    </div>
+                    <div class="metric">
+                        <div class="metric-label">Precision</div>
+                        <div class="metric-value" id="precision-display">0%</div>
+                    </div>
+                    <div class="metric">
+                        <div class="metric-label">Recall</div>
+                        <div class="metric-value" id="recall-display">0%</div>
+                    </div>
+                    <div class="metric">
+                        <div class="metric-label">F1-Score</div>
+                        <div class="metric-value" id="f1-score-display">0%</div>
+                    </div>
+                </div>
+            </div>
         </div>
         
         <div class="card">
-            <!-- Feature importance and charts HTML -->
+            <div class="tabs">
+                <div class="tab active" data-tab="feature-importance">Feature Importance</div>
+                <div class="tab" data-tab="performance">Model Performance</div>
+                <div class="tab" data-tab="roc-auc">ROC-AUC Analysis</div>
+                <div class="tab" data-tab="history">Prediction History</div>
+            </div>
+            
+            <div class="tab-content active" id="feature-importance">
+                <h2>Feature Importance Analysis</h2>
+                <div class="feature-importance-chart">
+                    <canvas id="feature-importance-chart"></canvas>
+                </div>
+                <div class="feature-importance">
+                    <div class="feature-bar">
+                        <div class="feature-name">Torque</div>
+                        <div class="feature-value">
+                            <div class="feature-fill" style="width: 0%"></div>
+                        </div>
+                    </div>
+                    <div class="feature-bar">
+                        <div class="feature-name">Tool Wear</div>
+                        <div class="feature-value">
+                            <div class="feature-fill" style="width: 0%"></div>
+                        </div>
+                    </div>
+                    <div class="feature-bar">
+                        <div class="feature-name">Rotational Speed</div>
+                        <div class="feature-value">
+                            <div class="feature-fill" style="width: 0%"></div>
+                        </div>
+                    </div>
+                    <div class="feature-bar">
+                        <div class="feature-name">Process Temperature</div>
+                        <div class="feature-value">
+                            <div class="feature-fill" style="width: 0%"></div>
+                        </div>
+                    </div>
+                    <div class="feature-bar">
+                        <div class="feature-name">Air Temperature</div>
+                        <div class="feature-value">
+                            <div class="feature-fill" style="width: 0%"></div>
+                        </div>
+                    </div>
+                    <div class="feature-bar">
+                        <div class="feature-name">Product Type</div>
+                        <div class="feature-value">
+                            <div class="feature-fill" style="width: 0%"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="tab-content" id="performance">
+                <h2>Model Performance Metrics</h2>
+                <div class="chart-container">
+                    <canvas id="performance-chart"></canvas>
+                </div>
+            </div>
+            
+            <div class="tab-content" id="roc-auc">
+                <h2>ROC-AUC Analysis</h2>
+                <div class="auc-value" id="auc-value">AUC: --</div>
+                <div class="roc-container">
+                    <canvas id="roc-chart"></canvas>
+                </div>
+                <div class="threshold-control">
+                    <label for="threshold-slider">Classification Threshold: <span id="threshold-value">0.5</span></label>
+                    <input type="range" id="threshold-slider" class="threshold-slider" min="0" max="1" step="0.01" value="0.5">
+                    <p>Adjusting the threshold can help balance precision and recall. Lower thresholds increase recall but may decrease precision.</p>
+                </div>
+            </div>
+            
+            <div class="tab-content" id="history">
+                <h2>Prediction History</h2>
+                <div class="chart-container">
+                    <canvas id="history-chart"></canvas>
+                </div>
+            </div>
+        </div>
+        
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p id="loading-text">Processing...</p>
         </div>
         
         <footer>
@@ -88,7 +1000,781 @@
     </div>
 
     <script>
-        // COMPLETE JAVASCRIPT IMPLEMENTATION
+        // Enhanced ML Pipeline with Class Imbalance Handling and ROC-AUC
+        class MLPipeline {
+            constructor() {
+                this.csvParser = new FlexibleCSVParser();
+                this.rawData = [];
+                this.dataset = [];
+                this.X_train = [];
+                this.X_test = [];
+                this.y_train = [];
+                this.y_test = [];
+                this.processedData = {
+                    X_train_processed: [],
+                    X_test_processed: [],
+                    y_train: [],
+                    y_test: []
+                };
+                this.model = null;
+                this.featureImportance = [0, 0, 0, 0, 0, 0, 0, 0];
+                this.modelMetrics = {
+                    accuracy: 0,
+                    precision: 0,
+                    recall: 0,
+                    f1: 0,
+                    confusionMatrix: [0, 0, 0, 0],
+                    auc: 0,
+                    rocCurve: []
+                };
+                this.numericStats = {};
+                this.categoricalStats = {};
+                this.correlationMatrix = [];
+                this.preprocessingParams = {};
+                this.columnMapping = {};
+                this.missingValues = {};
+                this.hasMissingValues = false;
+                this.classWeights = {0: 1, 1: 1}; // For handling class imbalance
+                this.predictionThreshold = 0.5; // Default threshold
+            }
+            
+            loadData(csvText) {
+                try {
+                    const parsedData = this.csvParser.parseCSV(csvText);
+                    this.rawData = parsedData.data;
+                    this.columnMapping = parsedData.columnMapping;
+                    
+                    // Calculate missing values
+                    this.calculateMissingValues();
+                    
+                    this.dataset = this.rawData.map(row => {
+                        return {
+                            Type: row.type,
+                            AirTemp: row.airtemp,
+                            ProcessTemp: row.processtemp,
+                            RotationalSpeed: row.rotationalspeed,
+                            Torque: row.torque,
+                            ToolWear: row.toolwear,
+                            Failure: row.failure
+                        };
+                    }).filter(record => {
+                        // Remove records with critical missing values in Type or Failure
+                        return record.Type !== null && record.Failure !== null;
+                    });
+                    
+                    return {
+                        dataset: this.dataset,
+                        columnMapping: this.columnMapping,
+                        totalRecords: this.dataset.length,
+                        missingValues: this.missingValues,
+                        hasMissingValues: this.hasMissingValues
+                    };
+                } catch (error) {
+                    throw new Error(`Failed to parse CSV: ${error.message}`);
+                }
+            }
+            
+            calculateMissingValues() {
+                this.missingValues = {};
+                this.hasMissingValues = false;
+                
+                // Calculate missing values for each column
+                const columns = ['type', 'airtemp', 'processtemp', 'rotationalspeed', 'torque', 'toolwear', 'failure'];
+                
+                columns.forEach(col => {
+                    const missingCount = this.rawData.filter(row => 
+                        row[col] === null || row[col] === undefined || row[col] === ''
+                    ).length;
+                    
+                    this.missingValues[col] = missingCount;
+                    if (missingCount > 0) {
+                        this.hasMissingValues = true;
+                    }
+                });
+            }
+            
+            handleMissingValues(strategy) {
+                if (!this.hasMissingValues) return;
+                
+                if (strategy === 'delete') {
+                    // Delete rows with any missing values
+                    this.rawData = this.rawData.filter(row => {
+                        return Object.values(row).every(value => 
+                            value !== null && value !== undefined && value !== ''
+                        );
+                    });
+                } else if (strategy === 'fill') {
+                    // Fill missing values with median for numeric, mode for categorical
+                    const columns = ['type', 'airtemp', 'processtemp', 'rotationalspeed', 'torque', 'toolwear', 'failure'];
+                    
+                    columns.forEach(col => {
+                        const values = this.rawData
+                            .map(row => row[col])
+                            .filter(val => val !== null && val !== undefined && val !== '');
+                        
+                        if (values.length === 0) return;
+                        
+                        let fillValue;
+                        
+                        if (['airtemp', 'processtemp', 'rotationalspeed', 'torque', 'toolwear'].includes(col)) {
+                            // Numeric - use median
+                            const sorted = [...values].sort((a, b) => a - b);
+                            fillValue = sorted[Math.floor(sorted.length / 2)];
+                        } else if (col === 'type') {
+                            // Categorical - use mode
+                            const frequency = {};
+                            values.forEach(val => {
+                                frequency[val] = (frequency[val] || 0) + 1;
+                            });
+                            fillValue = Object.keys(frequency).reduce((a, b) => 
+                                frequency[a] > frequency[b] ? a : b
+                            );
+                        } else if (col === 'failure') {
+                            // Binary - use mode
+                            const zeros = values.filter(val => val === 0 || val === '0').length;
+                            const ones = values.filter(val => val === 1 || val === '1').length;
+                            fillValue = zeros > ones ? 0 : 1;
+                        }
+                        
+                        // Fill missing values
+                        this.rawData.forEach(row => {
+                            if (row[col] === null || row[col] === undefined || row[col] === '') {
+                                row[col] = fillValue;
+                            }
+                        });
+                    });
+                }
+                
+                // Recalculate missing values
+                this.calculateMissingValues();
+                
+                // Update dataset
+                this.dataset = this.rawData.map(row => {
+                    return {
+                        Type: row.type,
+                        AirTemp: row.airtemp,
+                        ProcessTemp: row.processtemp,
+                        RotationalSpeed: row.rotationalspeed,
+                        Torque: row.torque,
+                        ToolWear: row.toolwear,
+                        Failure: row.failure
+                    };
+                }).filter(record => {
+                    return record.Type !== null && record.Failure !== null;
+                });
+            }
+            
+            getDatasetInfo() {
+                const totalRecords = this.dataset.length;
+                const failureCount = this.dataset.filter(d => d.Failure === 1).length;
+                const failureRate = totalRecords > 0 ? (failureCount / totalRecords * 100).toFixed(2) : '0.00';
+                
+                return {
+                    totalRecords,
+                    failureCount,
+                    failureRate,
+                    features: 6,
+                    missingValues: this.missingValues,
+                    hasMissingValues: this.hasMissingValues
+                };
+            }
+            
+            // Split data into train/test sets BEFORE preprocessing
+            splitData() {
+                // Shuffle dataset
+                const shuffled = [...this.dataset].sort(() => Math.random() - 0.5);
+                
+                // Split into features (X) and target (y)
+                const X = shuffled.map(record => ({
+                    Type: record.Type,
+                    AirTemp: record.AirTemp,
+                    ProcessTemp: record.ProcessTemp,
+                    RotationalSpeed: record.RotationalSpeed,
+                    Torque: record.Torque,
+                    ToolWear: record.ToolWear
+                }));
+                
+                const y = shuffled.map(record => record.Failure);
+                
+                // 80/20 split
+                const splitIndex = Math.floor(X.length * 0.8);
+                
+                this.X_train = X.slice(0, splitIndex);
+                this.X_test = X.slice(splitIndex);
+                this.y_train = y.slice(0, splitIndex);
+                this.y_test = y.slice(splitIndex);
+                
+                return {
+                    X_train: this.X_train,
+                    X_test: this.X_test,
+                    y_train: this.y_train,
+                    y_test: this.y_test,
+                    trainSize: this.X_train.length,
+                    testSize: this.X_test.length
+                };
+            }
+            
+            performEDA() {
+                // Calculate numeric statistics
+                this.calculateNumericStats();
+                
+                // Calculate categorical statistics
+                this.calculateCategoricalStats();
+                
+                // Calculate correlation matrix
+                this.calculateCorrelationMatrix();
+                
+                return {
+                    numericStats: this.numericStats,
+                    categoricalStats: this.categoricalStats,
+                    correlationMatrix: this.correlationMatrix
+                };
+            }
+            
+            calculateNumericStats() {
+                const numericFeatures = ['AirTemp', 'ProcessTemp', 'RotationalSpeed', 'Torque', 'ToolWear'];
+                this.numericStats = {};
+                
+                numericFeatures.forEach(feature => {
+                    const values = this.dataset.map(d => d[feature]).filter(val => val !== null);
+                    if (values.length === 0) return;
+                    
+                    values.sort((a, b) => a - b);
+                    const mean = values.reduce((a, b) => a + b, 0) / values.length;
+                    const median = values[Math.floor(values.length / 2)];
+                    const min = values[0];
+                    const max = values[values.length - 1];
+                    const std = Math.sqrt(values.reduce((sq, n) => sq + Math.pow(n - mean, 2), 0) / values.length);
+                    
+                    this.numericStats[feature] = {
+                        mean: mean.toFixed(2),
+                        median: median.toFixed(2),
+                        min: min.toFixed(2),
+                        max: max.toFixed(2),
+                        std: std.toFixed(2),
+                        count: values.length
+                    };
+                });
+                
+                return this.numericStats;
+            }
+            
+            calculateCategoricalStats() {
+                const typeValues = this.dataset.map(record => record.Type).filter(val => val !== null);
+                const failureValues = this.dataset.map(record => record.Failure).filter(val => val !== null);
+                
+                // Type distribution
+                const typeCounts = {};
+                typeValues.forEach(type => {
+                    typeCounts[type] = (typeCounts[type] || 0) + 1;
+                });
+                
+                // Failure distribution
+                const failureCounts = { 0: 0, 1: 0 };
+                failureValues.forEach(failure => {
+                    failureCounts[failure] = (failureCounts[failure] || 0) + 1;
+                });
+                
+                this.categoricalStats = {
+                    Type: typeCounts,
+                    Failure: failureCounts
+                };
+                
+                return this.categoricalStats;
+            }
+            
+            calculateCorrelationMatrix() {
+                const numericFeatures = ['AirTemp', 'ProcessTemp', 'RotationalSpeed', 'Torque', 'ToolWear', 'Failure'];
+                const matrix = [];
+                
+                // Initialize matrix
+                for (let i = 0; i < numericFeatures.length; i++) {
+                    matrix[i] = [];
+                    for (let j = 0; j < numericFeatures.length; j++) {
+                        matrix[i][j] = 0;
+                    }
+                }
+                
+                // Calculate correlations
+                for (let i = 0; i < numericFeatures.length; i++) {
+                    for (let j = 0; j < numericFeatures.length; j++) {
+                        if (i === j) {
+                            matrix[i][j] = 1;
+                        } else {
+                            const col1 = numericFeatures[i];
+                            const col2 = numericFeatures[j];
+                            
+                            const values1 = this.dataset.map(record => record[col1]).filter(val => val !== null);
+                            const values2 = this.dataset.map(record => record[col2]).filter(val => val !== null);
+                            
+                            // Ensure we have the same number of values
+                            const minLength = Math.min(values1.length, values2.length);
+                            const v1 = values1.slice(0, minLength);
+                            const v2 = values2.slice(0, minLength);
+                            
+                            if (minLength > 0) {
+                                matrix[i][j] = this.calculateCorrelation(v1, v2);
+                            }
+                        }
+                    }
+                }
+                
+                this.correlationMatrix = {
+                    matrix,
+                    columns: numericFeatures
+                };
+                
+                return this.correlationMatrix;
+            }
+            
+            calculateCorrelation(arr1, arr2) {
+                const n = arr1.length;
+                if (n === 0) return 0;
+                
+                const mean1 = arr1.reduce((sum, val) => sum + val, 0) / n;
+                const mean2 = arr2.reduce((sum, val) => sum + val, 0) / n;
+                
+                let numerator = 0;
+                let denom1 = 0;
+                let denom2 = 0;
+                
+                for (let i = 0; i < n; i++) {
+                    numerator += (arr1[i] - mean1) * (arr2[i] - mean2);
+                    denom1 += Math.pow(arr1[i] - mean1, 2);
+                    denom2 += Math.pow(arr2[i] - mean2, 2);
+                }
+                
+                return numerator / Math.sqrt(denom1 * denom2);
+            }
+            
+            // Create histogram data for numeric features
+            createHistogramData(feature, bins = 10) {
+                const values = this.dataset.map(record => record[feature]).filter(val => val !== null);
+                if (values.length === 0) return { labels: [], data: [] };
+                
+                const min = Math.min(...values);
+                const max = Math.max(...values);
+                const binWidth = (max - min) / bins;
+                
+                const histogram = Array(bins).fill(0);
+                const labels = [];
+                
+                for (let i = 0; i < bins; i++) {
+                    const binStart = min + i * binWidth;
+                    const binEnd = min + (i + 1) * binWidth;
+                    labels.push(`${binStart.toFixed(1)}-${binEnd.toFixed(1)}`);
+                    
+                    histogram[i] = values.filter(val => 
+                        val >= binStart && val < (i === bins - 1 ? binEnd + 0.001 : binEnd)
+                    ).length;
+                }
+                
+                return {
+                    labels,
+                    data: histogram
+                };
+            }
+            
+            preprocessData() {
+                // Split data first
+                const splitResult = this.splitData();
+                
+                // Calculate preprocessing parameters from training data only
+                const numericColumns = ['AirTemp', 'ProcessTemp', 'RotationalSpeed', 'Torque', 'ToolWear'];
+                this.preprocessingParams = {};
+                
+                // Calculate min and max for normalization from training data
+                numericColumns.forEach(col => {
+                    const values = this.X_train.map(x => x[col]).filter(val => val !== null);
+                    if (values.length === 0) return;
+                    
+                    this.preprocessingParams[col] = {
+                        min: Math.min(...values),
+                        max: Math.max(...values)
+                    };
+                });
+                
+                // One-hot encoding for Type from training data
+                const typeValues = this.X_train.map(x => x.Type).filter(val => val !== null);
+                const uniqueTypes = [...new Set(typeValues)];
+                this.preprocessingParams.Type = uniqueTypes;
+                
+                // Process training data
+                this.processedData.X_train_processed = this.X_train.map(record => {
+                    const processed = [];
+                    
+                    // One-hot encode Type
+                    this.preprocessingParams.Type.forEach(type => {
+                        processed.push(record.Type === type ? 1 : 0);
+                    });
+                    
+                    // Normalize numeric features
+                    numericColumns.forEach(col => {
+                        const { min, max } = this.preprocessingParams[col];
+                        const normalized = (record[col] - min) / (max - min);
+                        processed.push(normalized);
+                    });
+                    
+                    return processed;
+                });
+                
+                // Process test data using training parameters
+                this.processedData.X_test_processed = this.X_test.map(record => {
+                    const processed = [];
+                    
+                    // One-hot encode Type
+                    this.preprocessingParams.Type.forEach(type => {
+                        processed.push(record.Type === type ? 1 : 0);
+                    });
+                    
+                    // Normalize numeric features using training min/max
+                    numericColumns.forEach(col => {
+                        const { min, max } = this.preprocessingParams[col];
+                        const normalized = (record[col] - min) / (max - min);
+                        processed.push(normalized);
+                    });
+                    
+                    return processed;
+                });
+                
+                this.processedData.y_train = this.y_train;
+                this.processedData.y_test = this.y_test;
+                
+                return {
+                    splitInfo: splitResult,
+                    preprocessingParams: this.preprocessingParams,
+                    processedData: this.processedData
+                };
+            }
+            
+            trainModel() {
+                // Calculate class weights to handle imbalance
+                this.calculateClassWeights();
+                
+                // Simple neural network implementation
+                const inputSize = this.processedData.X_train_processed[0].length;
+                const hiddenSize = 8;
+                const outputSize = 1;
+                
+                // Initialize weights
+                const weights1 = Array(inputSize).fill().map(() => 
+                    Array(hiddenSize).fill().map(() => Math.random() * 0.1 - 0.05)
+                );
+                const weights2 = Array(hiddenSize).fill().map(() => 
+                    Array(outputSize).fill().map(() => Math.random() * 0.1 - 0.05)
+                );
+                
+                const biases1 = Array(hiddenSize).fill(0);
+                const biases2 = Array(outputSize).fill(0);
+                
+                // Training parameters
+                const learningRate = 0.01;
+                const epochs = 100;
+                
+                // Training loop
+                for (let epoch = 0; epoch < epochs; epoch++) {
+                    let totalLoss = 0;
+                    
+                    for (let i = 0; i < this.processedData.X_train_processed.length; i++) {
+                        const input = this.processedData.X_train_processed[i];
+                        const target = this.processedData.y_train[i];
+                        
+                        // Forward pass
+                        const hidden = Array(hiddenSize).fill(0);
+                        for (let j = 0; j < hiddenSize; j++) {
+                            let sum = biases1[j];
+                            for (let k = 0; k < inputSize; k++) {
+                                sum += input[k] * weights1[k][j];
+                            }
+                            hidden[j] = Math.max(0, sum); // ReLU activation
+                        }
+                        
+                        const output = Array(outputSize).fill(0);
+                        for (let j = 0; j < outputSize; j++) {
+                            let sum = biases2[j];
+                            for (let k = 0; k < hiddenSize; k++) {
+                                sum += hidden[k] * weights2[k][j];
+                            }
+                            output[j] = 1 / (1 + Math.exp(-sum)); // Sigmoid activation
+                        }
+                        
+                        // Calculate weighted loss (binary cross-entropy with class weights)
+                        const weight = target === 1 ? this.classWeights[1] : this.classWeights[0];
+                        const loss = -weight * (target * Math.log(output[0]) + (1 - target) * Math.log(1 - output[0]));
+                        totalLoss += loss;
+                        
+                        // Backward pass
+                        const outputError = (output[0] - target) * weight;
+                        
+                        // Update weights and biases for output layer
+                        for (let j = 0; j < hiddenSize; j++) {
+                            for (let k = 0; k < outputSize; k++) {
+                                weights2[j][k] -= learningRate * outputError * hidden[j];
+                            }
+                        }
+                        for (let j = 0; j < outputSize; j++) {
+                            biases2[j] -= learningRate * outputError;
+                        }
+                        
+                        // Calculate hidden layer errors
+                        const hiddenErrors = Array(hiddenSize).fill(0);
+                        for (let j = 0; j < hiddenSize; j++) {
+                            let error = 0;
+                            for (let k = 0; k < outputSize; k++) {
+                                error += outputError * weights2[j][k];
+                            }
+                            hiddenErrors[j] = error * (hidden[j] > 0 ? 1 : 0); // ReLU derivative
+                        }
+                        
+                        // Update weights and biases for hidden layer
+                        for (let j = 0; j < inputSize; j++) {
+                            for (let k = 0; k < hiddenSize; k++) {
+                                weights1[j][k] -= learningRate * hiddenErrors[k] * input[j];
+                            }
+                        }
+                        for (let j = 0; j < hiddenSize; j++) {
+                            biases1[j] -= learningRate * hiddenErrors[j];
+                        }
+                    }
+                }
+                
+                // Store the trained model
+                this.model = {
+                    weights1,
+                    weights2,
+                    biases1,
+                    biases2,
+                    inputSize,
+                    hiddenSize,
+                    outputSize
+                };
+                
+                // Calculate feature importance (simplified)
+                this.calculateFeatureImportance();
+                
+                return this.model;
+            }
+            
+            calculateClassWeights() {
+                // Count classes in training data
+                const classCounts = {0: 0, 1: 0};
+                this.processedData.y_train.forEach(label => {
+                    classCounts[label] = (classCounts[label] || 0) + 1;
+                });
+                
+                // Calculate weights inversely proportional to class frequencies
+                const total = this.processedData.y_train.length;
+                this.classWeights = {
+                    0: total / (2 * classCounts[0]),
+                    1: total / (2 * classCounts[1])
+                };
+                
+                console.log("Class weights:", this.classWeights);
+                return this.classWeights;
+            }
+            
+            calculateFeatureImportance() {
+                // Simplified feature importance calculation
+                // Based on the magnitude of weights in the first layer
+                const { weights1 } = this.model;
+                
+                // Sum absolute weights for each input feature
+                this.featureImportance = Array(weights1.length).fill(0);
+                for (let i = 0; i < weights1.length; i++) {
+                    for (let j = 0; j < weights1[i].length; j++) {
+                        this.featureImportance[i] += Math.abs(weights1[i][j]);
+                    }
+                }
+                
+                // Normalize to percentages
+                const total = this.featureImportance.reduce((sum, val) => sum + val, 0);
+                this.featureImportance = this.featureImportance.map(val => (val / total) * 100);
+                
+                return this.featureImportance;
+            }
+            
+            evaluateModel() {
+                if (!this.model) {
+                    throw new Error("Model not trained yet");
+                }
+                
+                const { weights1, weights2, biases1, biases2, hiddenSize, outputSize } = this.model;
+                
+                // Test on test set
+                let testCorrect = 0;
+                let truePositives = 0, falsePositives = 0, trueNegatives = 0, falseNegatives = 0;
+                let predictions = [];
+                
+                for (let i = 0; i < this.processedData.X_test_processed.length; i++) {
+                    const input = this.processedData.X_test_processed[i];
+                    const target = this.processedData.y_test[i];
+                    
+                    // Forward pass
+                    const hidden = Array(hiddenSize).fill(0);
+                    for (let j = 0; j < hiddenSize; j++) {
+                        let sum = biases1[j];
+                        for (let k = 0; k < input.length; k++) {
+                            sum += input[k] * weights1[k][j];
+                        }
+                        hidden[j] = Math.max(0, sum); // ReLU
+                    }
+                    
+                    const output = Array(outputSize).fill(0);
+                    for (let j = 0; j < outputSize; j++) {
+                        let sum = biases2[j];
+                        for (let k = 0; k < hiddenSize; k++) {
+                            sum += hidden[k] * weights2[k][j];
+                        }
+                        output[j] = 1 / (1 + Math.exp(-sum)); // Sigmoid
+                    }
+                    
+                    const probability = output[0];
+                    const prediction = probability > this.predictionThreshold ? 1 : 0;
+                    
+                    predictions.push({
+                        probability,
+                        actual: target
+                    });
+                    
+                    if (prediction === target) {
+                        testCorrect++;
+                        if (prediction === 1) {
+                            truePositives++;
+                        } else {
+                            trueNegatives++;
+                        }
+                    } else {
+                        if (prediction === 1) {
+                            falsePositives++;
+                        } else {
+                            falseNegatives++;
+                        }
+                    }
+                }
+                
+                const testAccuracy = testCorrect / this.processedData.X_test_processed.length;
+                
+                // Calculate additional metrics
+                const precision = truePositives / (truePositives + falsePositives) || 0;
+                const recall = truePositives / (truePositives + falseNegatives) || 0;
+                const f1 = 2 * (precision * recall) / (precision + recall) || 0;
+                
+                // Calculate ROC curve and AUC
+                const rocData = this.calculateROCAUC(predictions);
+                
+                this.modelMetrics = {
+                    accuracy: testAccuracy,
+                    precision,
+                    recall,
+                    f1,
+                    confusionMatrix: [truePositives, falsePositives, falseNegatives, trueNegatives],
+                    auc: rocData.auc,
+                    rocCurve: rocData.curve
+                };
+                
+                return this.modelMetrics;
+            }
+            
+            calculateROCAUC(predictions) {
+                // Sort predictions by probability in descending order
+                const sortedPredictions = [...predictions].sort((a, b) => b.probability - a.probability);
+                
+                // Calculate ROC curve points
+                const rocCurve = [];
+                let truePositives = 0;
+                let falsePositives = 0;
+                
+                const totalPositives = sortedPredictions.filter(p => p.actual === 1).length;
+                const totalNegatives = sortedPredictions.filter(p => p.actual === 0).length;
+                
+                // Add starting point (0,0)
+                rocCurve.push({fpr: 0, tpr: 0, threshold: 1});
+                
+                // Calculate points for each possible threshold
+                for (let i = 0; i < sortedPredictions.length; i++) {
+                    if (sortedPredictions[i].actual === 1) {
+                        truePositives++;
+                    } else {
+                        falsePositives++;
+                    }
+                    
+                    const tpr = truePositives / totalPositives;
+                    const fpr = falsePositives / totalNegatives;
+                    const threshold = i < sortedPredictions.length - 1 ? 
+                        (sortedPredictions[i].probability + sortedPredictions[i+1].probability) / 2 : 
+                        0;
+                    
+                    rocCurve.push({fpr, tpr, threshold});
+                }
+                
+                // Add ending point (1,1)
+                rocCurve.push({fpr: 1, tpr: 1, threshold: 0});
+                
+                // Calculate AUC using trapezoidal rule
+                let auc = 0;
+                for (let i = 1; i < rocCurve.length; i++) {
+                    const width = rocCurve[i].fpr - rocCurve[i-1].fpr;
+                    const height = (rocCurve[i].tpr + rocCurve[i-1].tpr) / 2;
+                    auc += width * height;
+                }
+                
+                return {
+                    curve: rocCurve,
+                    auc: auc
+                };
+            }
+            
+            setPredictionThreshold(threshold) {
+                this.predictionThreshold = threshold;
+            }
+            
+            predict(inputData) {
+                if (!this.model) {
+                    throw new Error("Model not trained yet");
+                }
+                
+                const { weights1, weights2, biases1, biases2, hiddenSize, outputSize } = this.model;
+                
+                // Preprocess input data
+                const processedInput = [];
+                
+                // One-hot encode Type
+                this.preprocessingParams.Type.forEach(type => {
+                    processedInput.push(inputData.Type === type ? 1 : 0);
+                });
+                
+                // Normalize numeric features
+                const numericColumns = ['AirTemp', 'ProcessTemp', 'RotationalSpeed', 'Torque', 'ToolWear'];
+                numericColumns.forEach(col => {
+                    const { min, max } = this.preprocessingParams[col];
+                    const normalized = (inputData[col] - min) / (max - min);
+                    processedInput.push(normalized);
+                });
+                
+                // Forward pass
+                const hidden = Array(hiddenSize).fill(0);
+                for (let j = 0; j < hiddenSize; j++) {
+                    let sum = biases1[j];
+                    for (let k = 0; k < processedInput.length; k++) {
+                        sum += processedInput[k] * weights1[k][j];
+                    }
+                    hidden[j] = Math.max(0, sum); // ReLU
+                }
+                
+                const output = Array(outputSize).fill(0);
+                for (let j = 0; j < outputSize; j++) {
+                    let sum = biases2[j];
+                    for (let k = 0; k < hiddenSize; k++) {
+                        sum += hidden[k] * weights2[k][j];
+                    }
+                    output[j] = 1 / (1 + Math.exp(-sum)); // Sigmoid
+                }
+                
+                return output[0];
+            }
+        }
+
+        // Flexible CSV Parser
         class FlexibleCSVParser {
             constructor() {
                 this.expectedColumns = {
@@ -163,874 +1849,12 @@
             }
         }
 
-        class MLPipeline {
-            constructor() {
-                this.csvParser = new FlexibleCSVParser();
-                this.rawData = [];
-                this.dataset = [];
-                this.X_train = [];
-                this.X_test = [];
-                this.y_train = [];
-                this.y_test = [];
-                this.processedData = {
-                    X_train_processed: [],
-                    X_test_processed: [],
-                    y_train: [],
-                    y_test: []
-                };
-                this.model = null;
-                this.featureImportance = [];
-                this.modelMetrics = {
-                    accuracy: 0,
-                    precision: 0,
-                    recall: 0,
-                    f1: 0,
-                    roc_auc: 0,
-                    confusionMatrix: [0, 0, 0, 0]
-                };
-                this.rocCurve = { fpr: [], tpr: [], thresholds: [], auc: 0 };
-                this.classImbalanceMethod = 'none';
-                this.predictionThreshold = 0.5;
-                this.numericStats = {};
-                this.categoricalStats = {};
-                this.correlationMatrix = [];
-                this.preprocessingParams = {};
-                this.columnMapping = {};
-                this.missingValues = {};
-                this.hasMissingValues = false;
-            }
-            
-            loadData(csvText) {
-                try {
-                    const parsedData = this.csvParser.parseCSV(csvText);
-                    this.rawData = parsedData.data;
-                    this.columnMapping = parsedData.columnMapping;
-                    
-                    this.calculateMissingValues();
-                    
-                    this.dataset = this.rawData.map(row => {
-                        return {
-                            Type: row.type,
-                            AirTemp: row.airtemp,
-                            ProcessTemp: row.processtemp,
-                            RotationalSpeed: row.rotationalspeed,
-                            Torque: row.torque,
-                            ToolWear: row.toolwear,
-                            Failure: row.failure
-                        };
-                    }).filter(record => {
-                        return record.Type !== null && record.Failure !== null;
-                    });
-                    
-                    return {
-                        dataset: this.dataset,
-                        columnMapping: this.columnMapping,
-                        totalRecords: this.dataset.length,
-                        missingValues: this.missingValues,
-                        hasMissingValues: this.hasMissingValues
-                    };
-                } catch (error) {
-                    throw new Error(`Failed to parse CSV: ${error.message}`);
-                }
-            }
-            
-            calculateMissingValues() {
-                this.missingValues = {};
-                this.hasMissingValues = false;
-                
-                const columns = ['type', 'airtemp', 'processtemp', 'rotationalspeed', 'torque', 'toolwear', 'failure'];
-                
-                columns.forEach(col => {
-                    const missingCount = this.rawData.filter(row => 
-                        row[col] === null || row[col] === undefined || row[col] === ''
-                    ).length;
-                    
-                    this.missingValues[col] = missingCount;
-                    if (missingCount > 0) {
-                        this.hasMissingValues = true;
-                    }
-                });
-            }
-            
-            handleMissingValues(strategy) {
-                if (!this.hasMissingValues) return;
-                
-                if (strategy === 'delete') {
-                    this.rawData = this.rawData.filter(row => {
-                        return Object.values(row).every(value => 
-                            value !== null && value !== undefined && value !== ''
-                        );
-                    });
-                } else if (strategy === 'fill') {
-                    const columns = ['type', 'airtemp', 'processtemp', 'rotationalspeed', 'torque', 'toolwear', 'failure'];
-                    
-                    columns.forEach(col => {
-                        const values = this.rawData
-                            .map(row => row[col])
-                            .filter(val => val !== null && val !== undefined && val !== '');
-                        
-                        if (values.length === 0) return;
-                        
-                        let fillValue;
-                        
-                        if (['airtemp', 'processtemp', 'rotationalspeed', 'torque', 'toolwear'].includes(col)) {
-                            const sorted = [...values].sort((a, b) => a - b);
-                            fillValue = sorted[Math.floor(sorted.length / 2)];
-                        } else if (col === 'type') {
-                            const frequency = {};
-                            values.forEach(val => {
-                                frequency[val] = (frequency[val] || 0) + 1;
-                            });
-                            fillValue = Object.keys(frequency).reduce((a, b) => 
-                                frequency[a] > frequency[b] ? a : b
-                            );
-                        } else if (col === 'failure') {
-                            const zeros = values.filter(val => val === 0 || val === '0').length;
-                            const ones = values.filter(val => val === 1 || val === '1').length;
-                            fillValue = zeros > ones ? 0 : 1;
-                        }
-                        
-                        this.rawData.forEach(row => {
-                            if (row[col] === null || row[col] === undefined || row[col] === '') {
-                                row[col] = fillValue;
-                            }
-                        });
-                    });
-                }
-                
-                this.calculateMissingValues();
-                
-                this.dataset = this.rawData.map(row => {
-                    return {
-                        Type: row.type,
-                        AirTemp: row.airtemp,
-                        ProcessTemp: row.processtemp,
-                        RotationalSpeed: row.rotationalspeed,
-                        Torque: row.torque,
-                        ToolWear: row.toolwear,
-                        Failure: row.failure
-                    };
-                }).filter(record => {
-                    return record.Type !== null && record.Failure !== null;
-                });
-            }
-            
-            getDatasetInfo() {
-                const totalRecords = this.dataset.length;
-                const failureCount = this.dataset.filter(d => d.Failure === 1).length;
-                const failureRate = totalRecords > 0 ? (failureCount / totalRecords * 100).toFixed(2) : '0.00';
-                
-                return {
-                    totalRecords,
-                    failureCount,
-                    failureRate,
-                    features: 6,
-                    missingValues: this.missingValues,
-                    hasMissingValues: this.hasMissingValues
-                };
-            }
-            
-            handleClassImbalance(method) {
-                this.classImbalanceMethod = method;
-                
-                if (method === 'none') {
-                    return;
-                }
-                
-                const X = this.dataset.map(record => ({
-                    Type: record.Type,
-                    AirTemp: record.AirTemp,
-                    ProcessTemp: record.ProcessTemp,
-                    RotationalSpeed: record.RotationalSpeed,
-                    Torque: record.Torque,
-                    ToolWear: record.ToolWear
-                }));
-                
-                const y = this.dataset.map(record => record.Failure);
-                
-                if (method === 'smote') {
-                    this.applySMOTE(X, y);
-                } else if (method === 'undersampling') {
-                    this.applyUndersampling(X, y);
-                }
-            }
-            
-            applySMOTE(features, targets) {
-                const minorityClass = 1;
-                const minoritySamples = [];
-                const majoritySamples = [];
-                
-                features.forEach((feature, index) => {
-                    if (targets[index] === minorityClass) {
-                        minoritySamples.push({ feature, target: targets[index] });
-                    } else {
-                        majoritySamples.push({ feature, target: targets[index] });
-                    }
-                });
-                
-                const desiredRatio = 0.3;
-                const totalSamples = features.length;
-                const desiredMinorityCount = Math.floor(totalSamples * desiredRatio);
-                const samplesToCreate = Math.max(0, desiredMinorityCount - minoritySamples.length);
-                
-                if (samplesToCreate <= 0) return;
-                
-                const syntheticSamples = [];
-                for (let i = 0; i < samplesToCreate; i++) {
-                    const randomIndex = Math.floor(Math.random() * minoritySamples.length);
-                    const sample = minoritySamples[randomIndex];
-                    
-                    const k = Math.min(5, minoritySamples.length - 1);
-                    const neighbors = [];
-                    for (let j = 0; j < k; j++) {
-                        const neighborIndex = Math.floor(Math.random() * minoritySamples.length);
-                        if (neighborIndex !== randomIndex && !neighbors.includes(minoritySamples[neighborIndex])) {
-                            neighbors.push(minoritySamples[neighborIndex]);
-                        }
-                    }
-                    
-                    if (neighbors.length > 0) {
-                        const randomNeighbor = neighbors[Math.floor(Math.random() * neighbors.length)];
-                        const syntheticFeature = {};
-                        
-                        Object.keys(sample.feature).forEach(key => {
-                            const diff = randomNeighbor.feature[key] - sample.feature[key];
-                            const gap = Math.random();
-                            syntheticFeature[key] = sample.feature[key] + gap * diff;
-                        });
-                        
-                        syntheticSamples.push({
-                            feature: syntheticFeature,
-                            target: minorityClass
-                        });
-                    }
-                }
-                
-                const allSamples = [
-                    ...minoritySamples,
-                    ...syntheticSamples,
-                    ...majoritySamples
-                ];
-                
-                allSamples.sort(() => Math.random() - 0.5);
-                
-                this.dataset = allSamples.map(item => ({
-                    Type: item.feature.Type,
-                    AirTemp: item.feature.AirTemp,
-                    ProcessTemp: item.feature.ProcessTemp,
-                    RotationalSpeed: item.feature.RotationalSpeed,
-                    Torque: item.feature.Torque,
-                    ToolWear: item.feature.ToolWear,
-                    Failure: item.target
-                }));
-            }
-            
-            applyUndersampling(features, targets) {
-                const minorityClass = 1;
-                const minoritySamples = [];
-                const majoritySamples = [];
-                
-                features.forEach((feature, index) => {
-                    if (targets[index] === minorityClass) {
-                        minoritySamples.push({ feature, target: targets[index] });
-                    } else {
-                        majoritySamples.push({ feature, target: targets[index] });
-                    }
-                });
-                
-                const undersampledMajority = [];
-                const samplesToKeep = Math.min(majoritySamples.length, minoritySamples.length * 3);
-                
-                for (let i = 0; i < samplesToKeep; i++) {
-                    const randomIndex = Math.floor(Math.random() * majoritySamples.length);
-                    undersampledMajority.push(majoritySamples[randomIndex]);
-                }
-                
-                const allSamples = [
-                    ...minoritySamples,
-                    ...undersampledMajority
-                ];
-                
-                allSamples.sort(() => Math.random() - 0.5);
-                
-                this.dataset = allSamples.map(item => ({
-                    Type: item.feature.Type,
-                    AirTemp: item.feature.AirTemp,
-                    ProcessTemp: item.feature.ProcessTemp,
-                    RotationalSpeed: item.feature.RotationalSpeed,
-                    Torque: item.feature.Torque,
-                    ToolWear: item.feature.ToolWear,
-                    Failure: item.target
-                }));
-            }
-            
-            calculateClassWeights() {
-                const failureCount = this.dataset.filter(d => d.Failure === 1).length;
-                const nonFailureCount = this.dataset.filter(d => d.Failure === 0).length;
-                const total = failureCount + nonFailureCount;
-                
-                const weightFailure = total / (2 * failureCount);
-                const weightNonFailure = total / (2 * nonFailureCount);
-                
-                return {
-                    0: weightNonFailure,
-                    1: weightFailure
-                };
-            }
-            
-            splitData() {
-                const shuffled = [...this.dataset].sort(() => Math.random() - 0.5);
-                
-                const X = shuffled.map(record => ({
-                    Type: record.Type,
-                    AirTemp: record.AirTemp,
-                    ProcessTemp: record.ProcessTemp,
-                    RotationalSpeed: record.RotationalSpeed,
-                    Torque: record.Torque,
-                    ToolWear: record.ToolWear
-                }));
-                
-                const y = shuffled.map(record => record.Failure);
-                
-                const splitIndex = Math.floor(X.length * 0.8);
-                
-                this.X_train = X.slice(0, splitIndex);
-                this.X_test = X.slice(splitIndex);
-                this.y_train = y.slice(0, splitIndex);
-                this.y_test = y.slice(splitIndex);
-                
-                return {
-                    X_train: this.X_train,
-                    X_test: this.X_test,
-                    y_train: this.y_train,
-                    y_test: this.y_test,
-                    trainSize: this.X_train.length,
-                    testSize: this.X_test.length
-                };
-            }
-            
-            preprocessData() {
-                const splitResult = this.splitData();
-                
-                const numericColumns = ['AirTemp', 'ProcessTemp', 'RotationalSpeed', 'Torque', 'ToolWear'];
-                this.preprocessingParams = {};
-                
-                numericColumns.forEach(col => {
-                    const values = this.X_train.map(x => x[col]).filter(val => val !== null);
-                    if (values.length === 0) return;
-                    
-                    this.preprocessingParams[col] = {
-                        min: Math.min(...values),
-                        max: Math.max(...values)
-                    };
-                });
-                
-                const typeValues = this.X_train.map(x => x.Type).filter(val => val !== null);
-                const uniqueTypes = [...new Set(typeValues)];
-                this.preprocessingParams.Type = uniqueTypes;
-                
-                this.processedData.X_train_processed = this.X_train.map(record => {
-                    const processed = [];
-                    
-                    this.preprocessingParams.Type.forEach(type => {
-                        processed.push(record.Type === type ? 1 : 0);
-                    });
-                    
-                    numericColumns.forEach(col => {
-                        const { min, max } = this.preprocessingParams[col];
-                        const normalized = (record[col] - min) / (max - min);
-                        processed.push(normalized);
-                    });
-                    
-                    return processed;
-                });
-                
-                this.processedData.X_test_processed = this.X_test.map(record => {
-                    const processed = [];
-                    
-                    this.preprocessingParams.Type.forEach(type => {
-                        processed.push(record.Type === type ? 1 : 0);
-                    });
-                    
-                    numericColumns.forEach(col => {
-                        const { min, max } = this.preprocessingParams[col];
-                        const normalized = (record[col] - min) / (max - min);
-                        processed.push(normalized);
-                    });
-                    
-                    return processed;
-                });
-                
-                this.processedData.y_train = this.y_train;
-                this.processedData.y_test = this.y_test;
-                
-                return {
-                    splitInfo: splitResult,
-                    preprocessingParams: this.preprocessingParams,
-                    processedData: this.processedData
-                };
-            }
-            
-            trainModel() {
-                const classWeights = this.classImbalanceMethod === 'class_weight' ? 
-                    this.calculateClassWeights() : { 0: 1, 1: 1 };
-                
-                const inputSize = this.processedData.X_train_processed[0].length;
-                const hiddenSize = 16;
-                const outputSize = 1;
-                
-                const weights1 = Array(inputSize).fill().map(() => 
-                    Array(hiddenSize).fill().map(() => (Math.random() - 0.5) * Math.sqrt(2 / inputSize))
-                );
-                const weights2 = Array(hiddenSize).fill().map(() => 
-                    Array(outputSize).fill().map(() => (Math.random() - 0.5) * Math.sqrt(2 / hiddenSize))
-                );
-                
-                const biases1 = Array(hiddenSize).fill(0);
-                const biases2 = Array(outputSize).fill(0);
-                
-                const learningRate = 0.01;
-                const epochs = 200;
-                
-                for (let epoch = 0; epoch < epochs; epoch++) {
-                    let totalLoss = 0;
-                    
-                    for (let i = 0; i < this.processedData.X_train_processed.length; i++) {
-                        const input = this.processedData.X_train_processed[i];
-                        const target = this.processedData.y_train[i];
-                        const weight = classWeights[target];
-                        
-                        const hidden = Array(hiddenSize).fill(0);
-                        for (let j = 0; j < hiddenSize; j++) {
-                            let sum = biases1[j];
-                            for (let k = 0; k < inputSize; k++) {
-                                sum += input[k] * weights1[k][j];
-                            }
-                            hidden[j] = Math.max(0, sum);
-                        }
-                        
-                        const output = Array(outputSize).fill(0);
-                        for (let j = 0; j < outputSize; j++) {
-                            let sum = biases2[j];
-                            for (let k = 0; k < hiddenSize; k++) {
-                                sum += hidden[k] * weights2[k][j];
-                            }
-                            output[j] = 1 / (1 + Math.exp(-sum));
-                        }
-                        
-                        const loss = -weight * (target * Math.log(output[0]) + (1 - target) * Math.log(1 - output[0]));
-                        totalLoss += loss;
-                        
-                        const outputError = (output[0] - target) * weight;
-                        
-                        for (let j = 0; j < hiddenSize; j++) {
-                            for (let k = 0; k < outputSize; k++) {
-                                weights2[j][k] -= learningRate * outputError * hidden[j];
-                            }
-                        }
-                        for (let j = 0; j < outputSize; j++) {
-                            biases2[j] -= learningRate * outputError;
-                        }
-                        
-                        const hiddenErrors = Array(hiddenSize).fill(0);
-                        for (let j = 0; j < hiddenSize; j++) {
-                            let error = 0;
-                            for (let k = 0; k < outputSize; k++) {
-                                error += outputError * weights2[j][k];
-                            }
-                            hiddenErrors[j] = error * (hidden[j] > 0 ? 1 : 0);
-                        }
-                        
-                        for (let j = 0; j < inputSize; j++) {
-                            for (let k = 0; k < hiddenSize; k++) {
-                                weights1[j][k] -= learningRate * hiddenErrors[k] * input[j];
-                            }
-                        }
-                        for (let j = 0; j < hiddenSize; j++) {
-                            biases1[j] -= learningRate * hiddenErrors[j];
-                        }
-                    }
-                }
-                
-                this.model = {
-                    weights1,
-                    weights2,
-                    biases1,
-                    biases2,
-                    inputSize,
-                    hiddenSize,
-                    outputSize
-                };
-                
-                this.calculateFeatureImportance();
-                
-                return this.model;
-            }
-            
-            calculateFeatureImportance() {
-                const { weights1 } = this.model;
-                
-                this.featureImportance = Array(weights1.length).fill(0);
-                for (let i = 0; i < weights1.length; i++) {
-                    for (let j = 0; j < weights1[i].length; j++) {
-                        this.featureImportance[i] += Math.abs(weights1[i][j]);
-                    }
-                }
-                
-                const total = this.featureImportance.reduce((sum, val) => sum + val, 0);
-                this.featureImportance = this.featureImportance.map(val => (val / total) * 100);
-                
-                return this.featureImportance;
-            }
-            
-            calculateROCCurve() {
-                const { weights1, weights2, biases1, biases2, hiddenSize, outputSize } = this.model;
-                const probabilities = [];
-                const actuals = [];
-                
-                for (let i = 0; i < this.processedData.X_test_processed.length; i++) {
-                    const input = this.processedData.X_test_processed[i];
-                    const target = this.processedData.y_test[i];
-                    
-                    const hidden = Array(hiddenSize).fill(0);
-                    for (let j = 0; j < hiddenSize; j++) {
-                        let sum = biases1[j];
-                        for (let k = 0; k < input.length; k++) {
-                            sum += input[k] * weights1[k][j];
-                        }
-                        hidden[j] = Math.max(0, sum);
-                    }
-                    
-                    const output = Array(outputSize).fill(0);
-                    for (let j = 0; j < outputSize; j++) {
-                        let sum = biases2[j];
-                        for (let k = 0; k < hiddenSize; k++) {
-                            sum += hidden[k] * weights2[k][j];
-                        }
-                        output[j] = 1 / (1 + Math.exp(-sum));
-                    }
-                    
-                    probabilities.push(output[0]);
-                    actuals.push(target);
-                }
-                
-                const thresholds = Array.from({ length: 101 }, (_, i) => i / 100);
-                const fpr = [];
-                const tpr = [];
-                
-                thresholds.forEach(threshold => {
-                    let truePositives = 0;
-                    let falsePositives = 0;
-                    let trueNegatives = 0;
-                    let falseNegatives = 0;
-                    
-                    for (let i = 0; i < probabilities.length; i++) {
-                        const prediction = probabilities[i] >= threshold ? 1 : 0;
-                        const actual = actuals[i];
-                        
-                        if (prediction === 1 && actual === 1) truePositives++;
-                        else if (prediction === 1 && actual === 0) falsePositives++;
-                        else if (prediction === 0 && actual === 1) falseNegatives++;
-                        else if (prediction === 0 && actual === 0) trueNegatives++;
-                    }
-                    
-                    const tprate = truePositives / (truePositives + falseNegatives) || 0;
-                    const fprate = falsePositives / (falsePositives + trueNegatives) || 0;
-                    
-                    tpr.push(tprate);
-                    fpr.push(fprate);
-                });
-                
-                let auc = 0;
-                for (let i = 1; i < fpr.length; i++) {
-                    auc += (fpr[i] - fpr[i-1]) * (tpr[i] + tpr[i-1]) / 2;
-                }
-                
-                this.rocCurve = {
-                    fpr,
-                    tpr,
-                    thresholds,
-                    auc
-                };
-                
-                return this.rocCurve;
-            }
-            
-            evaluateModel(threshold = 0.5) {
-                this.predictionThreshold = threshold;
-                
-                if (!this.model) {
-                    throw new Error("Model not trained yet");
-                }
-                
-                const { weights1, weights2, biases1, biases2, hiddenSize, outputSize } = this.model;
-                
-                let testCorrect = 0;
-                let truePositives = 0, falsePositives = 0, trueNegatives = 0, falseNegatives = 0;
-                const probabilities = [];
-                
-                for (let i = 0; i < this.processedData.X_test_processed.length; i++) {
-                    const input = this.processedData.X_test_processed[i];
-                    const target = this.processedData.y_test[i];
-                    
-                    const hidden = Array(hiddenSize).fill(0);
-                    for (let j = 0; j < hiddenSize; j++) {
-                        let sum = biases1[j];
-                        for (let k = 0; k < input.length; k++) {
-                            sum += input[k] * weights1[k][j];
-                        }
-                        hidden[j] = Math.max(0, sum);
-                    }
-                    
-                    const output = Array(outputSize).fill(0);
-                    for (let j = 0; j < outputSize; j++) {
-                        let sum = biases2[j];
-                        for (let k = 0; k < hiddenSize; k++) {
-                            sum += hidden[k] * weights2[k][j];
-                        }
-                        output[j] = 1 / (1 + Math.exp(-sum));
-                    }
-                    
-                    const probability = output[0];
-                    probabilities.push(probability);
-                    const prediction = probability >= threshold ? 1 : 0;
-                    
-                    if (prediction === target) {
-                        testCorrect++;
-                        if (prediction === 1) {
-                            truePositives++;
-                        } else {
-                            trueNegatives++;
-                        }
-                    } else {
-                        if (prediction === 1) {
-                            falsePositives++;
-                        } else {
-                            falseNegatives++;
-                        }
-                    }
-                }
-                
-                const testAccuracy = testCorrect / this.processedData.X_test_processed.length;
-                const precision = truePositives / (truePositives + falsePositives) || 0;
-                const recall = truePositives / (truePositives + falseNegatives) || 0;
-                const f1 = 2 * (precision * recall) / (precision + recall) || 0;
-                
-                this.calculateROCCurve();
-                const roc_auc = this.rocCurve.auc;
-                
-                this.modelMetrics = {
-                    accuracy: testAccuracy,
-                    precision,
-                    recall,
-                    f1,
-                    roc_auc,
-                    confusionMatrix: [truePositives, falsePositives, falseNegatives, trueNegatives],
-                    probabilities
-                };
-                
-                return this.modelMetrics;
-            }
-            
-            predict(inputData) {
-                if (!this.model) {
-                    throw new Error("Model not trained yet");
-                }
-                
-                const { weights1, weights2, biases1, biases2, hiddenSize, outputSize } = this.model;
-                
-                const processedInput = [];
-                
-                this.preprocessingParams.Type.forEach(type => {
-                    processedInput.push(inputData.Type === type ? 1 : 0);
-                });
-                
-                const numericColumns = ['AirTemp', 'ProcessTemp', 'RotationalSpeed', 'Torque', 'ToolWear'];
-                numericColumns.forEach(col => {
-                    const { min, max } = this.preprocessingParams[col];
-                    const normalized = (inputData[col] - min) / (max - min);
-                    processedInput.push(normalized);
-                });
-                
-                const hidden = Array(hiddenSize).fill(0);
-                for (let j = 0; j < hiddenSize; j++) {
-                    let sum = biases1[j];
-                    for (let k = 0; k < processedInput.length; k++) {
-                        sum += processedInput[k] * weights1[k][j];
-                    }
-                    hidden[j] = Math.max(0, sum);
-                }
-                
-                const output = Array(outputSize).fill(0);
-                for (let j = 0; j < outputSize; j++) {
-                    let sum = biases2[j];
-                    for (let k = 0; k < hiddenSize; k++) {
-                        sum += hidden[k] * weights2[k][j];
-                    }
-                    output[j] = 1 / (1 + Math.exp(-sum));
-                }
-                
-                return output[0];
-            }
-            
-            performEDA() {
-                this.calculateNumericStats();
-                this.calculateCategoricalStats();
-                this.calculateCorrelationMatrix();
-                
-                return {
-                    numericStats: this.numericStats,
-                    categoricalStats: this.categoricalStats,
-                    correlationMatrix: this.correlationMatrix
-                };
-            }
-            
-            calculateNumericStats() {
-                const numericFeatures = ['AirTemp', 'ProcessTemp', 'RotationalSpeed', 'Torque', 'ToolWear'];
-                this.numericStats = {};
-                
-                numericFeatures.forEach(feature => {
-                    const values = this.dataset.map(d => d[feature]).filter(val => val !== null);
-                    if (values.length === 0) return;
-                    
-                    values.sort((a, b) => a - b);
-                    const mean = values.reduce((a, b) => a + b, 0) / values.length;
-                    const median = values[Math.floor(values.length / 2)];
-                    const min = values[0];
-                    const max = values[values.length - 1];
-                    const std = Math.sqrt(values.reduce((sq, n) => sq + Math.pow(n - mean, 2), 0) / values.length);
-                    
-                    this.numericStats[feature] = {
-                        mean: mean.toFixed(2),
-                        median: median.toFixed(2),
-                        min: min.toFixed(2),
-                        max: max.toFixed(2),
-                        std: std.toFixed(2),
-                        count: values.length
-                    };
-                });
-                
-                return this.numericStats;
-            }
-            
-            calculateCategoricalStats() {
-                const typeValues = this.dataset.map(record => record.Type).filter(val => val !== null);
-                const failureValues = this.dataset.map(record => record.Failure).filter(val => val !== null);
-                
-                const typeCounts = {};
-                typeValues.forEach(type => {
-                    typeCounts[type] = (typeCounts[type] || 0) + 1;
-                });
-                
-                const failureCounts = { 0: 0, 1: 0 };
-                failureValues.forEach(failure => {
-                    failureCounts[failure] = (failureCounts[failure] || 0) + 1;
-                });
-                
-                this.categoricalStats = {
-                    Type: typeCounts,
-                    Failure: failureCounts
-                };
-                
-                return this.categoricalStats;
-            }
-            
-            calculateCorrelationMatrix() {
-                const numericFeatures = ['AirTemp', 'ProcessTemp', 'RotationalSpeed', 'Torque', 'ToolWear', 'Failure'];
-                const matrix = [];
-                
-                for (let i = 0; i < numericFeatures.length; i++) {
-                    matrix[i] = [];
-                    for (let j = 0; j < numericFeatures.length; j++) {
-                        matrix[i][j] = 0;
-                    }
-                }
-                
-                for (let i = 0; i < numericFeatures.length; i++) {
-                    for (let j = 0; j < numericFeatures.length; j++) {
-                        if (i === j) {
-                            matrix[i][j] = 1;
-                        } else {
-                            const col1 = numericFeatures[i];
-                            const col2 = numericFeatures[j];
-                            
-                            const values1 = this.dataset.map(record => record[col1]).filter(val => val !== null);
-                            const values2 = this.dataset.map(record => record[col2]).filter(val => val !== null);
-                            
-                            const minLength = Math.min(values1.length, values2.length);
-                            const v1 = values1.slice(0, minLength);
-                            const v2 = values2.slice(0, minLength);
-                            
-                            if (minLength > 0) {
-                                matrix[i][j] = this.calculateCorrelation(v1, v2);
-                            }
-                        }
-                    }
-                }
-                
-                this.correlationMatrix = {
-                    matrix,
-                    columns: numericFeatures
-                };
-                
-                return this.correlationMatrix;
-            }
-            
-            calculateCorrelation(arr1, arr2) {
-                const n = arr1.length;
-                if (n === 0) return 0;
-                
-                const mean1 = arr1.reduce((sum, val) => sum + val, 0) / n;
-                const mean2 = arr2.reduce((sum, val) => sum + val, 0) / n;
-                
-                let numerator = 0;
-                let denom1 = 0;
-                let denom2 = 0;
-                
-                for (let i = 0; i < n; i++) {
-                    numerator += (arr1[i] - mean1) * (arr2[i] - mean2);
-                    denom1 += Math.pow(arr1[i] - mean1, 2);
-                    denom2 += Math.pow(arr2[i] - mean2, 2);
-                }
-                
-                return numerator / Math.sqrt(denom1 * denom2);
-            }
-            
-            createHistogramData(feature, bins = 10) {
-                const values = this.dataset.map(record => record[feature]).filter(val => val !== null);
-                if (values.length === 0) return { labels: [], data: [] };
-                
-                const min = Math.min(...values);
-                const max = Math.max(...values);
-                const binWidth = (max - min) / bins;
-                
-                const histogram = Array(bins).fill(0);
-                const labels = [];
-                
-                for (let i = 0; i < bins; i++) {
-                    const binStart = min + i * binWidth;
-                    const binEnd = min + (i + 1) * binWidth;
-                    labels.push(`${binStart.toFixed(1)}-${binEnd.toFixed(1)}`);
-                    
-                    histogram[i] = values.filter(val => 
-                        val >= binStart && val < (i === bins - 1 ? binEnd + 0.001 : binEnd)
-                    ).length;
-                }
-                
-                return {
-                    labels,
-                    data: histogram
-                };
-            }
-        }
-
+        // Enhanced UIController with ROC-AUC and Feature Importance
         class UIController {
             constructor() {
                 this.pipeline = new MLPipeline();
                 this.predictionHistory = [];
                 this.currentStep = 1;
-                this.performanceChart = null;
-                this.historyChart = null;
                 this.rocChart = null;
                 this.featureImportanceChart = null;
                 this.init();
@@ -1039,61 +1863,6 @@
             init() {
                 this.setupEventListeners();
                 this.updatePipelineStep(1);
-                this.initializeCharts();
-            }
-            
-            initializeCharts() {
-                // Initialize performance chart
-                const performanceCtx = document.getElementById('performance-chart').getContext('2d');
-                this.performanceChart = new Chart(performanceCtx, {
-                    type: 'bar',
-                    data: {
-                        labels: ['Accuracy', 'Precision', 'Recall', 'F1-Score', 'ROC AUC'],
-                        datasets: [{
-                            label: 'Model Performance',
-                            data: [0, 0, 0, 0, 0],
-                            backgroundColor: [
-                                'rgba(52, 152, 219, 0.7)',
-                                'rgba(46, 204, 113, 0.7)',
-                                'rgba(241, 196, 15, 0.7)',
-                                'rgba(155, 89, 182, 0.7)',
-                                'rgba(231, 76, 60, 0.7)'
-                            ],
-                            borderColor: [
-                                'rgb(52, 152, 219)',
-                                'rgb(46, 204, 113)',
-                                'rgb(241, 196, 15)',
-                                'rgb(155, 89, 182)',
-                                'rgb(231, 76, 60)'
-                            ],
-                            borderWidth: 1
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        scales: {
-                            y: {
-                                beginAtZero: true,
-                                max: 1,
-                                ticks: {
-                                    callback: function(value) {
-                                        return (value * 100).toFixed(0) + '%';
-                                    }
-                                }
-                            }
-                        },
-                        plugins: {
-                            tooltip: {
-                                callbacks: {
-                                    label: function(context) {
-                                        return (context.parsed.y * 100).toFixed(1) + '%';
-                                    }
-                                }
-                            }
-                        }
-                    }
-                });
             }
             
             setupEventListeners() {
@@ -1106,24 +1875,22 @@
                     this.handleFileUpload(e.target.files[0]);
                 });
                 
-                // Drag and drop
-                const fileUploadArea = document.getElementById('file-upload-area');
-                fileUploadArea.addEventListener('dragover', (e) => {
+                document.getElementById('file-upload-area').addEventListener('dragover', (e) => {
                     e.preventDefault();
-                    fileUploadArea.style.borderColor = '#3498db';
-                    fileUploadArea.style.backgroundColor = '#f8f9fa';
+                    e.currentTarget.style.borderColor = '#3498db';
+                    e.currentTarget.style.backgroundColor = '#f8f9fa';
                 });
                 
-                fileUploadArea.addEventListener('dragleave', (e) => {
+                document.getElementById('file-upload-area').addEventListener('dragleave', (e) => {
                     e.preventDefault();
-                    fileUploadArea.style.borderColor = '#ddd';
-                    fileUploadArea.style.backgroundColor = 'white';
+                    e.currentTarget.style.borderColor = '#ddd';
+                    e.currentTarget.style.backgroundColor = 'white';
                 });
                 
-                fileUploadArea.addEventListener('drop', (e) => {
+                document.getElementById('file-upload-area').addEventListener('drop', (e) => {
                     e.preventDefault();
-                    fileUploadArea.style.borderColor = '#ddd';
-                    fileUploadArea.style.backgroundColor = 'white';
+                    e.currentTarget.style.borderColor = '#ddd';
+                    e.currentTarget.style.backgroundColor = 'white';
                     
                     if (e.dataTransfer.files.length > 0) {
                         this.handleFileUpload(e.dataTransfer.files[0]);
@@ -1172,17 +1939,6 @@
                 document.getElementById('reset-btn').addEventListener('click', () => {
                     this.resetForm();
                 });
-                
-                // Threshold slider
-                document.getElementById('threshold-slider')?.addEventListener('input', (e) => {
-                    const threshold = parseFloat(e.target.value);
-                    document.getElementById('threshold-value').textContent = threshold.toFixed(2);
-                    
-                    if (this.pipeline.model) {
-                        const newMetrics = this.pipeline.evaluateModel(threshold);
-                        this.updateModelMetrics(newMetrics);
-                    }
-                });
             }
             
             handleFileUpload(file) {
@@ -1206,7 +1962,9 @@
                         this.displayDataPreview(this.pipeline.rawData.slice(0, 10));
                         document.getElementById('analyze-btn').style.display = 'inline-block';
                         
+                        // Update step 1 status
                         this.updateStepStatus(1, 'complete');
+                        
                         this.hideLoading();
                     } catch (error) {
                         this.showUploadStatus(`Error: ${error.message}`, 'error');
@@ -1233,9 +1991,11 @@
                 const tableHead = document.getElementById('data-table-head');
                 const tableBody = document.getElementById('data-table-body');
                 
+                // Clear previous content
                 tableHead.innerHTML = '';
                 tableBody.innerHTML = '';
                 
+                // Create headers
                 const headers = Object.keys(data[0]);
                 const headerRow = document.createElement('tr');
                 headers.forEach(header => {
@@ -1245,6 +2005,7 @@
                 });
                 tableHead.appendChild(headerRow);
                 
+                // Create rows
                 data.forEach(row => {
                     const tr = document.createElement('tr');
                     headers.forEach(header => {
@@ -1264,22 +2025,27 @@
             
             analyzeDataset() {
                 this.showLoading('Analyzing dataset...');
+                
+                // Switch to dataset info tab
                 this.switchTab('dataset-info');
                 
                 setTimeout(() => {
                     const result = this.pipeline.getDatasetInfo();
                     
+                    // Update dataset stats
                     document.getElementById('total-records').textContent = result.totalRecords;
                     document.getElementById('total-features').textContent = result.features;
                     document.getElementById('failure-rate').textContent = `${result.failureRate}%`;
                     
                     document.getElementById('dataset-stats').style.display = 'grid';
                     
+                    // Update dataset summary
                     document.getElementById('dataset-summary').innerHTML = `
                         <p>The dataset contains <strong>${result.totalRecords}</strong> records with <strong>${result.features}</strong> predictive features.</p>
                         <p>The failure rate is <strong>${result.failureRate}%</strong> (${result.failureCount} failures out of ${result.totalRecords} records).</p>
                     `;
                     
+                    // Show missing values info if any
                     if (result.hasMissingValues) {
                         this.displayMissingValuesInfo(result.missingValues);
                     } else {
@@ -1291,8 +2057,10 @@
                         document.getElementById('missing-values-section').style.display = 'block';
                     }
                     
+                    // Update step 2 status
                     this.updateStepStatus(2, 'complete');
                     document.getElementById('eda-btn').style.display = 'inline-block';
+                    
                     this.hideLoading();
                 }, 500);
             }
@@ -1329,6 +2097,7 @@
                 section.innerHTML = html;
                 section.style.display = 'block';
                 
+                // Add event listeners
                 document.getElementById('delete-missing-btn').addEventListener('click', () => {
                     this.handleMissingValues('delete');
                 });
@@ -1344,19 +2113,23 @@
                 setTimeout(() => {
                     this.pipeline.handleMissingValues(strategy);
                     
+                    // Update dataset stats
                     const result = this.pipeline.getDatasetInfo();
                     document.getElementById('total-records').textContent = result.totalRecords;
                     
+                    // Calculate failure rate
                     const failureCount = this.pipeline.dataset.filter(record => record.Failure === 1).length;
                     const failureRate = ((failureCount / result.totalRecords) * 100).toFixed(1);
                     document.getElementById('failure-rate').textContent = `${failureRate}%`;
                     
+                    // Update dataset summary
                     document.getElementById('dataset-summary').innerHTML = `
                         <p>The dataset contains <strong>${result.totalRecords}</strong> records with <strong>${result.features}</strong> predictive features.</p>
                         <p>The failure rate is <strong>${failureRate}%</strong> (${failureCount} failures out of ${result.totalRecords} records).</p>
                         <p><strong>Missing values handled using:</strong> ${strategy === 'delete' ? 'Row deletion' : 'Median/mode imputation'}</p>
                     `;
                     
+                    // Hide missing values section
                     document.getElementById('missing-values-section').innerHTML = `
                         <div class="status-badge status-success" style="margin-top: 15px;">
                             Missing values successfully handled using ${strategy === 'delete' ? 'row deletion' : 'median/mode imputation'}.
@@ -1369,14 +2142,21 @@
             
             performEDA() {
                 this.showLoading('Performing Exploratory Data Analysis...');
+                
+                // Switch to EDA tab
                 this.switchTab('eda');
                 
                 setTimeout(() => {
+                    // Calculate statistics
                     const edaResults = this.pipeline.performEDA();
+                    
+                    // Display EDA results
                     this.displayEDAResults(edaResults);
                     
+                    // Update step 3 status
                     this.updateStepStatus(3, 'complete');
                     document.getElementById('preprocess-btn').style.display = 'inline-block';
+                    
                     this.hideLoading();
                 }, 800);
             }
@@ -1655,97 +2435,29 @@
             
             preprocessData() {
                 this.showLoading('Preprocessing data...');
+                
+                // Switch to preprocessing tab
                 this.switchTab('preprocessing');
                 
                 setTimeout(() => {
-                    this.displayClassImbalanceInfo();
-                    this.hideLoading();
-                }, 500);
-            }
-            
-            displayClassImbalanceInfo() {
-                const failureCount = this.pipeline.dataset.filter(record => record.Failure === 1).length;
-                const nonFailureCount = this.pipeline.dataset.filter(record => record.Failure === 0).length;
-                const total = failureCount + nonFailureCount;
-                const failureRate = ((failureCount / total) * 100).toFixed(1);
-                
-                const section = document.getElementById('class-imbalance-section');
-                let html = '<div class="imbalance-notice">';
-                html += `<h4>Class Imbalance Detected</h4>`;
-                html += `<p><strong>Failure Rate:</strong> ${failureRate}% (${failureCount} failures out of ${total} records)</p>`;
-                html += `<p><strong>Issue:</strong> The model may have low recall (miss actual failures) due to class imbalance.</p>`;
-                html += `<p><strong>Solution:</strong> Choose a method to handle class imbalance:</p>`;
-                html += '</div>';
-                
-                html += '<div class="sampling-options">';
-                html += `<div class="sampling-option" data-method="none">
-                    <h5>No Handling</h5>
-                    <p>Train with original data distribution</p>
-                    <small>Fast but may have poor recall</small>
-                </div>`;
-                html += `<div class="sampling-option" data-method="smote">
-                    <h5>SMOTE Oversampling</h5>
-                    <p>Create synthetic failure samples</p>
-                    <small>Good for improving recall</small>
-                </div>`;
-                html += `<div class="sampling-option" data-method="undersampling">
-                    <h5>Random Undersampling</h5>
-                    <p>Reduce non-failure samples</p>
-                    <small>Balanced but may lose information</small>
-                </div>`;
-                html += `<div class="sampling-option" data-method="class_weight">
-                    <h5>Class Weights</h5>
-                    <p>Weight failures higher during training</p>
-                    <small>Good balance of precision/recall</small>
-                </div>`;
-                html += '</div>';
-                
-                html += '<button class="btn btn-success" id="apply-imbalance-handling" style="margin-top: 15px;">Apply Selected Method & Continue</button>';
-                
-                section.innerHTML = html;
-                section.style.display = 'block';
-                
-                document.querySelectorAll('.sampling-option').forEach(option => {
-                    option.addEventListener('click', () => {
-                        document.querySelectorAll('.sampling-option').forEach(opt => {
-                            opt.classList.remove('selected');
-                        });
-                        option.classList.add('selected');
-                    });
-                });
-                
-                document.querySelector('.sampling-option[data-method="class_weight"]').classList.add('selected');
-                
-                document.getElementById('apply-imbalance-handling').addEventListener('click', () => {
-                    this.applyClassImbalanceHandling();
-                });
-            }
-            
-            applyClassImbalanceHandling() {
-                const selectedOption = document.querySelector('.sampling-option.selected');
-                if (!selectedOption) {
-                    alert('Please select a class imbalance handling method');
-                    return;
-                }
-                
-                const method = selectedOption.getAttribute('data-method');
-                this.showLoading(`Applying ${method}...`);
-                
-                setTimeout(() => {
-                    this.pipeline.handleClassImbalance(method);
-                    
+                    // Split data first
                     const splitResult = this.pipeline.splitData();
+                    
+                    // Then preprocess
                     const processedData = this.pipeline.preprocessData();
                     
-                    this.displayPreprocessingInfo(splitResult, processedData, method);
+                    // Display preprocessing info
+                    this.displayPreprocessingInfo(splitResult, processedData);
                     
+                    // Update step 4 status
                     this.updateStepStatus(4, 'complete');
                     document.getElementById('train-btn').style.display = 'inline-block';
+                    
                     this.hideLoading();
-                }, 1000);
+                }, 800);
             }
             
-            displayPreprocessingInfo(splitResult, processedData, imbalanceMethod) {
+            displayPreprocessingInfo(splitResult, processedData) {
                 const preprocessingContent = document.getElementById('preprocessing-content');
                 let html = '';
                 
@@ -1753,7 +2465,6 @@
                 html += '<div class="data-split-info">';
                 html += `<p><strong>Training Set:</strong> ${splitResult.trainSize} records (80%)</p>`;
                 html += `<p><strong>Test Set:</strong> ${splitResult.testSize} records (20%)</p>`;
-                html += `<p><strong>Class Imbalance Handling:</strong> ${this.getMethodName(imbalanceMethod)}</p>`;
                 html += '</div>';
                 
                 html += '<h4>Preprocessing Steps Applied</h4>';
@@ -1761,22 +2472,12 @@
                 html += '<li>One-hot encoding for categorical features (Product Type)</li>';
                 html += '<li>Min-max normalization for numeric features</li>';
                 html += '<li>Training/test split before preprocessing to avoid data leakage</li>';
-                html += `<li>Class imbalance handling: ${this.getMethodName(imbalanceMethod)}</li>`;
                 html += '</ul>';
                 
                 preprocessingContent.innerHTML = html;
                 
+                // Show preprocessed data preview
                 this.displayPreprocessedPreview(processedData.processedData.X_train_processed.slice(0, 10));
-            }
-            
-            getMethodName(method) {
-                const names = {
-                    'none': 'No Handling',
-                    'smote': 'SMOTE Oversampling',
-                    'undersampling': 'Random Undersampling',
-                    'class_weight': 'Class Weighting'
-                };
-                return names[method] || method;
             }
             
             displayPreprocessedPreview(data) {
@@ -1785,9 +2486,11 @@
                 const tableHead = document.getElementById('preprocessed-table-head');
                 const tableBody = document.getElementById('preprocessed-table-body');
                 
+                // Clear previous content
                 tableHead.innerHTML = '';
                 tableBody.innerHTML = '';
                 
+                // Create headers
                 const headers = ['Type_L', 'Type_M', 'Type_H', 'AirTemp', 'ProcessTemp', 'RotationalSpeed', 'Torque', 'ToolWear'];
                 const headerRow = document.createElement('tr');
                 headers.forEach(header => {
@@ -1797,6 +2500,7 @@
                 });
                 tableHead.appendChild(headerRow);
                 
+                // Create rows
                 data.forEach(row => {
                     const tr = document.createElement('tr');
                     row.forEach(value => {
@@ -1812,6 +2516,8 @@
             
             trainModel() {
                 this.showLoading('Training neural network model...');
+                
+                // Switch to training tab
                 this.switchTab('training');
                 
                 setTimeout(() => {
@@ -1826,30 +2532,43 @@
                             <li>Hidden Layer: ${model.hiddenSize} neurons (ReLU activation)</li>
                             <li>Output Layer: ${model.outputSize} neuron (Sigmoid activation)</li>
                         </ul>
-                        <p>Training completed with 200 epochs using class-weighted binary cross-entropy loss.</p>
-                        <p><strong>Class Imbalance Method:</strong> ${this.getMethodName(this.pipeline.classImbalanceMethod)}</p>
+                        <p>Training completed with 100 epochs using class-weighted binary cross-entropy loss.</p>
+                        <p><strong>Class weights applied:</strong> No Failure: ${this.pipeline.classWeights[0].toFixed(2)}, Failure: ${this.pipeline.classWeights[1].toFixed(2)}</p>
                     `;
                     
+                    // Update step 5 status
                     this.updateStepStatus(5, 'complete');
                     document.getElementById('evaluate-btn').style.display = 'inline-block';
+                    
                     this.hideLoading();
                 }, 1000);
             }
             
             evaluateModel() {
                 this.showLoading('Evaluating model performance...');
+                
+                // Switch to evaluation tab
                 this.switchTab('evaluation');
                 
                 setTimeout(() => {
-                    const metrics = this.pipeline.evaluateModel(this.pipeline.predictionThreshold);
+                    const metrics = this.pipeline.evaluateModel();
                     
+                    // Display evaluation results
                     this.displayEvaluationResults(metrics);
-                    this.displayROCCurve();
-                    this.displayFeatureImportance();
+                    
+                    // Update UI with model metrics
                     this.updateModelMetrics(metrics);
                     
+                    // Create ROC curve
+                    this.createROCChart(metrics.rocCurve, metrics.auc);
+                    
+                    // Create feature importance chart
+                    this.createFeatureImportanceChart();
+                    
+                    // Update step 6 status
                     this.updateStepStatus(6, 'complete');
                     document.getElementById('prediction-ready-btn').style.display = 'inline-block';
+                    
                     this.hideLoading();
                 }, 800);
             }
@@ -1864,7 +2583,7 @@
                 html += `<div class="metric"><div class="metric-label">Precision</div><div class="metric-value">${(metrics.precision * 100).toFixed(1)}%</div></div>`;
                 html += `<div class="metric"><div class="metric-label">Recall</div><div class="metric-value">${(metrics.recall * 100).toFixed(1)}%</div></div>`;
                 html += `<div class="metric"><div class="metric-label">F1-Score</div><div class="metric-value">${(metrics.f1 * 100).toFixed(1)}%</div></div>`;
-                html += `<div class="metric"><div class="metric-label">ROC AUC</div><div class="metric-value">${(metrics.roc_auc * 100).toFixed(1)}%</div></div>`;
+                html += `<div class="metric"><div class="metric-label">AUC</div><div class="metric-value">${metrics.auc.toFixed(3)}</div></div>`;
                 html += '</div>';
                 
                 // Confusion matrix
@@ -1884,43 +2603,63 @@
                 
                 html += '</div>';
                 
+                // Add class imbalance handling info
+                html += '<div class="missing-values-section" style="margin-top: 20px;">';
+                html += '<h4>Class Imbalance Handling</h4>';
+                html += '<p>The model uses class-weighted loss function to handle the 96.6%/3.4% class imbalance.</p>';
+                html += '<p>Class weights applied: ';
+                html += `<strong>No Failure: ${this.pipeline.classWeights[0].toFixed(2)}, Failure: ${this.pipeline.classWeights[1].toFixed(2)}</strong>`;
+                html += '</p>';
+                html += '<p>You can adjust the classification threshold to balance precision and recall.</p>';
+                html += '</div>';
+                
                 evaluationContent.innerHTML = html;
             }
             
-            displayROCCurve() {
-                const rocData = this.pipeline.rocCurve;
-                const ctx = document.getElementById('roc-curve').getContext('2d');
+            createROCChart(rocCurve, auc) {
+                const ctx = document.getElementById('roc-chart').getContext('2d');
+                
+                // Extract FPR and TPR for the curve
+                const fpr = rocCurve.map(point => point.fpr);
+                const tpr = rocCurve.map(point => point.tpr);
+                
+                // Update AUC value
+                document.getElementById('auc-value').textContent = `AUC: ${auc.toFixed(3)}`;
+                
+                if (this.rocChart) {
+                    this.rocChart.destroy();
+                }
                 
                 this.rocChart = new Chart(ctx, {
                     type: 'line',
                     data: {
-                        datasets: [{
-                            label: `ROC Curve (AUC = ${rocData.auc.toFixed(3)})`,
-                            data: rocData.fpr.map((fpr, index) => ({
-                                x: fpr,
-                                y: rocData.tpr[index]
-                            })),
-                            borderColor: '#3498db',
-                            backgroundColor: 'rgba(52, 152, 219, 0.1)',
-                            borderWidth: 2,
-                            fill: true,
-                            tension: 0.4
-                        }, {
-                            label: 'Random Classifier',
-                            data: [{x: 0, y: 0}, {x: 1, y: 1}],
-                            borderColor: '#95a5a6',
-                            borderWidth: 1,
-                            borderDash: [5, 5],
-                            pointRadius: 0
-                        }]
+                        labels: fpr,
+                        datasets: [
+                            {
+                                label: 'ROC Curve',
+                                data: tpr,
+                                borderColor: '#3498db',
+                                backgroundColor: 'rgba(52, 152, 219, 0.1)',
+                                borderWidth: 2,
+                                fill: false,
+                                tension: 0.1
+                            },
+                            {
+                                label: 'Random Classifier',
+                                data: fpr,
+                                borderColor: '#95a5a6',
+                                borderWidth: 1,
+                                borderDash: [5, 5],
+                                fill: false,
+                                pointRadius: 0
+                            }
+                        ]
                     },
                     options: {
                         responsive: true,
                         maintainAspectRatio: false,
                         scales: {
                             x: {
-                                type: 'linear',
-                                position: 'bottom',
                                 title: {
                                     display: true,
                                     text: 'False Positive Rate'
@@ -1929,11 +2668,9 @@
                                 max: 1
                             },
                             y: {
-                                type: 'linear',
-                                position: 'left',
                                 title: {
                                     display: true,
-                                    text: 'True Positive Rate (Recall)'
+                                    text: 'True Positive Rate'
                                 },
                                 min: 0,
                                 max: 1
@@ -1943,9 +2680,9 @@
                             tooltip: {
                                 callbacks: {
                                     label: function(context) {
-                                        const pointIndex = context.dataIndex;
-                                        const threshold = rocData.thresholds[pointIndex];
-                                        return `Threshold: ${threshold.toFixed(2)}, FPR: ${context.parsed.x.toFixed(3)}, TPR: ${context.parsed.y.toFixed(3)}`;
+                                        const index = context.dataIndex;
+                                        const threshold = rocCurve[index].threshold.toFixed(2);
+                                        return `Threshold: ${threshold}, TPR: ${context.parsed.y.toFixed(3)}, FPR: ${context.parsed.x.toFixed(3)}`;
                                     }
                                 }
                             }
@@ -1953,22 +2690,41 @@
                     }
                 });
                 
-                document.getElementById('roc-curve-section').style.display = 'block';
+                // Add threshold slider event listener
+                document.getElementById('threshold-slider').addEventListener('input', (e) => {
+                    const threshold = parseFloat(e.target.value);
+                    document.getElementById('threshold-value').textContent = threshold.toFixed(2);
+                    this.pipeline.setPredictionThreshold(threshold);
+                    
+                    // Re-evaluate model with new threshold
+                    const metrics = this.pipeline.evaluateModel();
+                    this.updateModelMetrics(metrics);
+                    this.displayEvaluationResults(metrics);
+                });
             }
             
-            displayFeatureImportance() {
+            createFeatureImportanceChart() {
+                const ctx = document.getElementById('feature-importance-chart').getContext('2d');
                 const importance = this.pipeline.featureImportance;
+                
+                // Feature names based on the model's feature order
                 const featureNames = ['Type_L', 'Type_M', 'Type_H', 'AirTemp', 'ProcessTemp', 'RotationalSpeed', 'Torque', 'ToolWear'];
                 
-                const ctx = document.getElementById('feature-importance-chart').getContext('2d');
+                // Prepare data for chart
+                const labels = featureNames;
+                const data = importance;
+                
+                if (this.featureImportanceChart) {
+                    this.featureImportanceChart.destroy();
+                }
                 
                 this.featureImportanceChart = new Chart(ctx, {
                     type: 'bar',
                     data: {
-                        labels: featureNames,
+                        labels: labels,
                         datasets: [{
-                            label: 'Feature Importance (%)',
-                            data: importance,
+                            label: 'Feature Importance',
+                            data: data,
                             backgroundColor: 'rgba(52, 152, 219, 0.7)',
                             borderColor: 'rgb(52, 152, 219)',
                             borderWidth: 1
@@ -1988,18 +2744,19 @@
                             }
                         },
                         plugins: {
+                            legend: {
+                                display: false
+                            },
                             tooltip: {
                                 callbacks: {
                                     label: function(context) {
-                                        return `Importance: ${context.parsed.x.toFixed(1)}%`;
+                                        return `Importance: ${context.parsed.x.toFixed(2)}%`;
                                     }
                                 }
                             }
                         }
                     }
                 });
-                
-                document.getElementById('feature-importance-section').style.display = 'block';
             }
             
             updateModelMetrics(metrics) {
@@ -2008,25 +2765,16 @@
                 document.getElementById('recall-display').textContent = `${(metrics.recall * 100).toFixed(1)}%`;
                 document.getElementById('f1-score-display').textContent = `${(metrics.f1 * 100).toFixed(1)}%`;
                 
-                if (this.performanceChart) {
-                    this.performanceChart.data.datasets[0].data = [
-                        metrics.accuracy,
-                        metrics.precision,
-                        metrics.recall,
-                        metrics.f1,
-                        metrics.roc_auc
-                    ];
-                    this.performanceChart.update();
-                }
-                
-                this.updateFeatureImportanceBars();
+                // Update feature importance visualization
+                this.updateFeatureImportance();
             }
             
-            updateFeatureImportanceBars() {
+            updateFeatureImportance() {
                 const importance = this.pipeline.featureImportance;
                 const featureBars = document.querySelectorAll('.feature-fill');
                 
-                const featureOrder = [5, 6, 4, 3, 2, 1];
+                // Map importance to feature bars (adjust based on your feature order)
+                const featureOrder = [5, 6, 4, 3, 2, 1]; // Adjust based on your model's feature order
                 
                 featureBars.forEach((bar, index) => {
                     const featureIndex = featureOrder[index] || index;
@@ -2041,8 +2789,10 @@
                 document.getElementById('risk-level').textContent = 'Model Ready for Predictions';
                 document.getElementById('risk-level').className = 'low-risk';
                 
+                // Reset gauge
                 this.updateGauge(0);
                 
+                // Show success message
                 const evaluationContent = document.getElementById('evaluation-content');
                 evaluationContent.innerHTML += '<div class="status-badge status-complete" style="margin-top: 15px;">Model is ready for predictions!</div>';
             }
@@ -2061,8 +2811,10 @@
                     const probability = this.pipeline.predict(formData);
                     const percentage = (probability * 100).toFixed(1);
                     
+                    // Update prediction display
                     document.getElementById('prediction-value').textContent = `${percentage}%`;
                     
+                    // Update risk level
                     let riskLevel, riskClass;
                     if (probability < 0.3) {
                         riskLevel = 'Low Risk';
@@ -2078,8 +2830,10 @@
                     document.getElementById('risk-level').textContent = riskLevel;
                     document.getElementById('risk-level').className = riskClass;
                     
+                    // Update gauge
                     this.updateGauge(probability);
                     
+                    // Add to prediction history
                     this.predictionHistory.push({
                         timestamp: new Date(),
                         probability,
@@ -2087,6 +2841,7 @@
                         parameters: {...formData}
                     });
                     
+                    // Update history chart
                     this.updateHistoryChart();
                     
                 } catch (error) {
@@ -2095,6 +2850,7 @@
             }
             
             updateGauge(probability) {
+                // Convert probability to gauge angle (0 to 180 degrees)
                 const angle = probability * 180;
                 document.getElementById('gauge-needle').style.transform = `translateX(-50%) rotate(${angle}deg)`;
             }
@@ -2102,9 +2858,11 @@
             updateHistoryChart() {
                 const ctx = document.getElementById('history-chart').getContext('2d');
                 
+                // Extract data for chart
                 const labels = this.predictionHistory.map((_, index) => `Prediction ${index + 1}`);
                 const data = this.predictionHistory.map(p => p.probability * 100);
                 
+                // Create or update chart
                 if (this.historyChart) {
                     this.historyChart.data.labels = labels;
                     this.historyChart.data.datasets[0].data = data;
@@ -2157,14 +2915,17 @@
             }
             
             switchTab(tabId) {
+                // Hide all tab contents
                 document.querySelectorAll('.tab-content').forEach(content => {
                     content.classList.remove('active');
                 });
                 
+                // Deactivate all tabs
                 document.querySelectorAll('.tab').forEach(tab => {
                     tab.classList.remove('active');
                 });
                 
+                // Activate selected tab
                 document.getElementById(tabId).classList.add('active');
                 document.querySelector(`.tab[data-tab="${tabId}"]`).classList.add('active');
             }
@@ -2172,6 +2933,7 @@
             updatePipelineStep(step) {
                 this.currentStep = step;
                 
+                // Update step indicators
                 for (let i = 1; i <= 6; i++) {
                     const stepEl = document.getElementById(`step${i}`);
                     if (i < step) {
@@ -2206,7 +2968,7 @@
             }
         }
 
-        // Initialize the application
+        // Initialize the application when the page loads
         document.addEventListener('DOMContentLoaded', () => {
             new UIController();
         });
