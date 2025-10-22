@@ -7,7 +7,6 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/papaparse@5.3.2/papaparse.min.js"></script>
     <style>
-        /* All the CSS styles remain exactly the same */
         :root {
             --primary: #2c3e50;
             --secondary: #3498db;
@@ -775,7 +774,6 @@
             </div>
         </div>
         
-        <!-- Rest of the HTML remains the same -->
         <div class="dashboard">
             <div class="card">
                 <h2>Machine Parameters</h2>
@@ -1104,545 +1102,698 @@
                     X_test: this.X_test,
                     y_train: this.y_train,
                     y_test: this.y_test,
-                    train_size: this.X_train.length,
-                    test_size: this.X_test.length
+                    trainSize: this.X_train.length,
+                    testSize: this.X_test.length
                 };
             }
             
-            getDatasetInfo() {
-                const totalRecords = this.dataset.length;
-                const failureCount = this.dataset.filter(d => d.Failure === 1).length;
-                const failureRate = (failureCount / totalRecords * 100).toFixed(2);
+            preprocessData() {
+                // Calculate preprocessing parameters from training data only
+                const numericColumns = ['AirTemp', 'ProcessTemp', 'RotationalSpeed', 'Torque', 'ToolWear'];
+                this.preprocessingParams = {};
                 
-                return {
-                    totalRecords,
-                    failureCount,
-                    failureRate,
-                    features: 6,
-                    missingValues: this.missingValues,
-                    hasMissingValues: this.hasMissingValues
-                };
-            }
-            
-            performEDA() {
-                const numericFeatures = ['AirTemp', 'ProcessTemp', 'RotationalSpeed', 'Torque', 'ToolWear'];
-                this.numericStats = {};
-                
-                numericFeatures.forEach(feature => {
-                    const values = this.dataset.map(d => d[feature]).filter(val => val !== null);
-                    if (values.length === 0) return;
-                    
-                    this.numericStats[feature] = {
-                        count: values.length,
-                        mean: values.reduce((a, b) => a + b, 0) / values.length,
-                        std: Math.sqrt(values.reduce((sq, n) => sq + Math.pow(n - values.reduce((a, b) => a + b, 0) / values.length, 2), 0) / values.length),
+                // Calculate min and max for normalization from training data
+                numericColumns.forEach(col => {
+                    const values = this.X_train.map(x => x[col]);
+                    this.preprocessingParams[col] = {
                         min: Math.min(...values),
-                        '25%': this.percentile(values, 25),
-                        '50%': this.percentile(values, 50),
-                        '75%': this.percentile(values, 75),
                         max: Math.max(...values)
                     };
                 });
                 
-                const typeCounts = {};
-                const typeFailures = {};
-                this.dataset.forEach(d => {
-                    if (d.Type !== null) {
-                        typeCounts[d.Type] = (typeCounts[d.Type] || 0) + 1;
-                        if (d.Failure === 1) {
-                            typeFailures[d.Type] = (typeFailures[d.Type] || 0) + 1;
-                        }
-                    }
-                });
-                
-                const typeFailureRates = {};
-                for (const type in typeCounts) {
-                    typeFailureRates[type] = ((typeFailures[type] || 0) / typeCounts[type] * 100).toFixed(2);
-                }
-                
-                this.categoricalStats = {
-                    Type: {
-                        counts: typeCounts,
-                        failureRates: typeFailureRates
-                    }
-                };
-                
-                this.calculateCorrelationMatrix();
-                
-                return {
-                    numericStats: this.numericStats,
-                    categoricalStats: this.categoricalStats,
-                    correlationMatrix: this.correlationMatrix
-                };
-            }
-            
-            percentile(arr, p) {
-                const sorted = [...arr].sort((a, b) => a - b);
-                const index = (p / 100) * (sorted.length - 1);
-                const lower = Math.floor(index);
-                const upper = lower + 1;
-                const weight = index - lower;
-                
-                if (upper >= sorted.length) return sorted[lower];
-                return sorted[lower] * (1 - weight) + sorted[upper] * weight;
-            }
-            
-            calculateCorrelationMatrix() {
-                const numericFeatures = ['AirTemp', 'ProcessTemp', 'RotationalSpeed', 'Torque', 'ToolWear', 'Failure'];
-                this.correlationMatrix = [];
-                
-                for (let i = 0; i < numericFeatures.length; i++) {
-                    this.correlationMatrix[i] = [];
-                    for (let j = 0; j < numericFeatures.length; j++) {
-                        this.correlationMatrix[i][j] = 0;
-                    }
-                }
-                
-                for (let i = 0; i < numericFeatures.length; i++) {
-                    for (let j = i; j < numericFeatures.length; j++) {
-                        const feature1 = numericFeatures[i];
-                        const feature2 = numericFeatures[j];
-                        
-                        const values1 = this.dataset.map(d => d[feature1]).filter(val => val !== null);
-                        const values2 = this.dataset.map(d => d[feature2]).filter(val => val !== null);
-                        
-                        const minLength = Math.min(values1.length, values2.length);
-                        const validValues1 = values1.slice(0, minLength);
-                        const validValues2 = values2.slice(0, minLength);
-                        
-                        const correlation = this.calculateCorrelation(validValues1, validValues2);
-                        this.correlationMatrix[i][j] = correlation;
-                        this.correlationMatrix[j][i] = correlation;
-                    }
-                }
-                
-                return this.correlationMatrix;
-            }
-            
-            calculateCorrelation(x, y) {
-                const n = x.length;
-                if (n === 0) return 0;
-                
-                const sum_x = x.reduce((a, b) => a + b, 0);
-                const sum_y = y.reduce((a, b) => a + b, 0);
-                const sum_xy = x.reduce((sum, val, i) => sum + val * y[i], 0);
-                const sum_x2 = x.reduce((sum, val) => sum + val * val, 0);
-                const sum_y2 = y.reduce((sum, val) => sum + val * val, 0);
-                
-                const numerator = n * sum_xy - sum_x * sum_y;
-                const denominator = Math.sqrt((n * sum_x2 - sum_x * sum_x) * (n * sum_y2 - sum_y * sum_y));
-                
-                return denominator === 0 ? 0 : numerator / denominator;
-            }
-            
-            preprocessData() {
-                // First split the data
-                const splitInfo = this.splitData();
-                
-                // Calculate preprocessing parameters from TRAINING data only
-                const numericFeatures = ['AirTemp', 'ProcessTemp', 'RotationalSpeed', 'Torque', 'ToolWear'];
-                
-                // Calculate mean and std from training data for standardization
-                this.preprocessingParams = {};
-                numericFeatures.forEach(feature => {
-                    const values = this.X_train.map(record => record[feature]).filter(val => val !== null);
-                    if (values.length === 0) return;
-                    
-                    this.preprocessingParams[feature] = {
-                        mean: values.reduce((a, b) => a + b, 0) / values.length,
-                        std: Math.sqrt(values.reduce((sq, n) => sq + Math.pow(n - values.reduce((a, b) => a + b, 0) / values.length, 2), 0) / values.length)
-                    };
-                });
+                // One-hot encoding for Type from training data
+                const typeValues = this.X_train.map(x => x.Type);
+                const uniqueTypes = [...new Set(typeValues)];
+                this.preprocessingParams.Type = uniqueTypes;
                 
                 // Process training data
                 this.processedData.X_train_processed = this.X_train.map(record => {
-                    // One-hot encoding for Type
-                    const typeL = record.Type === 'L' ? 1 : 0;
-                    const typeM = record.Type === 'M' ? 1 : 0;
-                    const typeH = record.Type === 'H' ? 1 : 0;
+                    const processed = [];
                     
-                    // Standardize numerical features using training parameters
-                    const standardizedAirTemp = (record.AirTemp - this.preprocessingParams.AirTemp.mean) / this.preprocessingParams.AirTemp.std;
-                    const standardizedProcessTemp = (record.ProcessTemp - this.preprocessingParams.ProcessTemp.mean) / this.preprocessingParams.ProcessTemp.std;
-                    const standardizedRpm = (record.RotationalSpeed - this.preprocessingParams.RotationalSpeed.mean) / this.preprocessingParams.RotationalSpeed.std;
-                    const standardizedTorque = (record.Torque - this.preprocessingParams.Torque.mean) / this.preprocessingParams.Torque.std;
-                    const standardizedToolWear = (record.ToolWear - this.preprocessingParams.ToolWear.mean) / this.preprocessingParams.ToolWear.std;
+                    // One-hot encode Type
+                    this.preprocessingParams.Type.forEach(type => {
+                        processed.push(record.Type === type ? 1 : 0);
+                    });
                     
-                    return [
-                        typeL,
-                        typeM,
-                        typeH,
-                        standardizedAirTemp,
-                        standardizedProcessTemp,
-                        standardizedRpm,
-                        standardizedTorque,
-                        standardizedToolWear
-                    ];
+                    // Normalize numeric features
+                    numericColumns.forEach(col => {
+                        const { min, max } = this.preprocessingParams[col];
+                        const normalized = (record[col] - min) / (max - min);
+                        processed.push(normalized);
+                    });
+                    
+                    return processed;
+                });
+                
+                // Process test data using training parameters
+                this.processedData.X_test_processed = this.X_test.map(record => {
+                    const processed = [];
+                    
+                    // One-hot encode Type
+                    this.preprocessingParams.Type.forEach(type => {
+                        processed.push(record.Type === type ? 1 : 0);
+                    });
+                    
+                    // Normalize numeric features using training min/max
+                    numericColumns.forEach(col => {
+                        const { min, max } = this.preprocessingParams[col];
+                        const normalized = (record[col] - min) / (max - min);
+                        processed.push(normalized);
+                    });
+                    
+                    return processed;
                 });
                 
                 this.processedData.y_train = this.y_train;
-                
-                // Process test data using SAME parameters from training data
-                this.processedData.X_test_processed = this.X_test.map(record => {
-                    const typeL = record.Type === 'L' ? 1 : 0;
-                    const typeM = record.Type === 'M' ? 1 : 0;
-                    const typeH = record.Type === 'H' ? 1 : 0;
-                    
-                    const standardizedAirTemp = (record.AirTemp - this.preprocessingParams.AirTemp.mean) / this.preprocessingParams.AirTemp.std;
-                    const standardizedProcessTemp = (record.ProcessTemp - this.preprocessingParams.ProcessTemp.mean) / this.preprocessingParams.ProcessTemp.std;
-                    const standardizedRpm = (record.RotationalSpeed - this.preprocessingParams.RotationalSpeed.mean) / this.preprocessingParams.RotationalSpeed.std;
-                    const standardizedTorque = (record.Torque - this.preprocessingParams.Torque.mean) / this.preprocessingParams.Torque.std;
-                    const standardizedToolWear = (record.ToolWear - this.preprocessingParams.ToolWear.mean) / this.preprocessingParams.ToolWear.std;
-                    
-                    return [
-                        typeL,
-                        typeM,
-                        typeH,
-                        standardizedAirTemp,
-                        standardizedProcessTemp,
-                        standardizedRpm,
-                        standardizedTorque,
-                        standardizedToolWear
-                    ];
-                });
-                
                 this.processedData.y_test = this.y_test;
                 
-                return {
-                    splitInfo: splitInfo,
-                    preprocessingParams: this.preprocessingParams,
-                    processedData: this.processedData
+                return this.processedData;
+            }
+            
+            trainModel() {
+                // Simple neural network implementation
+                const inputSize = this.processedData.X_train_processed[0].length;
+                const hiddenSize = 8;
+                const outputSize = 1;
+                
+                // Initialize weights
+                const weights1 = Array(inputSize).fill().map(() => 
+                    Array(hiddenSize).fill().map(() => Math.random() * 0.1 - 0.05)
+                );
+                const weights2 = Array(hiddenSize).fill().map(() => 
+                    Array(outputSize).fill().map(() => Math.random() * 0.1 - 0.05)
+                );
+                
+                const biases1 = Array(hiddenSize).fill(0);
+                const biases2 = Array(outputSize).fill(0);
+                
+                // Training parameters
+                const learningRate = 0.01;
+                const epochs = 100;
+                
+                // Training loop
+                for (let epoch = 0; epoch < epochs; epoch++) {
+                    let totalLoss = 0;
+                    
+                    for (let i = 0; i < this.processedData.X_train_processed.length; i++) {
+                        const input = this.processedData.X_train_processed[i];
+                        const target = this.processedData.y_train[i];
+                        
+                        // Forward pass
+                        const hidden = Array(hiddenSize).fill(0);
+                        for (let j = 0; j < hiddenSize; j++) {
+                            let sum = biases1[j];
+                            for (let k = 0; k < inputSize; k++) {
+                                sum += input[k] * weights1[k][j];
+                            }
+                            hidden[j] = Math.max(0, sum); // ReLU activation
+                        }
+                        
+                        const output = Array(outputSize).fill(0);
+                        for (let j = 0; j < outputSize; j++) {
+                            let sum = biases2[j];
+                            for (let k = 0; k < hiddenSize; k++) {
+                                sum += hidden[k] * weights2[k][j];
+                            }
+                            output[j] = 1 / (1 + Math.exp(-sum)); // Sigmoid activation
+                        }
+                        
+                        // Calculate loss (binary cross-entropy)
+                        const loss = -target * Math.log(output[0]) - (1 - target) * Math.log(1 - output[0]);
+                        totalLoss += loss;
+                        
+                        // Backward pass
+                        const outputError = output[0] - target;
+                        
+                        // Update weights and biases for output layer
+                        for (let j = 0; j < hiddenSize; j++) {
+                            for (let k = 0; k < outputSize; k++) {
+                                weights2[j][k] -= learningRate * outputError * hidden[j];
+                            }
+                        }
+                        for (let j = 0; j < outputSize; j++) {
+                            biases2[j] -= learningRate * outputError;
+                        }
+                        
+                        // Calculate hidden layer errors
+                        const hiddenErrors = Array(hiddenSize).fill(0);
+                        for (let j = 0; j < hiddenSize; j++) {
+                            let error = 0;
+                            for (let k = 0; k < outputSize; k++) {
+                                error += outputError * weights2[j][k];
+                            }
+                            hiddenErrors[j] = error * (hidden[j] > 0 ? 1 : 0); // ReLU derivative
+                        }
+                        
+                        // Update weights and biases for hidden layer
+                        for (let j = 0; j < inputSize; j++) {
+                            for (let k = 0; k < hiddenSize; k++) {
+                                weights1[j][k] -= learningRate * hiddenErrors[k] * input[j];
+                            }
+                        }
+                        for (let j = 0; j < hiddenSize; j++) {
+                            biases1[j] -= learningRate * hiddenErrors[j];
+                        }
+                    }
+                    
+                    // Calculate average loss for this epoch
+                    const avgLoss = totalLoss / this.processedData.X_train_processed.length;
+                    
+                    // Update progress every 10 epochs
+                    if (epoch % 10 === 0) {
+                        console.log(`Epoch ${epoch}, Loss: ${avgLoss.toFixed(4)}`);
+                    }
+                }
+                
+                // Store the trained model
+                this.model = {
+                    weights1,
+                    weights2,
+                    biases1,
+                    biases2,
+                    inputSize,
+                    hiddenSize,
+                    outputSize
                 };
+                
+                // Calculate feature importance (simplified)
+                this.calculateFeatureImportance();
+                
+                return this.model;
             }
             
             calculateFeatureImportance() {
-                const correlations = [0, 0, 0, 0, 0, 0, 0, 0];
+                // Simplified feature importance calculation
+                // Based on the magnitude of weights in the first layer
+                const { weights1 } = this.model;
                 
-                // Combine train and test for feature importance calculation
-                const allFeatures = [...this.processedData.X_train_processed, ...this.processedData.X_test_processed];
-                const allTargets = [...this.processedData.y_train, ...this.processedData.y_test];
-                
-                allFeatures.forEach((features, index) => {
-                    for (let i = 0; i < 8; i++) {
-                        correlations[i] += features[i] * allTargets[index];
+                // Sum absolute weights for each input feature
+                this.featureImportance = Array(weights1.length).fill(0);
+                for (let i = 0; i < weights1.length; i++) {
+                    for (let j = 0; j < weights1[i].length; j++) {
+                        this.featureImportance[i] += Math.abs(weights1[i][j]);
                     }
-                });
+                }
                 
-                const maxCorrelation = Math.max(...correlations.map(Math.abs));
-                this.featureImportance = correlations.map(c => (Math.abs(c) / maxCorrelation) * 100);
+                // Normalize to percentages
+                const total = this.featureImportance.reduce((sum, val) => sum + val, 0);
+                this.featureImportance = this.featureImportance.map(val => (val / total) * 100);
                 
                 return this.featureImportance;
             }
             
-            trainModel(epochs = 100) {
-                this.model = new NeuralNetwork(8, 8, 1, 0.01);
-                const trainingLoss = [];
-                
-                for (let epoch = 0; epoch < epochs; epoch++) {
-                    let epochLoss = 0;
-                    
-                    this.processedData.X_train_processed.forEach((features, index) => {
-                        this.model.train(features, [this.processedData.y_train[index]]);
-                        
-                        const prediction = this.model.forward(features);
-                        const error = this.processedData.y_train[index] - prediction;
-                        epochLoss += error * error;
-                    });
-                    
-                    epochLoss /= this.processedData.X_train_processed.length;
-                    trainingLoss.push(epochLoss);
+            evaluateModel() {
+                if (!this.model) {
+                    throw new Error("Model not trained yet");
                 }
                 
-                return trainingLoss;
-            }
-            
-            evaluateModel() {
-                if (!this.model) return null;
+                const { weights1, weights2, biases1, biases2, hiddenSize, outputSize } = this.model;
                 
-                let truePositives = 0;
-                let falsePositives = 0;
-                let falseNegatives = 0;
-                let trueNegatives = 0;
+                // Test on training set
+                let trainCorrect = 0;
+                const trainPredictions = [];
                 
-                this.processedData.X_test_processed.forEach((features, index) => {
-                    const prediction = this.model.forward(features);
-                    const predictedClass = prediction > 0.5 ? 1 : 0;
-                    const actualClass = this.processedData.y_test[index];
+                for (let i = 0; i < this.processedData.X_train_processed.length; i++) {
+                    const input = this.processedData.X_train_processed[i];
+                    const target = this.processedData.y_train[i];
                     
-                    if (predictedClass === 1 && actualClass === 1) truePositives++;
-                    else if (predictedClass === 1 && actualClass === 0) falsePositives++;
-                    else if (predictedClass === 0 && actualClass === 1) falseNegatives++;
-                    else if (predictedClass === 0 && actualClass === 0) trueNegatives++;
-                });
+                    // Forward pass
+                    const hidden = Array(hiddenSize).fill(0);
+                    for (let j = 0; j < hiddenSize; j++) {
+                        let sum = biases1[j];
+                        for (let k = 0; k < input.length; k++) {
+                            sum += input[k] * weights1[k][j];
+                        }
+                        hidden[j] = Math.max(0, sum); // ReLU
+                    }
+                    
+                    const output = Array(outputSize).fill(0);
+                    for (let j = 0; j < outputSize; j++) {
+                        let sum = biases2[j];
+                        for (let k = 0; k < hiddenSize; k++) {
+                            sum += hidden[k] * weights2[k][j];
+                        }
+                        output[j] = 1 / (1 + Math.exp(-sum)); // Sigmoid
+                    }
+                    
+                    const prediction = output[0] > 0.5 ? 1 : 0;
+                    trainPredictions.push(prediction);
+                    
+                    if (prediction === target) {
+                        trainCorrect++;
+                    }
+                }
                 
-                const accuracy = (truePositives + trueNegatives) / this.processedData.X_test_processed.length;
+                const trainAccuracy = trainCorrect / this.processedData.X_train_processed.length;
+                
+                // Test on test set
+                let testCorrect = 0;
+                const testPredictions = [];
+                let truePositives = 0, falsePositives = 0, trueNegatives = 0, falseNegatives = 0;
+                
+                for (let i = 0; i < this.processedData.X_test_processed.length; i++) {
+                    const input = this.processedData.X_test_processed[i];
+                    const target = this.processedData.y_test[i];
+                    
+                    // Forward pass
+                    const hidden = Array(hiddenSize).fill(0);
+                    for (let j = 0; j < hiddenSize; j++) {
+                        let sum = biases1[j];
+                        for (let k = 0; k < input.length; k++) {
+                            sum += input[k] * weights1[k][j];
+                        }
+                        hidden[j] = Math.max(0, sum); // ReLU
+                    }
+                    
+                    const output = Array(outputSize).fill(0);
+                    for (let j = 0; j < outputSize; j++) {
+                        let sum = biases2[j];
+                        for (let k = 0; k < hiddenSize; k++) {
+                            sum += hidden[k] * weights2[k][j];
+                        }
+                        output[j] = 1 / (1 + Math.exp(-sum)); // Sigmoid
+                    }
+                    
+                    const prediction = output[0] > 0.5 ? 1 : 0;
+                    testPredictions.push(prediction);
+                    
+                    if (prediction === target) {
+                        testCorrect++;
+                        if (prediction === 1) {
+                            truePositives++;
+                        } else {
+                            trueNegatives++;
+                        }
+                    } else {
+                        if (prediction === 1) {
+                            falsePositives++;
+                        } else {
+                            falseNegatives++;
+                        }
+                    }
+                }
+                
+                const testAccuracy = testCorrect / this.processedData.X_test_processed.length;
+                
+                // Calculate additional metrics
                 const precision = truePositives / (truePositives + falsePositives) || 0;
                 const recall = truePositives / (truePositives + falseNegatives) || 0;
                 const f1 = 2 * (precision * recall) / (precision + recall) || 0;
                 
                 this.modelMetrics = {
-                    accuracy,
+                    accuracy: testAccuracy,
                     precision,
                     recall,
                     f1,
-                    confusionMatrix: [truePositives, falsePositives, falseNegatives, trueNegatives]
+                    confusionMatrix: [truePositives, falsePositives, falseNegatives, trueNegatives],
+                    trainAccuracy
                 };
                 
                 return this.modelMetrics;
             }
             
-            predict(features) {
-                if (!this.model) return null;
-                
-                // Convert categorical to numerical (one-hot encoding)
-                const typeL = features[0] === 'L' ? 1 : 0;
-                const typeM = features[0] === 'M' ? 1 : 0;
-                const typeH = features[0] === 'H' ? 1 : 0;
-                
-                // Standardize numerical features using training parameters
-                const standardizedAirTemp = (features[1] - this.preprocessingParams.AirTemp.mean) / this.preprocessingParams.AirTemp.std;
-                const standardizedProcessTemp = (features[2] - this.preprocessingParams.ProcessTemp.mean) / this.preprocessingParams.ProcessTemp.std;
-                const standardizedRpm = (features[3] - this.preprocessingParams.RotationalSpeed.mean) / this.preprocessingParams.RotationalSpeed.std;
-                const standardizedTorque = (features[4] - this.preprocessingParams.Torque.mean) / this.preprocessingParams.Torque.std;
-                const standardizedToolWear = (features[5] - this.preprocessingParams.ToolWear.mean) / this.preprocessingParams.ToolWear.std;
-                
-                const processedFeatures = [
-                    typeL,
-                    typeM,
-                    typeH,
-                    standardizedAirTemp,
-                    standardizedProcessTemp,
-                    standardizedRpm,
-                    standardizedTorque,
-                    standardizedToolWear
-                ];
-                
-                return this.model.forward(processedFeatures);
-            }
-        }
-
-        // Neural Network Implementation (unchanged)
-        class NeuralNetwork {
-            constructor(inputNodes, hiddenNodes, outputNodes, learningRate = 0.01) {
-                this.inputNodes = inputNodes;
-                this.hiddenNodes = hiddenNodes;
-                this.outputNodes = outputNodes;
-                this.learningRate = learningRate;
-                
-                this.weightsInputHidden = this.randomMatrix(this.inputNodes, this.hiddenNodes);
-                this.weightsHiddenOutput = this.randomMatrix(this.hiddenNodes, this.outputNodes);
-                
-                this.biasHidden = this.randomMatrix(1, this.hiddenNodes);
-                this.biasOutput = this.randomMatrix(1, this.outputNodes);
-            }
-            
-            randomMatrix(rows, cols) {
-                return Array.from({ length: rows }, () => 
-                    Array.from({ length: cols }, () => (Math.random() * 2 - 1) * 0.1)
-                );
-            }
-            
-            sigmoid(x) {
-                return 1 / (1 + Math.exp(-x));
-            }
-            
-            sigmoidDerivative(x) {
-                return x * (1 - x);
-            }
-            
-            forward(input) {
-                if (!Array.isArray(input[0])) {
-                    input = [input];
+            predict(inputData) {
+                if (!this.model) {
+                    throw new Error("Model not trained yet");
                 }
                 
-                this.hiddenInput = this.matrixMultiply(input, this.weightsInputHidden);
-                this.hiddenInput = this.matrixAdd(this.hiddenInput, this.biasHidden);
-                this.hiddenOutput = this.matrixMap(this.hiddenInput, this.sigmoid);
+                const { weights1, weights2, biases1, biases2, hiddenSize, outputSize } = this.model;
                 
-                this.outputInput = this.matrixMultiply(this.hiddenOutput, this.weightsHiddenOutput);
-                this.outputInput = this.matrixAdd(this.outputInput, this.biasOutput);
-                this.output = this.matrixMap(this.outputInput, this.sigmoid);
+                // Preprocess input data
+                const processedInput = [];
                 
-                return this.output[0][0];
+                // One-hot encode Type
+                this.preprocessingParams.Type.forEach(type => {
+                    processedInput.push(inputData.Type === type ? 1 : 0);
+                });
+                
+                // Normalize numeric features
+                const numericColumns = ['AirTemp', 'ProcessTemp', 'RotationalSpeed', 'Torque', 'ToolWear'];
+                numericColumns.forEach(col => {
+                    const { min, max } = this.preprocessingParams[col];
+                    const normalized = (inputData[col] - min) / (max - min);
+                    processedInput.push(normalized);
+                });
+                
+                // Forward pass
+                const hidden = Array(hiddenSize).fill(0);
+                for (let j = 0; j < hiddenSize; j++) {
+                    let sum = biases1[j];
+                    for (let k = 0; k < processedInput.length; k++) {
+                        sum += processedInput[k] * weights1[k][j];
+                    }
+                    hidden[j] = Math.max(0, sum); // ReLU
+                }
+                
+                const output = Array(outputSize).fill(0);
+                for (let j = 0; j < outputSize; j++) {
+                    let sum = biases2[j];
+                    for (let k = 0; k < hiddenSize; k++) {
+                        sum += hidden[k] * weights2[k][j];
+                    }
+                    output[j] = 1 / (1 + Math.exp(-sum)); // Sigmoid
+                }
+                
+                return output[0];
             }
             
-            train(input, target) {
-                this.forward(input);
+            // EDA methods
+            calculateNumericStats() {
+                const numericColumns = ['AirTemp', 'ProcessTemp', 'RotationalSpeed', 'Torque', 'ToolWear'];
+                this.numericStats = {};
                 
-                if (!Array.isArray(input[0])) input = [input];
-                if (!Array.isArray(target)) target = [target];
+                numericColumns.forEach(col => {
+                    const values = this.dataset.map(record => record[col]).filter(val => val !== null);
+                    if (values.length === 0) return;
+                    
+                    values.sort((a, b) => a - b);
+                    const mean = values.reduce((sum, val) => sum + val, 0) / values.length;
+                    const median = values[Math.floor(values.length / 2)];
+                    const min = values[0];
+                    const max = values[values.length - 1];
+                    const std = Math.sqrt(values.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / values.length);
+                    
+                    this.numericStats[col] = {
+                        mean,
+                        median,
+                        min,
+                        max,
+                        std,
+                        count: values.length
+                    };
+                });
                 
-                const outputError = this.matrixSubtract(target, this.output);
-                const outputGradient = this.matrixMap(this.output, this.sigmoidDerivative);
-                const outputDelta = this.matrixMultiplyElementwise(outputError, outputGradient);
-                
-                const hiddenError = this.matrixMultiply(outputDelta, this.transpose(this.weightsHiddenOutput));
-                const hiddenGradient = this.matrixMap(this.hiddenOutput, this.sigmoidDerivative);
-                const hiddenDelta = this.matrixMultiplyElementwise(hiddenError, hiddenGradient);
-                
-                this.weightsHiddenOutput = this.matrixAdd(
-                    this.weightsHiddenOutput,
-                    this.matrixMultiply(
-                        this.transpose(this.hiddenOutput),
-                        this.matrixMultiplyScalar(outputDelta, this.learningRate)
-                    )
-                );
-                
-                this.weightsInputHidden = this.matrixAdd(
-                    this.weightsInputHidden,
-                    this.matrixMultiply(
-                        this.transpose(input),
-                        this.matrixMultiplyScalar(hiddenDelta, this.learningRate)
-                    )
-                );
-                
-                this.biasOutput = this.matrixAdd(
-                    this.biasOutput,
-                    this.matrixMultiplyScalar(outputDelta, this.learningRate)
-                );
-                
-                this.biasHidden = this.matrixAdd(
-                    this.biasHidden,
-                    this.matrixMultiplyScalar(hiddenDelta, this.learningRate)
-                );
+                return this.numericStats;
             }
             
-            matrixMultiply(a, b) {
-                const result = Array(a.length).fill().map(() => Array(b[0].length).fill(0));
+            calculateCategoricalStats() {
+                const typeValues = this.dataset.map(record => record.Type).filter(val => val !== null);
+                const failureValues = this.dataset.map(record => record.Failure).filter(val => val !== null);
                 
-                for (let i = 0; i < a.length; i++) {
-                    for (let j = 0; j < b[0].length; j++) {
-                        for (let k = 0; k < a[0].length; k++) {
-                            result[i][j] += a[i][k] * b[k][j];
+                // Type distribution
+                const typeCounts = {};
+                typeValues.forEach(type => {
+                    typeCounts[type] = (typeCounts[type] || 0) + 1;
+                });
+                
+                // Failure distribution
+                const failureCounts = { 0: 0, 1: 0 };
+                failureValues.forEach(failure => {
+                    failureCounts[failure] = (failureCounts[failure] || 0) + 1;
+                });
+                
+                this.categoricalStats = {
+                    Type: typeCounts,
+                    Failure: failureCounts
+                };
+                
+                return this.categoricalStats;
+            }
+            
+            calculateCorrelationMatrix() {
+                const numericColumns = ['AirTemp', 'ProcessTemp', 'RotationalSpeed', 'Torque', 'ToolWear', 'Failure'];
+                const matrix = [];
+                
+                // Initialize matrix
+                for (let i = 0; i < numericColumns.length; i++) {
+                    matrix[i] = [];
+                    for (let j = 0; j < numericColumns.length; j++) {
+                        matrix[i][j] = 0;
+                    }
+                }
+                
+                // Calculate correlations
+                for (let i = 0; i < numericColumns.length; i++) {
+                    for (let j = 0; j < numericColumns.length; j++) {
+                        if (i === j) {
+                            matrix[i][j] = 1;
+                        } else {
+                            const col1 = numericColumns[i];
+                            const col2 = numericColumns[j];
+                            
+                            const values1 = this.dataset.map(record => record[col1]).filter(val => val !== null);
+                            const values2 = this.dataset.map(record => record[col2]).filter(val => val !== null);
+                            
+                            // Ensure we have the same number of values
+                            const minLength = Math.min(values1.length, values2.length);
+                            const v1 = values1.slice(0, minLength);
+                            const v2 = values2.slice(0, minLength);
+                            
+                            if (minLength > 0) {
+                                matrix[i][j] = this.calculateCorrelation(v1, v2);
+                            }
                         }
                     }
                 }
                 
-                return result;
+                this.correlationMatrix = matrix;
+                return {
+                    matrix,
+                    columns: numericColumns
+                };
             }
             
-            matrixAdd(a, b) {
-                return a.map((row, i) => row.map((val, j) => val + b[i][j]));
-            }
-            
-            matrixSubtract(a, b) {
-                return a.map((row, i) => row.map((val, j) => val - b[i][j]));
-            }
-            
-            matrixMultiplyElementwise(a, b) {
-                return a.map((row, i) => row.map((val, j) => val * b[i][j]));
-            }
-            
-            matrixMultiplyScalar(a, scalar) {
-                return a.map(row => row.map(val => val * scalar));
-            }
-            
-            matrixMap(a, func) {
-                return a.map(row => row.map(val => func(val)));
-            }
-            
-            transpose(a) {
-                return a[0].map((_, colIndex) => a.map(row => row[colIndex]));
+            calculateCorrelation(arr1, arr2) {
+                const n = arr1.length;
+                const mean1 = arr1.reduce((sum, val) => sum + val, 0) / n;
+                const mean2 = arr2.reduce((sum, val) => sum + val, 0) / n;
+                
+                let numerator = 0;
+                let denom1 = 0;
+                let denom2 = 0;
+                
+                for (let i = 0; i < n; i++) {
+                    numerator += (arr1[i] - mean1) * (arr2[i] - mean2);
+                    denom1 += Math.pow(arr1[i] - mean1, 2);
+                    denom2 += Math.pow(arr2[i] - mean2, 2);
+                }
+                
+                return numerator / Math.sqrt(denom1 * denom2);
             }
         }
 
-        // Application Logic with Proper Data Split
-        document.addEventListener('DOMContentLoaded', function() {
-            const mlPipeline = new MLPipeline();
+        // Flexible CSV Parser
+        class FlexibleCSVParser {
+            constructor() {
+                this.expectedColumns = {
+                    type: ['type', 'product type', 'product_type'],
+                    airtemp: ['air temperature', 'air temp', 'airtemperature', 'air_temp', 'air temperature [k]'],
+                    processtemp: ['process temperature', 'process temp', 'processtemperature', 'process_temp', 'process temperature [k]'],
+                    rotationalspeed: ['rotational speed', 'rotation speed', 'rotationalspeed', 'rotation_speed', 'rotational speed [rpm]'],
+                    torque: ['torque', 'torque [nm]'],
+                    toolwear: ['tool wear', 'tool_wear', 'toolwear', 'tool wear [min]'],
+                    failure: ['machine failure', 'failure', 'machine_failure', 'target']
+                };
+            }
             
-            // DOM elements and event listeners remain the same...
-            // Only the preprocessing section is updated
-            
-            // Preprocess data - UPDATED with proper split
-            preprocessBtn.addEventListener('click', function() {
-                loadingText.textContent = "Splitting and preprocessing data...";
-                loading.style.display = 'block';
+            parseCSV(csvText) {
+                const results = Papa.parse(csvText, {
+                    header: true,
+                    dynamicTyping: true,
+                    skipEmptyLines: true
+                });
                 
-                setTimeout(() => {
-                    const preprocessingResults = mlPipeline.preprocessData();
-                    
-                    // Display data split information
-                    document.getElementById('data-split-info').innerHTML = `
-                        <div class="data-split-info">
-                            <h4>Data Split Information</h4>
-                            <p><strong>Training set:</strong> ${preprocessingResults.splitInfo.train_size} records (80%)</p>
-                            <p><strong>Testing set:</strong> ${preprocessingResults.splitInfo.test_size} records (20%)</p>
-                            <p><em>Data was split BEFORE preprocessing to prevent data leakage</em></p>
-                        </div>
-                    `;
-                    document.getElementById('data-split-info').style.display = 'block';
-                    
-                    document.getElementById('preprocessing-content').innerHTML = `
-                        <p>Data preprocessing completed:</p>
-                        <ul>
-                            <li>Training set: ${preprocessingResults.splitInfo.train_size} records</li>
-                            <li>Testing set: ${preprocessingResults.splitInfo.test_size} records</li>
-                            <li>Categorical variable (Type) encoded using one-hot encoding</li>
-                            <li>Numerical features standardized using z-score normalization</li>
-                            <li><strong>Preprocessing parameters calculated from training data only</strong></li>
-                        </ul>
-                        <h4>Standardization Parameters (from training data):</h4>
-                        <table class="stats-table">
-                            <thead>
-                                <tr>
-                                    <th>Feature</th>
-                                    <th>Mean</th>
-                                    <th>Standard Deviation</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr>
-                                    <td>Air Temperature</td>
-                                    <td>${preprocessingResults.preprocessingParams.AirTemp.mean.toFixed(2)}</td>
-                                    <td>${preprocessingResults.preprocessingParams.AirTemp.std.toFixed(2)}</td>
-                                </tr>
-                                <tr>
-                                    <td>Process Temperature</td>
-                                    <td>${preprocessingResults.preprocessingParams.ProcessTemp.mean.toFixed(2)}</td>
-                                    <td>${preprocessingResults.preprocessingParams.ProcessTemp.std.toFixed(2)}</td>
-                                </tr>
-                                <tr>
-                                    <td>Rotational Speed</td>
-                                    <td>${preprocessingResults.preprocessingParams.RotationalSpeed.mean.toFixed(2)}</td>
-                                    <td>${preprocessingResults.preprocessingParams.RotationalSpeed.std.toFixed(2)}</td>
-                                </tr>
-                                <tr>
-                                    <td>Torque</td>
-                                    <td>${preprocessingResults.preprocessingParams.Torque.mean.toFixed(2)}</td>
-                                    <td>${preprocessingResults.preprocessingParams.Torque.std.toFixed(2)}</td>
-                                </tr>
-                                <tr>
-                                    <td>Tool Wear</td>
-                                    <td>${preprocessingResults.preprocessingParams.ToolWear.mean.toFixed(2)}</td>
-                                    <td>${preprocessingResults.preprocessingParams.ToolWear.std.toFixed(2)}</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    `;
-                    
-                    // Display preprocessed data preview (training set)
-                    displayPreprocessedData(preprocessingResults.processedData.X_train_processed, preprocessingResults.processedData.y_train);
-                    
-                    trainBtn.style.display = 'inline-block';
-                    loading.style.display = 'none';
-                    updatePipelineStep(4, 'complete');
-                    
-                    switchTab('preprocessing');
-                }, 1500);
-            });
-            
-            // Helper function to display preprocessed data
-            function displayPreprocessedData(processedFeatures, targets) {
-                const tableHead = document.getElementById('preprocessed-table-head');
-                const tableBody = document.getElementById('preprocessed-table-body');
+                if (results.errors.length > 0) {
+                    console.warn('CSV parsing errors:', results.errors);
+                }
                 
+                const headers = results.meta.fields || [];
+                const columnMapping = this.mapColumns(headers);
+                
+                const data = results.data.map(row => {
+                    const mappedRow = {};
+                    
+                    for (const [key, aliases] of Object.entries(this.expectedColumns)) {
+                        const actualHeader = columnMapping[key];
+                        if (actualHeader && row.hasOwnProperty(actualHeader)) {
+                            mappedRow[key] = row[actualHeader];
+                        } else {
+                            mappedRow[key] = null;
+                        }
+                    }
+                    
+                    return mappedRow;
+                });
+                
+                return {
+                    data,
+                    columnMapping
+                };
+            }
+            
+            mapColumns(headers) {
+                const mapping = {};
+                const usedHeaders = new Set();
+                
+                for (const [key, aliases] of Object.entries(this.expectedColumns)) {
+                    for (const alias of aliases) {
+                        const foundHeader = headers.find(h => 
+                            h && h.toLowerCase().replace(/[^a-z0-9]/g, '') === alias.toLowerCase().replace(/[^a-z0-9]/g, '')
+                        );
+                        
+                        if (foundHeader && !usedHeaders.has(foundHeader)) {
+                            mapping[key] = foundHeader;
+                            usedHeaders.add(foundHeader);
+                            break;
+                        }
+                    }
+                    
+                    if (!mapping[key]) {
+                        console.warn(`Could not find column for: ${key}`);
+                    }
+                }
+                
+                return mapping;
+            }
+        }
+
+        // UI Controller
+        class UIController {
+            constructor() {
+                this.pipeline = new MLPipeline();
+                this.predictionHistory = [];
+                this.currentStep = 1;
+                this.init();
+            }
+            
+            init() {
+                this.setupEventListeners();
+                this.updatePipelineStep(1);
+            }
+            
+            setupEventListeners() {
+                // File upload
+                document.getElementById('upload-btn').addEventListener('click', () => {
+                    document.getElementById('file-input').click();
+                });
+                
+                document.getElementById('file-input').addEventListener('change', (e) => {
+                    this.handleFileUpload(e.target.files[0]);
+                });
+                
+                document.getElementById('file-upload-area').addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    e.currentTarget.style.borderColor = '#3498db';
+                    e.currentTarget.style.backgroundColor = '#f8f9fa';
+                });
+                
+                document.getElementById('file-upload-area').addEventListener('dragleave', (e) => {
+                    e.preventDefault();
+                    e.currentTarget.style.borderColor = '#ddd';
+                    e.currentTarget.style.backgroundColor = 'white';
+                });
+                
+                document.getElementById('file-upload-area').addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    e.currentTarget.style.borderColor = '#ddd';
+                    e.currentTarget.style.backgroundColor = 'white';
+                    
+                    if (e.dataTransfer.files.length > 0) {
+                        this.handleFileUpload(e.dataTransfer.files[0]);
+                    }
+                });
+                
+                // Tab navigation
+                document.querySelectorAll('.tab').forEach(tab => {
+                    tab.addEventListener('click', () => {
+                        const tabId = tab.getAttribute('data-tab');
+                        this.switchTab(tabId);
+                    });
+                });
+                
+                // Pipeline buttons
+                document.getElementById('analyze-btn').addEventListener('click', () => {
+                    this.analyzeDataset();
+                });
+                
+                document.getElementById('eda-btn').addEventListener('click', () => {
+                    this.performEDA();
+                });
+                
+                document.getElementById('preprocess-btn').addEventListener('click', () => {
+                    this.preprocessData();
+                });
+                
+                document.getElementById('train-btn').addEventListener('click', () => {
+                    this.trainModel();
+                });
+                
+                document.getElementById('evaluate-btn').addEventListener('click', () => {
+                    this.evaluateModel();
+                });
+                
+                document.getElementById('prediction-ready-btn').addEventListener('click', () => {
+                    this.enablePredictions();
+                });
+                
+                // Prediction form
+                document.getElementById('prediction-form').addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    this.predict();
+                });
+                
+                document.getElementById('reset-btn').addEventListener('click', () => {
+                    this.resetForm();
+                });
+            }
+            
+            handleFileUpload(file) {
+                if (!file) return;
+                
+                if (!file.name.toLowerCase().endsWith('.csv')) {
+                    this.showUploadStatus('Please upload a CSV file.', 'error');
+                    return;
+                }
+                
+                this.showUploadStatus('Reading file...', 'info');
+                this.showLoading('Reading CSV file...');
+                
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        const csvText = e.target.result;
+                        const result = this.pipeline.loadData(csvText);
+                        
+                        this.showUploadStatus(`Successfully loaded ${result.totalRecords} records`, 'success');
+                        this.displayDataPreview(this.pipeline.rawData.slice(0, 10));
+                        document.getElementById('analyze-btn').style.display = 'inline-block';
+                        
+                        // Update step 1 status
+                        this.updateStepStatus(1, 'complete');
+                        
+                        this.hideLoading();
+                    } catch (error) {
+                        this.showUploadStatus(`Error: ${error.message}`, 'error');
+                        this.hideLoading();
+                    }
+                };
+                
+                reader.onerror = () => {
+                    this.showUploadStatus('Error reading file', 'error');
+                    this.hideLoading();
+                };
+                
+                reader.readAsText(file);
+            }
+            
+            showUploadStatus(message, type) {
+                const statusEl = document.getElementById('upload-status');
+                statusEl.innerHTML = `<div class="status-badge status-${type}">${message}</div>`;
+            }
+            
+            displayDataPreview(data) {
+                if (!data || data.length === 0) return;
+                
+                const tableHead = document.getElementById('data-table-head');
+                const tableBody = document.getElementById('data-table-body');
+                
+                // Clear previous content
                 tableHead.innerHTML = '';
                 tableBody.innerHTML = '';
                 
                 // Create headers
+                const headers = Object.keys(data[0]);
                 const headerRow = document.createElement('tr');
-                const headers = ['Type_L', 'Type_M', 'Type_H', 'AirTemp_std', 'ProcessTemp_std', 'RotationalSpeed_std', 'Torque_std', 'ToolWear_std', 'Failure'];
-                
                 headers.forEach(header => {
                     const th = document.createElement('th');
                     th.textContent = header;
@@ -1650,146 +1801,619 @@
                 });
                 tableHead.appendChild(headerRow);
                 
-                // Add data rows (first 10)
-                processedFeatures.slice(0, 10).forEach((features, index) => {
-                    const row = document.createElement('tr');
+                // Create rows
+                data.forEach(row => {
+                    const tr = document.createElement('tr');
+                    headers.forEach(header => {
+                        const td = document.createElement('td');
+                        td.textContent = row[header] !== null ? row[header] : 'NULL';
+                        if (row[header] === null) {
+                            td.style.color = '#e74c3c';
+                            td.style.fontWeight = 'bold';
+                        }
+                        tr.appendChild(td);
+                    });
+                    tableBody.appendChild(tr);
+                });
+                
+                document.getElementById('data-preview').style.display = 'block';
+            }
+            
+            analyzeDataset() {
+                this.showLoading('Analyzing dataset...');
+                
+                // Switch to dataset info tab
+                this.switchTab('dataset-info');
+                
+                setTimeout(() => {
+                    const result = this.pipeline.loadData(Papa.unparse(this.pipeline.rawData));
                     
-                    // Add one-hot encoded type features
-                    row.appendChild(createTableCell(features[0].toFixed(4)));
-                    row.appendChild(createTableCell(features[1].toFixed(4)));
-                    row.appendChild(createTableCell(features[2].toFixed(4)));
+                    // Update dataset stats
+                    document.getElementById('total-records').textContent = result.totalRecords;
+                    document.getElementById('total-features').textContent = Object.keys(this.pipeline.columnMapping).length;
                     
-                    // Add standardized numerical features
-                    row.appendChild(createTableCell(features[3].toFixed(4)));
-                    row.appendChild(createTableCell(features[4].toFixed(4)));
-                    row.appendChild(createTableCell(features[5].toFixed(4)));
-                    row.appendChild(createTableCell(features[6].toFixed(4)));
-                    row.appendChild(createTableCell(features[7].toFixed(4)));
+                    // Calculate failure rate
+                    const failureCount = this.pipeline.dataset.filter(record => record.Failure === 1).length;
+                    const failureRate = ((failureCount / result.totalRecords) * 100).toFixed(1);
+                    document.getElementById('failure-rate').textContent = `${failureRate}%`;
                     
-                    // Add target
-                    row.appendChild(createTableCell(targets[index]));
+                    document.getElementById('dataset-stats').style.display = 'grid';
                     
-                    tableBody.appendChild(row);
+                    // Show missing values info if any
+                    if (result.hasMissingValues) {
+                        this.displayMissingValuesInfo(result.missingValues);
+                    }
+                    
+                    // Update step 2 status
+                    this.updateStepStatus(2, 'complete');
+                    document.getElementById('eda-btn').style.display = 'inline-block';
+                    
+                    this.hideLoading();
+                }, 500);
+            }
+            
+            displayMissingValuesInfo(missingValues) {
+                const section = document.getElementById('missing-values-section');
+                section.innerHTML = '';
+                section.style.display = 'block';
+                
+                let html = '<div class="missing-values-section">';
+                html += '<h4>Missing Values Detected</h4>';
+                html += '<p>The following columns have missing values:</p>';
+                html += '<ul>';
+                
+                for (const [key, count] of Object.entries(missingValues)) {
+                    if (count > 0) {
+                        html += `<li><strong>${key}</strong>: ${count} missing values</li>`;
+                    }
+                }
+                
+                html += '</ul>';
+                html += '<p>How would you like to handle missing values?</p>';
+                html += '<div class="missing-values-options">';
+                html += '<button class="btn btn-warning" id="delete-missing-btn">Delete Rows with Missing Values</button>';
+                html += '<button class="btn btn-success" id="fill-missing-btn">Fill Missing Values</button>';
+                html += '</div>';
+                html += '</div>';
+                
+                section.innerHTML = html;
+                
+                // Add event listeners
+                document.getElementById('delete-missing-btn').addEventListener('click', () => {
+                    this.handleMissingValues('delete');
+                });
+                
+                document.getElementById('fill-missing-btn').addEventListener('click', () => {
+                    this.handleMissingValues('fill');
+                });
+            }
+            
+            handleMissingValues(strategy) {
+                this.showLoading(`Handling missing values (${strategy})...`);
+                
+                setTimeout(() => {
+                    this.pipeline.handleMissingValues(strategy);
+                    
+                    // Update dataset stats
+                    const totalRecords = this.pipeline.dataset.length;
+                    document.getElementById('total-records').textContent = totalRecords;
+                    
+                    // Calculate failure rate
+                    const failureCount = this.pipeline.dataset.filter(record => record.Failure === 1).length;
+                    const failureRate = ((failureCount / totalRecords) * 100).toFixed(1);
+                    document.getElementById('failure-rate').textContent = `${failureRate}%`;
+                    
+                    // Hide missing values section
+                    document.getElementById('missing-values-section').style.display = 'none';
+                    
+                    this.hideLoading();
+                }, 500);
+            }
+            
+            performEDA() {
+                this.showLoading('Performing Exploratory Data Analysis...');
+                
+                // Switch to EDA tab
+                this.switchTab('eda');
+                
+                setTimeout(() => {
+                    // Calculate statistics
+                    const numericStats = this.pipeline.calculateNumericStats();
+                    const categoricalStats = this.pipeline.calculateCategoricalStats();
+                    const correlation = this.pipeline.calculateCorrelationMatrix();
+                    
+                    // Display EDA results
+                    this.displayEDAResults(numericStats, categoricalStats, correlation);
+                    
+                    // Update step 3 status
+                    this.updateStepStatus(3, 'complete');
+                    document.getElementById('preprocess-btn').style.display = 'inline-block';
+                    
+                    this.hideLoading();
+                }, 800);
+            }
+            
+            displayEDAResults(numericStats, categoricalStats, correlation) {
+                const edaContent = document.getElementById('eda-content');
+                let html = '';
+                
+                // Numeric statistics
+                html += '<div class="eda-section">';
+                html += '<h3>Numeric Features Summary</h3>';
+                html += '<table class="stats-table">';
+                html += '<tr><th>Feature</th><th>Mean</th><th>Median</th><th>Min</th><th>Max</th><th>Std Dev</th></tr>';
+                
+                for (const [feature, stats] of Object.entries(numericStats)) {
+                    html += `<tr>
+                        <td>${feature}</td>
+                        <td>${stats.mean.toFixed(2)}</td>
+                        <td>${stats.median.toFixed(2)}</td>
+                        <td>${stats.min.toFixed(2)}</td>
+                        <td>${stats.max.toFixed(2)}</td>
+                        <td>${stats.std.toFixed(2)}</td>
+                    </tr>`;
+                }
+                
+                html += '</table>';
+                html += '</div>';
+                
+                // Categorical statistics
+                html += '<div class="eda-section">';
+                html += '<h3>Categorical Features Distribution</h3>';
+                
+                // Type distribution
+                html += '<h4>Product Type Distribution</h4>';
+                html += '<table class="stats-table">';
+                html += '<tr><th>Type</th><th>Count</th><th>Percentage</th></tr>';
+                
+                const total = this.pipeline.dataset.length;
+                for (const [type, count] of Object.entries(categoricalStats.Type)) {
+                    const percentage = ((count / total) * 100).toFixed(1);
+                    html += `<tr>
+                        <td>${type}</td>
+                        <td>${count}</td>
+                        <td>${percentage}%</td>
+                    </tr>`;
+                }
+                
+                html += '</table>';
+                
+                // Failure distribution
+                html += '<h4>Failure Distribution</h4>';
+                html += '<table class="stats-table">';
+                html += '<tr><th>Failure</th><th>Count</th><th>Percentage</th></tr>';
+                
+                for (const [failure, count] of Object.entries(categoricalStats.Failure)) {
+                    const label = failure === '1' ? 'Failure' : 'No Failure';
+                    const percentage = ((count / total) * 100).toFixed(1);
+                    html += `<tr>
+                        <td>${label}</td>
+                        <td>${count}</td>
+                        <td>${percentage}%</td>
+                    </tr>`;
+                }
+                
+                html += '</table>';
+                html += '</div>';
+                
+                // Correlation matrix
+                html += '<div class="eda-section">';
+                html += '<h3>Correlation Matrix</h3>';
+                html += '<div class="preview-table">';
+                html += '<table class="correlation-matrix">';
+                
+                // Header row
+                html += '<tr><th></th>';
+                correlation.columns.forEach(col => {
+                    html += `<th>${col}</th>`;
+                });
+                html += '</tr>';
+                
+                // Data rows
+                for (let i = 0; i < correlation.matrix.length; i++) {
+                    html += `<tr><th>${correlation.columns[i]}</th>`;
+                    for (let j = 0; j < correlation.matrix[i].length; j++) {
+                        const value = correlation.matrix[i][j];
+                        let cellClass = '';
+                        
+                        if (Math.abs(value) > 0.7) {
+                            cellClass = 'high-correlation';
+                        } else if (Math.abs(value) > 0.3) {
+                            cellClass = 'medium-correlation';
+                        } else {
+                            cellClass = 'low-correlation';
+                        }
+                        
+                        html += `<td class="${cellClass}">${value.toFixed(2)}</td>`;
+                    }
+                    html += '</tr>';
+                }
+                
+                html += '</table>';
+                html += '</div>';
+                html += '</div>';
+                
+                edaContent.innerHTML = html;
+            }
+            
+            preprocessData() {
+                this.showLoading('Preprocessing data...');
+                
+                // Switch to preprocessing tab
+                this.switchTab('preprocessing');
+                
+                setTimeout(() => {
+                    // Split data first
+                    const splitResult = this.pipeline.splitData();
+                    
+                    // Then preprocess
+                    const processedData = this.pipeline.preprocessData();
+                    
+                    // Display preprocessing info
+                    this.displayPreprocessingInfo(splitResult, processedData);
+                    
+                    // Update step 4 status
+                    this.updateStepStatus(4, 'complete');
+                    document.getElementById('train-btn').style.display = 'inline-block';
+                    
+                    this.hideLoading();
+                }, 800);
+            }
+            
+            displayPreprocessingInfo(splitResult, processedData) {
+                const preprocessingContent = document.getElementById('preprocessing-content');
+                let html = '';
+                
+                html += '<h4>Data Split</h4>';
+                html += '<div class="data-split-info">';
+                html += `<p><strong>Training Set:</strong> ${splitResult.trainSize} records (80%)</p>`;
+                html += `<p><strong>Test Set:</strong> ${splitResult.testSize} records (20%)</p>`;
+                html += '</div>';
+                
+                html += '<h4>Preprocessing Steps Applied</h4>';
+                html += '<ul>';
+                html += '<li>One-hot encoding for categorical features (Product Type)</li>';
+                html += '<li>Min-max normalization for numeric features</li>';
+                html += '<li>Training/test split before preprocessing to avoid data leakage</li>';
+                html += '</ul>';
+                
+                preprocessingContent.innerHTML = html;
+                
+                // Show preprocessed data preview
+                this.displayPreprocessedPreview(processedData.X_train_processed.slice(0, 10));
+            }
+            
+            displayPreprocessedPreview(data) {
+                if (!data || data.length === 0) return;
+                
+                const tableHead = document.getElementById('preprocessed-table-head');
+                const tableBody = document.getElementById('preprocessed-table-body');
+                
+                // Clear previous content
+                tableHead.innerHTML = '';
+                tableBody.innerHTML = '';
+                
+                // Create headers
+                const headers = ['Type_L', 'Type_M', 'Type_H', 'AirTemp', 'ProcessTemp', 'RotationalSpeed', 'Torque', 'ToolWear'];
+                const headerRow = document.createElement('tr');
+                headers.forEach(header => {
+                    const th = document.createElement('th');
+                    th.textContent = header;
+                    headerRow.appendChild(th);
+                });
+                tableHead.appendChild(headerRow);
+                
+                // Create rows
+                data.forEach(row => {
+                    const tr = document.createElement('tr');
+                    row.forEach(value => {
+                        const td = document.createElement('td');
+                        td.textContent = value.toFixed(4);
+                        tr.appendChild(td);
+                    });
+                    tableBody.appendChild(tr);
                 });
                 
                 document.getElementById('preprocessed-preview').style.display = 'block';
             }
             
-            // Rest of the application logic remains the same...
-            // [Include all other functions and event listeners from previous implementation]
-        });
-
-        // FlexibleCSVParser class remains exactly the same as before
-        class FlexibleCSVParser {
-            constructor() {
-                this.requiredColumns = {
-                    'type': { type: 'categorical', aliases: ['type', 'product type'] },
-                    'airtemp': { type: 'numeric', aliases: ['air temperature', 'air temp', 'air temperature [k]'] },
-                    'processtemp': { type: 'numeric', aliases: ['process temperature', 'process temp', 'process temperature [k]'] },
-                    'rotationalspeed': { type: 'numeric', aliases: ['rotational speed', 'rpm', 'rotational speed [rpm]'] },
-                    'torque': { type: 'numeric', aliases: ['torque', 'torque [nm]'] },
-                    'toolwear': { type: 'numeric', aliases: ['tool wear', 'tool wear [min]'] },
-                    'failure': { type: 'binary', aliases: ['machine failure', 'failure', 'target'] }
-                };
+            trainModel() {
+                this.showLoading('Training neural network model...');
+                
+                // Switch to training tab
+                this.switchTab('training');
+                
+                setTimeout(() => {
+                    const model = this.pipeline.trainModel();
+                    
+                    const trainingContent = document.getElementById('training-content');
+                    trainingContent.innerHTML = `
+                        <h4>Model Training Complete</h4>
+                        <p>The neural network has been successfully trained with the following architecture:</p>
+                        <ul>
+                            <li>Input Layer: ${model.inputSize} neurons</li>
+                            <li>Hidden Layer: ${model.hiddenSize} neurons (ReLU activation)</li>
+                            <li>Output Layer: ${model.outputSize} neuron (Sigmoid activation)</li>
+                        </ul>
+                        <p>Training completed with 100 epochs using binary cross-entropy loss.</p>
+                    `;
+                    
+                    // Update step 5 status
+                    this.updateStepStatus(5, 'complete');
+                    document.getElementById('evaluate-btn').style.display = 'inline-block';
+                    
+                    this.hideLoading();
+                }, 1000);
             }
             
-            parseCSV(csvText) {
-                const results = Papa.parse(csvText, {
-                    header: true,
-                    skipEmptyLines: true,
-                    transform: (value) => {
-                        return value === '' ? null : value;
+            evaluateModel() {
+                this.showLoading('Evaluating model performance...');
+                
+                // Switch to evaluation tab
+                this.switchTab('evaluation');
+                
+                setTimeout(() => {
+                    const metrics = this.pipeline.evaluateModel();
+                    
+                    // Display evaluation results
+                    this.displayEvaluationResults(metrics);
+                    
+                    // Update UI with model metrics
+                    this.updateModelMetrics(metrics);
+                    
+                    // Update step 6 status
+                    this.updateStepStatus(6, 'complete');
+                    document.getElementById('prediction-ready-btn').style.display = 'inline-block';
+                    
+                    this.hideLoading();
+                }, 800);
+            }
+            
+            displayEvaluationResults(metrics) {
+                const evaluationContent = document.getElementById('evaluation-content');
+                let html = '';
+                
+                html += '<h4>Model Performance on Test Set</h4>';
+                html += '<div class="metrics-grid">';
+                html += `<div class="metric"><div class="metric-label">Accuracy</div><div class="metric-value">${(metrics.accuracy * 100).toFixed(1)}%</div></div>`;
+                html += `<div class="metric"><div class="metric-label">Precision</div><div class="metric-value">${(metrics.precision * 100).toFixed(1)}%</div></div>`;
+                html += `<div class="metric"><div class="metric-label">Recall</div><div class="metric-value">${(metrics.recall * 100).toFixed(1)}%</div></div>`;
+                html += `<div class="metric"><div class="metric-label">F1-Score</div><div class="metric-value">${(metrics.f1 * 100).toFixed(1)}%</div></div>`;
+                html += '</div>';
+                
+                // Confusion matrix
+                html += '<h4>Confusion Matrix</h4>';
+                html += '<div class="confusion-matrix">';
+                html += '<div class="matrix-cell matrix-header"></div>';
+                html += '<div class="matrix-cell matrix-header">Predicted: No Failure</div>';
+                html += '<div class="matrix-cell matrix-header">Predicted: Failure</div>';
+                
+                html += '<div class="matrix-cell matrix-header">Actual: No Failure</div>';
+                html += `<div class="matrix-cell true-negative">${metrics.confusionMatrix[3]}</div>`;
+                html += `<div class="matrix-cell false-positive">${metrics.confusionMatrix[1]}</div>`;
+                
+                html += '<div class="matrix-cell matrix-header">Actual: Failure</div>';
+                html += `<div class="matrix-cell false-negative">${metrics.confusionMatrix[2]}</div>`;
+                html += `<div class="matrix-cell true-positive">${metrics.confusionMatrix[0]}</div>`;
+                
+                html += '</div>';
+                
+                evaluationContent.innerHTML = html;
+            }
+            
+            updateModelMetrics(metrics) {
+                document.getElementById('accuracy-display').textContent = `${(metrics.accuracy * 100).toFixed(1)}%`;
+                document.getElementById('precision-display').textContent = `${(metrics.precision * 100).toFixed(1)}%`;
+                document.getElementById('recall-display').textContent = `${(metrics.recall * 100).toFixed(1)}%`;
+                document.getElementById('f1-score-display').textContent = `${(metrics.f1 * 100).toFixed(1)}%`;
+                
+                // Update feature importance visualization
+                this.updateFeatureImportance();
+            }
+            
+            updateFeatureImportance() {
+                const importance = this.pipeline.featureImportance;
+                const featureBars = document.querySelectorAll('.feature-fill');
+                
+                // Map importance to feature bars (adjust based on your feature order)
+                const featureOrder = [5, 6, 4, 3, 2, 1]; // Adjust based on your model's feature order
+                
+                featureBars.forEach((bar, index) => {
+                    const featureIndex = featureOrder[index] || index;
+                    const width = importance[featureIndex] || 0;
+                    bar.style.width = `${width}%`;
+                });
+            }
+            
+            enablePredictions() {
+                document.getElementById('predict-btn').disabled = false;
+                document.getElementById('prediction-value').textContent = 'Ready';
+                document.getElementById('risk-level').textContent = 'Model Ready for Predictions';
+                document.getElementById('risk-level').className = 'low-risk';
+                
+                // Reset gauge
+                this.updateGauge(0);
+                
+                // Show success message
+                const evaluationContent = document.getElementById('evaluation-content');
+                evaluationContent.innerHTML += '<div class="status-badge status-complete" style="margin-top: 15px;">Model is ready for predictions!</div>';
+            }
+            
+            predict() {
+                const formData = {
+                    Type: document.getElementById('product-type').value,
+                    AirTemp: parseFloat(document.getElementById('air-temperature').value),
+                    ProcessTemp: parseFloat(document.getElementById('process-temperature').value),
+                    RotationalSpeed: parseFloat(document.getElementById('rotational-speed').value),
+                    Torque: parseFloat(document.getElementById('torque').value),
+                    ToolWear: parseInt(document.getElementById('tool-wear').value)
+                };
+                
+                try {
+                    const probability = this.pipeline.predict(formData);
+                    const percentage = (probability * 100).toFixed(1);
+                    
+                    // Update prediction display
+                    document.getElementById('prediction-value').textContent = `${percentage}%`;
+                    
+                    // Update risk level
+                    let riskLevel, riskClass;
+                    if (probability < 0.3) {
+                        riskLevel = 'Low Risk';
+                        riskClass = 'low-risk';
+                    } else if (probability < 0.7) {
+                        riskLevel = 'Medium Risk';
+                        riskClass = 'medium-risk';
+                    } else {
+                        riskLevel = 'High Risk';
+                        riskClass = 'high-risk';
                     }
+                    
+                    document.getElementById('risk-level').textContent = riskLevel;
+                    document.getElementById('risk-level').className = riskClass;
+                    
+                    // Update gauge
+                    this.updateGauge(probability);
+                    
+                    // Add to prediction history
+                    this.predictionHistory.push({
+                        timestamp: new Date(),
+                        probability,
+                        riskLevel,
+                        parameters: {...formData}
+                    });
+                    
+                    // Update history chart
+                    this.updateHistoryChart();
+                    
+                } catch (error) {
+                    alert(`Prediction error: ${error.message}`);
+                }
+            }
+            
+            updateGauge(probability) {
+                // Convert probability to gauge angle (0 to 180 degrees)
+                const angle = probability * 180;
+                document.getElementById('gauge-needle').style.transform = `translateX(-50%) rotate(${angle}deg)`;
+            }
+            
+            updateHistoryChart() {
+                const ctx = document.getElementById('history-chart').getContext('2d');
+                
+                // Extract data for chart
+                const labels = this.predictionHistory.map((_, index) => `Prediction ${index + 1}`);
+                const data = this.predictionHistory.map(p => p.probability * 100);
+                
+                // Create or update chart
+                if (this.historyChart) {
+                    this.historyChart.data.labels = labels;
+                    this.historyChart.data.datasets[0].data = data;
+                    this.historyChart.update();
+                } else {
+                    this.historyChart = new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: labels,
+                            datasets: [{
+                                label: 'Failure Probability (%)',
+                                data: data,
+                                borderColor: '#3498db',
+                                backgroundColor: 'rgba(52, 152, 219, 0.1)',
+                                borderWidth: 2,
+                                fill: true,
+                                tension: 0.4
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            scales: {
+                                y: {
+                                    beginAtZero: true,
+                                    max: 100,
+                                    title: {
+                                        display: true,
+                                        text: 'Probability (%)'
+                                    }
+                                },
+                                x: {
+                                    title: {
+                                        display: true,
+                                        text: 'Prediction History'
+                                    }
+                                }
+                            }
+                        }
+                    });
+                }
+            }
+            
+            resetForm() {
+                document.getElementById('prediction-form').reset();
+                document.getElementById('prediction-value').textContent = '0%';
+                document.getElementById('risk-level').textContent = 'Enter parameters above';
+                document.getElementById('risk-level').className = '';
+                this.updateGauge(0);
+            }
+            
+            switchTab(tabId) {
+                // Hide all tab contents
+                document.querySelectorAll('.tab-content').forEach(content => {
+                    content.classList.remove('active');
                 });
                 
-                if (results.errors.length > 0) {
-                    throw new Error(`CSV parsing error: ${results.errors[0].message}`);
-                }
-                
-                return this.mapColumns(results.data, results.meta.fields);
-            }
-            
-            mapColumns(data, headers) {
-                const columnMap = {};
-                const usedHeaders = new Set();
-                
-                for (const [requiredKey, requiredInfo] of Object.entries(this.requiredColumns)) {
-                    const foundHeader = this.findMatchingHeader(headers, requiredInfo.aliases, usedHeaders);
-                    if (foundHeader) {
-                        columnMap[requiredKey] = foundHeader;
-                        usedHeaders.add(foundHeader);
-                    }
-                }
-                
-                const missingColumns = Object.keys(this.requiredColumns).filter(key => !columnMap[key]);
-                if (missingColumns.length > 0) {
-                    throw new Error(`Missing required columns: ${missingColumns.join(', ')}`);
-                }
-                
-                const transformedData = data.map(row => {
-                    const transformedRow = {};
-                    
-                    for (const [requiredKey, actualHeader] of Object.entries(columnMap)) {
-                        const value = row[actualHeader];
-                        const columnInfo = this.requiredColumns[requiredKey];
-                        
-                        transformedRow[requiredKey] = this.transformValue(value, columnInfo.type);
-                    }
-                    
-                    return transformedRow;
+                // Deactivate all tabs
+                document.querySelectorAll('.tab').forEach(tab => {
+                    tab.classList.remove('active');
                 });
                 
-                return {
-                    data: transformedData,
-                    columnMapping: columnMap,
-                    originalHeaders: headers
-                };
+                // Activate selected tab
+                document.getElementById(tabId).classList.add('active');
+                document.querySelector(`.tab[data-tab="${tabId}"]`).classList.add('active');
             }
             
-            findMatchingHeader(headers, aliases, usedHeaders) {
-                const lowerHeaders = headers.map(h => h.toLowerCase().trim());
+            updatePipelineStep(step) {
+                this.currentStep = step;
                 
-                for (const alias of aliases) {
-                    const lowerAlias = alias.toLowerCase();
-                    const index = lowerHeaders.findIndex(h => h.includes(lowerAlias) && !usedHeaders.has(headers[lowerHeaders.indexOf(h)]));
-                    
-                    if (index !== -1) {
-                        return headers[index];
+                // Update step indicators
+                for (let i = 1; i <= 6; i++) {
+                    const stepEl = document.getElementById(`step${i}`);
+                    if (i < step) {
+                        stepEl.classList.add('step-active');
+                    } else if (i === step) {
+                        stepEl.classList.remove('step-active');
+                    } else {
+                        stepEl.classList.remove('step-active');
                     }
                 }
-                
-                return null;
             }
             
-            transformValue(value, type) {
-                if (value === null || value === undefined || value === '') {
-                    return null;
-                }
+            updateStepStatus(step, status) {
+                const stepEl = document.getElementById(`step${step}`);
+                const badge = stepEl.querySelector('.status-badge');
                 
-                switch (type) {
-                    case 'numeric':
-                        const num = parseFloat(value);
-                        return isNaN(num) ? null : num;
-                    
-                    case 'categorical':
-                        const str = String(value).trim().toUpperCase();
-                        return ['L', 'M', 'H'].includes(str) ? str : null;
-                    
-                    case 'binary':
-                        if (typeof value === 'boolean') return value ? 1 : 0;
-                        const numVal = parseInt(value);
-                        if (!isNaN(numVal)) return numVal === 1 ? 1 : 0;
-                        const strVal = String(value).toLowerCase().trim();
-                        return strVal === 'true' || strVal === 'yes' || strVal === '1' ? 1 : 0;
-                    
-                    default:
-                        return value;
+                badge.textContent = status === 'complete' ? 'Complete' : 'Pending';
+                badge.className = `status-badge status-${status}`;
+                
+                if (status === 'complete' && step < 6) {
+                    this.updatePipelineStep(step + 1);
                 }
+            }
+            
+            showLoading(message) {
+                document.getElementById('loading-text').textContent = message;
+                document.getElementById('loading').style.display = 'block';
+            }
+            
+            hideLoading() {
+                document.getElementById('loading').style.display = 'none';
             }
         }
 
-        // Include all other helper functions from the previous implementation
-        // [All the remaining JavaScript code for UI interactions, charts, etc.]
+        // Initialize the application when the page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            new UIController();
+        });
     </script>
 </body>
 </html>
