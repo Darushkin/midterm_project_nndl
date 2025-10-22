@@ -31,7 +31,7 @@
         }
         
         .container {
-            max-width: 1200px;
+            max-width: 1400px;
             margin: 0 auto;
             padding: 20px;
         }
@@ -271,6 +271,7 @@
             display: flex;
             margin-bottom: 20px;
             border-bottom: 1px solid #ddd;
+            flex-wrap: wrap;
         }
         
         .tab {
@@ -398,6 +399,7 @@
             display: flex;
             justify-content: space-between;
             margin-bottom: 20px;
+            flex-wrap: wrap;
         }
         
         .pipeline-step {
@@ -408,6 +410,8 @@
             border-radius: 10px;
             margin: 0 10px;
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+            min-width: 150px;
+            margin-bottom: 10px;
         }
         
         .step-number {
@@ -469,13 +473,86 @@
             background: rgba(231, 76, 60, 0.2);
             color: var(--danger);
         }
+        
+        .dataset-info {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin-top: 20px;
+        }
+        
+        .info-card {
+            background: var(--light);
+            padding: 15px;
+            border-radius: 5px;
+            text-align: center;
+        }
+        
+        .info-value {
+            font-size: 1.5rem;
+            font-weight: bold;
+            margin: 5px 0;
+        }
+        
+        .info-label {
+            font-size: 0.9rem;
+            color: #7f8c8d;
+        }
+        
+        .stats-table {
+            width: 100%;
+            margin-top: 15px;
+        }
+        
+        .stats-table th, .stats-table td {
+            padding: 8px;
+            text-align: center;
+        }
+        
+        .correlation-matrix {
+            width: 100%;
+            margin-top: 15px;
+        }
+        
+        .correlation-matrix th, .correlation-matrix td {
+            padding: 8px;
+            text-align: center;
+        }
+        
+        .high-correlation {
+            background-color: rgba(231, 76, 60, 0.2);
+        }
+        
+        .medium-correlation {
+            background-color: rgba(243, 156, 18, 0.2);
+        }
+        
+        .low-correlation {
+            background-color: rgba(46, 204, 113, 0.2);
+        }
+        
+        .chart-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            margin-top: 20px;
+        }
+        
+        .chart-item {
+            flex: 1;
+            min-width: 300px;
+        }
+        
+        .chart-item-full {
+            flex: 100%;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <header>
             <h1>Machine Failure Prediction System</h1>
-            <p class="subtitle">Complete ML Pipeline with Data Preprocessing, EDA, and Model Training</p>
+            <p class="subtitle">Complete ML Pipeline with CSV Upload and Enhanced EDA</p>
         </header>
         
         <div class="ml-pipeline">
@@ -483,30 +560,36 @@
             <div class="pipeline-steps">
                 <div class="pipeline-step step-active" id="step1">
                     <div class="step-number">1</div>
-                    <h3>Data Loading</h3>
-                    <p>Load and preview dataset</p>
-                    <div class="status-badge status-complete">Complete</div>
+                    <h3>Data Upload</h3>
+                    <p>Upload and preview CSV data</p>
+                    <div class="status-badge status-pending">Pending</div>
                 </div>
                 <div class="pipeline-step" id="step2">
                     <div class="step-number">2</div>
-                    <h3>Preprocessing</h3>
-                    <p>Clean and prepare data</p>
+                    <h3>Dataset Info</h3>
+                    <p>Explore dataset characteristics</p>
                     <div class="status-badge status-pending">Pending</div>
                 </div>
                 <div class="pipeline-step" id="step3">
                     <div class="step-number">3</div>
                     <h3>EDA</h3>
-                    <p>Explore data patterns</p>
+                    <p>Exploratory Data Analysis</p>
                     <div class="status-badge status-pending">Pending</div>
                 </div>
                 <div class="pipeline-step" id="step4">
                     <div class="step-number">4</div>
-                    <h3>Model Training</h3>
-                    <p>Train neural network</p>
+                    <h3>Preprocessing</h3>
+                    <p>Prepare data for modeling</p>
                     <div class="status-badge status-pending">Pending</div>
                 </div>
                 <div class="pipeline-step" id="step5">
                     <div class="step-number">5</div>
+                    <h3>Model Training</h3>
+                    <p>Train neural network</p>
+                    <div class="status-badge status-pending">Pending</div>
+                </div>
+                <div class="pipeline-step" id="step6">
+                    <div class="step-number">6</div>
                     <h3>Evaluation</h3>
                     <p>Test model performance</p>
                     <div class="status-badge status-pending">Pending</div>
@@ -515,27 +598,40 @@
             
             <div class="card">
                 <div class="tabs">
-                    <div class="tab active" data-tab="data-preview">Data Preview</div>
-                    <div class="tab" data-tab="preprocessing">Preprocessing</div>
+                    <div class="tab active" data-tab="data-upload">Data Upload</div>
+                    <div class="tab" data-tab="dataset-info">Dataset Info</div>
                     <div class="tab" data-tab="eda">EDA</div>
+                    <div class="tab" data-tab="preprocessing">Preprocessing</div>
                     <div class="tab" data-tab="training">Model Training</div>
                     <div class="tab" data-tab="evaluation">Evaluation</div>
                 </div>
                 
-                <div class="tab-content active" id="data-preview">
-                    <h3>Dataset Preview</h3>
-                    <p>Sample of the machine failure dataset with 10,000 records</p>
-                    <div class="data-preview">
+                <div class="tab-content active" id="data-upload">
+                    <h3>Upload Your Dataset</h3>
+                    <p>Upload a CSV file containing machine data with the following columns: UDI, Product ID, Type, Air temperature [K], Process temperature [K], Rotational speed [rpm], Torque [Nm], Tool wear [min], Machine failure</p>
+                    
+                    <div class="file-upload" id="file-upload-area">
+                        <p>Drag & drop your CSV file here or click to browse</p>
+                        <input type="file" id="file-input" accept=".csv" style="display: none;">
+                        <button type="button" class="btn btn-success" id="upload-btn">Choose File</button>
+                    </div>
+                    
+                    <div id="upload-status" style="margin-top: 15px;"></div>
+                    
+                    <div class="data-preview" id="data-preview" style="display: none;">
+                        <h4>Data Preview (First 10 rows)</h4>
                         <table id="data-table">
                             <thead>
                                 <tr>
+                                    <th>UDI</th>
+                                    <th>Product ID</th>
                                     <th>Type</th>
-                                    <th>Air Temp</th>
-                                    <th>Process Temp</th>
-                                    <th>RPM</th>
-                                    <th>Torque</th>
-                                    <th>Tool Wear</th>
-                                    <th>Failure</th>
+                                    <th>Air Temp [K]</th>
+                                    <th>Process Temp [K]</th>
+                                    <th>Rotational Speed [rpm]</th>
+                                    <th>Torque [Nm]</th>
+                                    <th>Tool Wear [min]</th>
+                                    <th>Machine Failure</th>
                                 </tr>
                             </thead>
                             <tbody id="data-table-body">
@@ -543,87 +639,68 @@
                             </tbody>
                         </table>
                     </div>
-                    <button class="btn btn-warning" id="preprocess-btn" style="margin-top: 15px;">Start Preprocessing</button>
+                    
+                    <button class="btn btn-warning" id="analyze-btn" style="margin-top: 15px; display: none;">Analyze Dataset</button>
                 </div>
                 
-                <div class="tab-content" id="preprocessing">
-                    <h3>Data Preprocessing</h3>
-                    <p>Steps performed to prepare the data for modeling:</p>
-                    <ul style="margin: 15px 0 15px 20px;">
-                        <li>Handled missing values (if any)</li>
-                        <li>Encoded categorical variables (Product Type)</li>
-                        <li>Normalized numerical features</li>
-                        <li>Split dataset into training and testing sets</li>
-                        <li>Balanced classes using SMOTE (if needed)</li>
-                    </ul>
-                    <div class="chart-container">
-                        <canvas id="preprocessing-chart"></canvas>
+                <div class="tab-content" id="dataset-info">
+                    <h3>Dataset Information</h3>
+                    <div id="dataset-summary">
+                        <p>Please upload a dataset to see information</p>
                     </div>
-                    <button class="btn btn-warning" id="eda-btn" style="margin-top: 15px;">Perform EDA</button>
+                    
+                    <div class="dataset-info" id="dataset-stats" style="display: none;">
+                        <div class="info-card">
+                            <div class="info-label">Total Records</div>
+                            <div class="info-value" id="total-records">0</div>
+                        </div>
+                        <div class="info-card">
+                            <div class="info-label">Features</div>
+                            <div class="info-value" id="total-features">0</div>
+                        </div>
+                        <div class="info-card">
+                            <div class="info-label">Failure Rate</div>
+                            <div class="info-value" id="failure-rate">0%</div>
+                        </div>
+                    </div>
+                    
+                    <button class="btn btn-warning" id="eda-btn" style="margin-top: 15px; display: none;">Perform EDA</button>
                 </div>
                 
                 <div class="tab-content" id="eda">
                     <h3>Exploratory Data Analysis</h3>
-                    <p>Key insights from the dataset:</p>
-                    <div class="chart-container">
-                        <canvas id="eda-chart"></canvas>
+                    <div id="eda-content">
+                        <p>Please analyze the dataset first to see EDA results</p>
                     </div>
-                    <button class="btn btn-warning" id="train-btn" style="margin-top: 15px;">Train Model</button>
+                    
+                    <button class="btn btn-warning" id="preprocess-btn" style="margin-top: 15px; display: none;">Preprocess Data</button>
+                </div>
+                
+                <div class="tab-content" id="preprocessing">
+                    <h3>Data Preprocessing</h3>
+                    <div id="preprocessing-content">
+                        <p>Please complete EDA first to preprocess data</p>
+                    </div>
+                    
+                    <button class="btn btn-warning" id="train-btn" style="margin-top: 15px; display: none;">Train Model</button>
                 </div>
                 
                 <div class="tab-content" id="training">
                     <h3>Model Training</h3>
-                    <p>Neural Network Architecture:</p>
-                    <ul style="margin: 15px 0 15px 20px;">
-                        <li>Input Layer: 6 neurons (normalized features)</li>
-                        <li>Hidden Layer 1: 64 neurons with ReLU activation</li>
-                        <li>Hidden Layer 2: 32 neurons with ReLU activation</li>
-                        <li>Output Layer: 1 neuron with Sigmoid activation</li>
-                    </ul>
-                    <div class="chart-container">
-                        <canvas id="training-chart"></canvas>
+                    <div id="training-content">
+                        <p>Please preprocess data first to train the model</p>
                     </div>
-                    <button class="btn btn-warning" id="evaluate-btn" style="margin-top: 15px;">Evaluate Model</button>
+                    
+                    <button class="btn btn-warning" id="evaluate-btn" style="margin-top: 15px; display: none;">Evaluate Model</button>
                 </div>
                 
                 <div class="tab-content" id="evaluation">
                     <h3>Model Evaluation</h3>
-                    <p>Performance metrics on test dataset:</p>
-                    <div class="metrics-grid">
-                        <div class="metric">
-                            <div class="metric-label">Accuracy</div>
-                            <div class="metric-value" id="accuracy">0%</div>
-                        </div>
-                        <div class="metric">
-                            <div class="metric-label">Precision</div>
-                            <div class="metric-value" id="precision">0%</div>
-                        </div>
-                        <div class="metric">
-                            <div class="metric-label">Recall</div>
-                            <div class="metric-value" id="recall">0%</div>
-                        </div>
-                        <div class="metric">
-                            <div class="metric-label">F1-Score</div>
-                            <div class="metric-value" id="f1-score">0%</div>
-                        </div>
+                    <div id="evaluation-content">
+                        <p>Please train the model first to see evaluation results</p>
                     </div>
                     
-                    <h3 style="margin-top: 30px;">Confusion Matrix</h3>
-                    <div class="confusion-matrix">
-                        <div class="matrix-cell matrix-header"></div>
-                        <div class="matrix-cell matrix-header">Predicted: Failure</div>
-                        <div class="matrix-cell matrix-header">Predicted: Normal</div>
-                        
-                        <div class="matrix-cell matrix-header">Actual: Failure</div>
-                        <div class="matrix-cell true-positive" id="true-positive">0</div>
-                        <div class="matrix-cell false-negative" id="false-negative">0</div>
-                        
-                        <div class="matrix-cell matrix-header">Actual: Normal</div>
-                        <div class="matrix-cell false-positive" id="false-positive">0</div>
-                        <div class="matrix-cell true-negative" id="true-negative">0</div>
-                    </div>
-                    
-                    <button class="btn btn-success" id="prediction-ready-btn" style="margin-top: 15px;">Ready for Predictions</button>
+                    <button class="btn btn-success" id="prediction-ready-btn" style="margin-top: 15px; display: none;">Ready for Predictions</button>
                 </div>
             </div>
         </div>
@@ -670,12 +747,6 @@
                     <button type="submit" class="btn" id="predict-btn" disabled>Predict Failure Risk</button>
                     <button type="button" class="btn btn-danger" id="reset-btn">Reset Form</button>
                 </form>
-                
-                <div class="file-upload" id="file-upload-area">
-                    <p>Or upload CSV file for batch predictions</p>
-                    <input type="file" id="file-input" accept=".csv" style="display: none;">
-                    <button type="button" class="btn btn-success" id="upload-btn" disabled>Choose File</button>
-                </div>
             </div>
             
             <div class="card">
@@ -782,7 +853,7 @@
         </div>
         
         <footer>
-            <p>Machine Failure Prediction System &copy; 2023 | Complete ML Pipeline Implementation</p>
+            <p>Machine Failure Prediction System &copy; 2023 | Complete ML Pipeline with CSV Upload</p>
         </footer>
     </div>
 
@@ -930,6 +1001,7 @@
         // Dataset and ML Pipeline
         class MLPipeline {
             constructor() {
+                this.rawData = [];
                 this.dataset = [];
                 this.processedData = [];
                 this.trainData = [];
@@ -943,62 +1015,178 @@
                     f1: 0,
                     confusionMatrix: [0, 0, 0, 0] // TP, FP, FN, TN
                 };
+                this.numericStats = {};
+                this.categoricalStats = {};
+                this.correlationMatrix = [];
             }
             
-            // Generate synthetic dataset for demonstration
-            generateDataset(size = 1000) {
-                const dataset = [];
-                const failureTypes = ['L', 'M', 'H'];
+            // Load data from CSV
+            loadData(csvData) {
+                this.rawData = csvData;
+                this.dataset = csvData.map(row => {
+                    return {
+                        UDI: row.UDI,
+                        ProductID: row['Product ID'],
+                        Type: row.Type,
+                        AirTemp: parseFloat(row['Air temperature [K]']),
+                        ProcessTemp: parseFloat(row['Process temperature [K]']),
+                        RotationalSpeed: parseFloat(row['Rotational speed [rpm]']),
+                        Torque: parseFloat(row['Torque [Nm]']),
+                        ToolWear: parseFloat(row['Tool wear [min]']),
+                        Failure: parseInt(row['Machine failure'])
+                    };
+                });
                 
-                for (let i = 0; i < size; i++) {
-                    const type = failureTypes[Math.floor(Math.random() * failureTypes.length)];
-                    const airTemp = 295 + Math.random() * 10;
-                    const processTemp = 305 + Math.random() * 10;
-                    const rpm = 1168 + Math.random() * 1718;
-                    const torque = 3.8 + Math.random() * 72.8;
-                    const toolWear = Math.random() * 253;
-                    
-                    // Calculate failure probability based on parameters
-                    let failureProb = 0;
-                    failureProb += (type === 'H') ? 0.3 : (type === 'M') ? 0.15 : 0.05;
-                    failureProb += (toolWear > 200) ? 0.3 : (toolWear > 150) ? 0.2 : (toolWear > 100) ? 0.1 : 0;
-                    failureProb += (torque > 60) ? 0.2 : (torque > 40) ? 0.1 : 0;
-                    failureProb += (rpm > 2500) ? 0.15 : (rpm > 2000) ? 0.1 : 0;
-                    failureProb += (processTemp > 312) ? 0.1 : 0;
-                    
-                    // Add some randomness
-                    failureProb += (Math.random() - 0.5) * 0.2;
-                    failureProb = Math.max(0, Math.min(1, failureProb));
-                    
-                    const failure = failureProb > 0.5 ? 1 : 0;
-                    
-                    dataset.push({
-                        type,
-                        airTemp,
-                        processTemp,
-                        rpm,
-                        torque,
-                        toolWear,
-                        failure
-                    });
+                return this.dataset;
+            }
+            
+            // Get dataset information
+            getDatasetInfo() {
+                const totalRecords = this.dataset.length;
+                const failureCount = this.dataset.filter(d => d.Failure === 1).length;
+                const failureRate = (failureCount / totalRecords * 100).toFixed(2);
+                
+                return {
+                    totalRecords,
+                    failureCount,
+                    failureRate,
+                    features: 6 // Type, AirTemp, ProcessTemp, RotationalSpeed, Torque, ToolWear
+                };
+            }
+            
+            // Perform EDA
+            performEDA() {
+                // Calculate numeric statistics
+                const numericFeatures = ['AirTemp', 'ProcessTemp', 'RotationalSpeed', 'Torque', 'ToolWear'];
+                this.numericStats = {};
+                
+                numericFeatures.forEach(feature => {
+                    const values = this.dataset.map(d => d[feature]);
+                    this.numericStats[feature] = {
+                        count: values.length,
+                        mean: values.reduce((a, b) => a + b, 0) / values.length,
+                        std: Math.sqrt(values.reduce((sq, n) => sq + Math.pow(n - values.reduce((a, b) => a + b, 0) / values.length, 2), 0) / values.length),
+                        min: Math.min(...values),
+                        '25%': this.percentile(values, 25),
+                        '50%': this.percentile(values, 50),
+                        '75%': this.percentile(values, 75),
+                        max: Math.max(...values)
+                    };
+                });
+                
+                // Calculate categorical statistics
+                const typeCounts = {};
+                this.dataset.forEach(d => {
+                    typeCounts[d.Type] = (typeCounts[d.Type] || 0) + 1;
+                });
+                
+                this.categoricalStats = {
+                    Type: typeCounts
+                };
+                
+                // Calculate correlation matrix
+                this.calculateCorrelationMatrix();
+                
+                return {
+                    numericStats: this.numericStats,
+                    categoricalStats: this.categoricalStats,
+                    correlationMatrix: this.correlationMatrix
+                };
+            }
+            
+            // Calculate percentile
+            percentile(arr, p) {
+                const sorted = [...arr].sort((a, b) => a - b);
+                const index = (p / 100) * (sorted.length - 1);
+                const lower = Math.floor(index);
+                const upper = lower + 1;
+                const weight = index - lower;
+                
+                if (upper >= sorted.length) return sorted[lower];
+                return sorted[lower] * (1 - weight) + sorted[upper] * weight;
+            }
+            
+            // Calculate correlation matrix
+            calculateCorrelationMatrix() {
+                const numericFeatures = ['AirTemp', 'ProcessTemp', 'RotationalSpeed', 'Torque', 'ToolWear', 'Failure'];
+                this.correlationMatrix = [];
+                
+                // Initialize matrix
+                for (let i = 0; i < numericFeatures.length; i++) {
+                    this.correlationMatrix[i] = [];
+                    for (let j = 0; j < numericFeatures.length; j++) {
+                        this.correlationMatrix[i][j] = 0;
+                    }
                 }
                 
-                this.dataset = dataset;
-                return dataset;
+                // Calculate correlations
+                for (let i = 0; i < numericFeatures.length; i++) {
+                    for (let j = i; j < numericFeatures.length; j++) {
+                        const feature1 = numericFeatures[i];
+                        const feature2 = numericFeatures[j];
+                        
+                        const values1 = this.dataset.map(d => d[feature1]);
+                        const values2 = this.dataset.map(d => d[feature2]);
+                        
+                        const correlation = this.calculateCorrelation(values1, values2);
+                        this.correlationMatrix[i][j] = correlation;
+                        this.correlationMatrix[j][i] = correlation;
+                    }
+                }
+                
+                return this.correlationMatrix;
+            }
+            
+            // Calculate correlation between two arrays
+            calculateCorrelation(x, y) {
+                const n = x.length;
+                const sum_x = x.reduce((a, b) => a + b, 0);
+                const sum_y = y.reduce((a, b) => a + b, 0);
+                const sum_xy = x.reduce((sum, val, i) => sum + val * y[i], 0);
+                const sum_x2 = x.reduce((sum, val) => sum + val * val, 0);
+                const sum_y2 = y.reduce((sum, val) => sum + val * val, 0);
+                
+                const numerator = n * sum_xy - sum_x * sum_y;
+                const denominator = Math.sqrt((n * sum_x2 - sum_x * sum_x) * (n * sum_y2 - sum_y * sum_y));
+                
+                return denominator === 0 ? 0 : numerator / denominator;
             }
             
             // Preprocess the dataset
             preprocessData() {
-                this.processedData = this.dataset.map(record => {
+                // Split into train and test sets (80/20)
+                const splitIndex = Math.floor(this.dataset.length * 0.8);
+                const trainDataset = this.dataset.slice(0, splitIndex);
+                const testDataset = this.dataset.slice(splitIndex);
+                
+                // Calculate normalization parameters from training data only
+                const numericFeatures = ['AirTemp', 'ProcessTemp', 'RotationalSpeed', 'Torque', 'ToolWear'];
+                const normalizationParams = {};
+                
+                numericFeatures.forEach(feature => {
+                    const values = trainDataset.map(d => d[feature]);
+                    normalizationParams[feature] = {
+                        min: Math.min(...values),
+                        max: Math.max(...values)
+                    };
+                });
+                
+                // Process training data
+                this.trainData = trainDataset.map(record => {
                     // Convert categorical to numerical
-                    const typeValue = record.type === 'L' ? 0 : record.type === 'M' ? 0.5 : 1;
+                    const typeValue = record.Type === 'L' ? 0 : record.Type === 'M' ? 0.5 : 1;
                     
                     // Normalize numerical features to [0, 1]
-                    const normalizedAirTemp = (record.airTemp - 295) / 10;
-                    const normalizedProcessTemp = (record.processTemp - 305) / 10;
-                    const normalizedRpm = (record.rpm - 1168) / 1718;
-                    const normalizedTorque = (record.torque - 3.8) / 72.8;
-                    const normalizedToolWear = record.toolWear / 253;
+                    const normalizedAirTemp = (record.AirTemp - normalizationParams.AirTemp.min) / 
+                                            (normalizationParams.AirTemp.max - normalizationParams.AirTemp.min);
+                    const normalizedProcessTemp = (record.ProcessTemp - normalizationParams.ProcessTemp.min) / 
+                                                (normalizationParams.ProcessTemp.max - normalizationParams.ProcessTemp.min);
+                    const normalizedRpm = (record.RotationalSpeed - normalizationParams.RotationalSpeed.min) / 
+                                        (normalizationParams.RotationalSpeed.max - normalizationParams.RotationalSpeed.min);
+                    const normalizedTorque = (record.Torque - normalizationParams.Torque.min) / 
+                                            (normalizationParams.Torque.max - normalizationParams.Torque.min);
+                    const normalizedToolWear = (record.ToolWear - normalizationParams.ToolWear.min) / 
+                                            (normalizationParams.ToolWear.max - normalizationParams.ToolWear.min);
                     
                     return {
                         features: [
@@ -1009,24 +1197,55 @@
                             normalizedTorque,
                             normalizedToolWear
                         ],
-                        target: record.failure
+                        target: record.Failure
                     };
                 });
                 
-                // Split into train and test sets (80/20)
-                const splitIndex = Math.floor(this.processedData.length * 0.8);
-                this.trainData = this.processedData.slice(0, splitIndex);
-                this.testData = this.processedData.slice(splitIndex);
+                // Process test data using same normalization parameters
+                this.testData = testDataset.map(record => {
+                    // Convert categorical to numerical
+                    const typeValue = record.Type === 'L' ? 0 : record.Type === 'M' ? 0.5 : 1;
+                    
+                    // Normalize numerical features to [0, 1] using training params
+                    const normalizedAirTemp = (record.AirTemp - normalizationParams.AirTemp.min) / 
+                                            (normalizationParams.AirTemp.max - normalizationParams.AirTemp.min);
+                    const normalizedProcessTemp = (record.ProcessTemp - normalizationParams.ProcessTemp.min) / 
+                                                (normalizationParams.ProcessTemp.max - normalizationParams.ProcessTemp.min);
+                    const normalizedRpm = (record.RotationalSpeed - normalizationParams.RotationalSpeed.min) / 
+                                        (normalizationParams.RotationalSpeed.max - normalizationParams.RotationalSpeed.min);
+                    const normalizedTorque = (record.Torque - normalizationParams.Torque.min) / 
+                                            (normalizationParams.Torque.max - normalizationParams.Torque.min);
+                    const normalizedToolWear = (record.ToolWear - normalizationParams.ToolWear.min) / 
+                                            (normalizationParams.ToolWear.max - normalizationParams.ToolWear.min);
+                    
+                    return {
+                        features: [
+                            typeValue,
+                            normalizedAirTemp,
+                            normalizedProcessTemp,
+                            normalizedRpm,
+                            normalizedTorque,
+                            normalizedToolWear
+                        ],
+                        target: record.Failure
+                    };
+                });
                 
-                return this.processedData;
+                this.processedData = [...this.trainData, ...this.testData];
+                
+                return {
+                    trainData: this.trainData,
+                    testData: this.testData,
+                    normalizationParams
+                };
             }
             
             // Calculate feature importance (simplified version)
             calculateFeatureImportance() {
                 // In a real implementation, this would use techniques like permutation importance
-                // For this demo, we'll use a simplified approach based on correlation
+                // For this demo, we'll use a simplified approach based on correlation with target
                 const correlations = [0, 0, 0, 0, 0, 0];
-                const featureNames = ['Type', 'Air Temp', 'Process Temp', 'RPM', 'Torque', 'Tool Wear'];
+                const featureNames = ['Type', 'AirTemp', 'ProcessTemp', 'RotationalSpeed', 'Torque', 'ToolWear'];
                 
                 this.processedData.forEach(record => {
                     for (let i = 0; i < 6; i++) {
@@ -1036,8 +1255,8 @@
                 });
                 
                 // Normalize to percentages
-                const maxCorrelation = Math.max(...correlations);
-                this.featureImportance = correlations.map(c => (c / maxCorrelation) * 100);
+                const maxCorrelation = Math.max(...correlations.map(Math.abs));
+                this.featureImportance = correlations.map(c => (Math.abs(c) / maxCorrelation) * 100);
                 
                 return this.featureImportance;
             }
@@ -1106,8 +1325,11 @@
             predict(features) {
                 if (!this.model) return null;
                 
-                // Normalize the input features
+                // Normalize the input features using the same parameters as training
+                // In a real implementation, we would save and reuse the normalization params
                 const typeValue = features[0] === 'L' ? 0 : features[0] === 'M' ? 0.5 : 1;
+                
+                // Use approximate normalization based on expected ranges
                 const normalizedAirTemp = (features[1] - 295) / 10;
                 const normalizedProcessTemp = (features[2] - 305) / 10;
                 const normalizedRpm = (features[3] - 1168) / 1718;
@@ -1139,6 +1361,7 @@
             const fileUploadArea = document.getElementById('file-upload-area');
             const fileInput = document.getElementById('file-input');
             const uploadBtn = document.getElementById('upload-btn');
+            const uploadStatus = document.getElementById('upload-status');
             const gaugeNeedle = document.getElementById('gauge-needle');
             const predictionValue = document.getElementById('prediction-value');
             const riskLevel = document.getElementById('risk-level');
@@ -1148,8 +1371,9 @@
             const loadingText = document.getElementById('loading-text');
             
             // Pipeline buttons
-            const preprocessBtn = document.getElementById('preprocess-btn');
+            const analyzeBtn = document.getElementById('analyze-btn');
             const edaBtn = document.getElementById('eda-btn');
+            const preprocessBtn = document.getElementById('preprocess-btn');
             const trainBtn = document.getElementById('train-btn');
             const evaluateBtn = document.getElementById('evaluate-btn');
             const predictionReadyBtn = document.getElementById('prediction-ready-btn');
@@ -1243,114 +1467,62 @@
                 }
             });
             
-            const preprocessingCtx = document.getElementById('preprocessing-chart').getContext('2d');
-            const preprocessingChart = new Chart(preprocessingCtx, {
-                type: 'doughnut',
-                data: {
-                    labels: ['Training Data', 'Testing Data'],
-                    datasets: [{
-                        data: [0, 0],
-                        backgroundColor: [
-                            'rgba(52, 152, 219, 0.7)',
-                            'rgba(46, 204, 113, 0.7)'
-                        ],
-                        borderColor: [
-                            'rgb(52, 152, 219)',
-                            'rgb(46, 204, 113)'
-                        ],
-                        borderWidth: 1
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            position: 'bottom'
-                        }
-                    }
-                }
+            // File upload handling
+            uploadBtn.addEventListener('click', function() {
+                fileInput.click();
             });
             
-            const edaCtx = document.getElementById('eda-chart').getContext('2d');
-            const edaChart = new Chart(edaCtx, {
-                type: 'bar',
-                data: {
-                    labels: ['Low', 'Medium', 'High'],
-                    datasets: [{
-                        label: 'Failure Rate by Product Type',
-                        data: [0, 0, 0],
-                        backgroundColor: 'rgba(231, 76, 60, 0.7)',
-                        borderColor: 'rgb(231, 76, 60)',
-                        borderWidth: 1
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    scales: {
-                        y: {
-                            beginAtZero: true,
-                            max: 100,
-                            ticks: {
-                                callback: function(value) {
-                                    return value + '%';
-                                }
-                            }
-                        }
-                    }
-                }
-            });
-            
-            const trainingCtx = document.getElementById('training-chart').getContext('2d');
-            const trainingChart = new Chart(trainingCtx, {
-                type: 'line',
-                data: {
-                    labels: [],
-                    datasets: [{
-                        label: 'Training Loss',
-                        data: [],
-                        borderColor: 'rgb(52, 152, 219)',
-                        backgroundColor: 'rgba(52, 152, 219, 0.1)',
-                        tension: 0.4,
-                        fill: true
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    scales: {
-                        y: {
-                            beginAtZero: true,
-                            title: {
-                                display: true,
-                                text: 'Loss'
-                            }
-                        },
-                        x: {
-                            title: {
-                                display: true,
-                                text: 'Epoch'
-                            }
-                        }
-                    }
-                }
-            });
-            
-            // Initialize the application
-            function initApp() {
-                // Generate and display sample data
-                loadingText.textContent = "Generating dataset...";
-                loading.style.display = 'block';
-                
-                setTimeout(() => {
-                    const dataset = mlPipeline.generateDataset(1000);
-                    displayDataPreview(dataset.slice(0, 10));
+            fileInput.addEventListener('change', function(e) {
+                if (e.target.files.length > 0) {
+                    const file = e.target.files[0];
+                    const fileName = file.name;
                     
-                    loading.style.display = 'none';
-                    updatePipelineStep(1, 'complete');
-                }, 1000);
-            }
+                    loadingText.textContent = "Loading CSV file...";
+                    loading.style.display = 'block';
+                    
+                    Papa.parse(file, {
+                        header: true,
+                        dynamicTyping: true,
+                        complete: function(results) {
+                            loading.style.display = 'none';
+                            
+                            if (results.errors.length > 0) {
+                                uploadStatus.innerHTML = `<p style="color: var(--danger)">Error parsing CSV: ${results.errors[0].message}</p>`;
+                                return;
+                            }
+                            
+                            // Check if required columns are present
+                            const requiredColumns = ['UDI', 'Product ID', 'Type', 'Air temperature [K]', 
+                                                   'Process temperature [K]', 'Rotational speed [rpm]', 
+                                                   'Torque [Nm]', 'Tool wear [min]', 'Machine failure'];
+                            const missingColumns = requiredColumns.filter(col => !results.meta.fields.includes(col));
+                            
+                            if (missingColumns.length > 0) {
+                                uploadStatus.innerHTML = `<p style="color: var(--danger)">Missing required columns: ${missingColumns.join(', ')}</p>`;
+                                return;
+                            }
+                            
+                            // Load data into pipeline
+                            mlPipeline.loadData(results.data);
+                            
+                            // Update UI
+                            uploadStatus.innerHTML = `<p style="color: var(--success)">Successfully loaded ${results.data.length} records from ${fileName}</p>`;
+                            fileUploadArea.innerHTML = `<p>File loaded: ${fileName}</p>`;
+                            
+                            // Show data preview
+                            displayDataPreview(results.data.slice(0, 10));
+                            document.getElementById('data-preview').style.display = 'block';
+                            analyzeBtn.style.display = 'inline-block';
+                            
+                            updatePipelineStep(1, 'complete');
+                        },
+                        error: function(error) {
+                            loading.style.display = 'none';
+                            uploadStatus.innerHTML = `<p style="color: var(--danger)">Error reading file: ${error.message}</p>`;
+                        }
+                    });
+                }
+            });
             
             // Display data in the preview table
             function displayDataPreview(data) {
@@ -1360,98 +1532,60 @@
                 data.forEach(record => {
                     const row = document.createElement('tr');
                     row.innerHTML = `
-                        <td>${record.type}</td>
-                        <td>${record.airTemp.toFixed(1)}</td>
-                        <td>${record.processTemp.toFixed(1)}</td>
-                        <td>${Math.round(record.rpm)}</td>
-                        <td>${record.torque.toFixed(1)}</td>
-                        <td>${Math.round(record.toolWear)}</td>
-                        <td>${record.failure ? 'Yes' : 'No'}</td>
+                        <td>${record.UDI}</td>
+                        <td>${record['Product ID']}</td>
+                        <td>${record.Type}</td>
+                        <td>${record['Air temperature [K]']}</td>
+                        <td>${record['Process temperature [K]']}</td>
+                        <td>${record['Rotational speed [rpm]']}</td>
+                        <td>${record['Torque [Nm]']}</td>
+                        <td>${record['Tool wear [min]']}</td>
+                        <td>${record['Machine failure']}</td>
                     `;
                     tableBody.appendChild(row);
                 });
             }
             
-            // Update pipeline step status
-            function updatePipelineStep(stepNumber, status) {
-                const step = document.getElementById(`step${stepNumber}`);
-                const badge = step.querySelector('.status-badge');
-                
-                step.classList.remove('step-active');
-                badge.className = 'status-badge';
-                
-                if (status === 'complete') {
-                    badge.classList.add('status-complete');
-                    badge.textContent = 'Complete';
-                    
-                    // Activate next step if available
-                    if (stepNumber < 5) {
-                        document.getElementById(`step${stepNumber + 1}`).classList.add('step-active');
-                    }
-                } else if (status === 'pending') {
-                    badge.classList.add('status-pending');
-                    badge.textContent = 'Pending';
-                } else if (status === 'error') {
-                    badge.classList.add('status-error');
-                    badge.textContent = 'Error';
-                }
-            }
-            
-            // Event listeners for pipeline buttons
-            preprocessBtn.addEventListener('click', function() {
-                loadingText.textContent = "Preprocessing data...";
+            // Analyze dataset
+            analyzeBtn.addEventListener('click', function() {
+                loadingText.textContent = "Analyzing dataset...";
                 loading.style.display = 'block';
                 
                 setTimeout(() => {
-                    mlPipeline.preprocessData();
+                    const datasetInfo = mlPipeline.getDatasetInfo();
                     
-                    // Update preprocessing chart
-                    preprocessingChart.data.datasets[0].data = [
-                        mlPipeline.trainData.length,
-                        mlPipeline.testData.length
-                    ];
-                    preprocessingChart.update();
+                    // Update dataset info
+                    document.getElementById('total-records').textContent = datasetInfo.totalRecords;
+                    document.getElementById('total-features').textContent = datasetInfo.features;
+                    document.getElementById('failure-rate').textContent = datasetInfo.failureRate + '%';
                     
+                    document.getElementById('dataset-stats').style.display = 'grid';
+                    document.getElementById('dataset-summary').innerHTML = `
+                        <p>The dataset contains ${datasetInfo.totalRecords} records with ${datasetInfo.features} predictive features. 
+                        The failure rate is ${datasetInfo.failureRate}% (${datasetInfo.failureCount} failures out of ${datasetInfo.totalRecords} records).</p>
+                    `;
+                    
+                    edaBtn.style.display = 'inline-block';
                     loading.style.display = 'none';
                     updatePipelineStep(2, 'complete');
                     
-                    // Switch to preprocessing tab
-                    switchTab('preprocessing');
-                }, 1500);
+                    // Switch to dataset info tab
+                    switchTab('dataset-info');
+                }, 1000);
             });
             
+            // Perform EDA
             edaBtn.addEventListener('click', function() {
                 loadingText.textContent = "Performing exploratory data analysis...";
                 loading.style.display = 'block';
                 
                 setTimeout(() => {
-                    // Calculate failure rates by product type for EDA
-                    const failureRates = {
-                        'L': 0,
-                        'M': 0,
-                        'H': 0
-                    };
-                    const typeCounts = {
-                        'L': 0,
-                        'M': 0,
-                        'H': 0
-                    };
+                    const edaResults = mlPipeline.performEDA();
                     
-                    mlPipeline.dataset.forEach(record => {
-                        typeCounts[record.type]++;
-                        if (record.failure) {
-                            failureRates[record.type]++;
-                        }
-                    });
+                    // Display EDA results
+                    displayEDAResults(edaResults);
                     
-                    // Update EDA chart
-                    edaChart.data.datasets[0].data = [
-                        (failureRates['L'] / typeCounts['L'] * 100).toFixed(1),
-                        (failureRates['M'] / typeCounts['M'] * 100).toFixed(1),
-                        (failureRates['H'] / typeCounts['H'] * 100).toFixed(1)
-                    ];
-                    edaChart.update();
-                    
+                    preprocessBtn.style.display = 'inline-block';
                     loading.style.display = 'none';
                     updatePipelineStep(3, 'complete');
                     
@@ -1460,6 +1594,144 @@
                 }, 1500);
             });
             
+            // Display EDA results
+            function displayEDAResults(edaResults) {
+                const edaContent = document.getElementById('eda-content');
+                
+                // Numeric features statistics
+                let numericHTML = `<h4>Numeric Features Statistics</h4>
+                                <table class="stats-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Feature</th>
+                                            <th>Count</th>
+                                            <th>Mean</th>
+                                            <th>Std</th>
+                                            <th>Min</th>
+                                            <th>25%</th>
+                                            <th>50%</th>
+                                            <th>75%</th>
+                                            <th>Max</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>`;
+                
+                const numericFeatures = ['AirTemp', 'ProcessTemp', 'RotationalSpeed', 'Torque', 'ToolWear'];
+                numericFeatures.forEach(feature => {
+                    const stats = edaResults.numericStats[feature];
+                    numericHTML += `
+                        <tr>
+                            <td>${feature}</td>
+                            <td>${stats.count}</td>
+                            <td>${stats.mean.toFixed(2)}</td>
+                            <td>${stats.std.toFixed(2)}</td>
+                            <td>${stats.min.toFixed(2)}</td>
+                            <td>${stats['25%'].toFixed(2)}</td>
+                            <td>${stats['50%'].toFixed(2)}</td>
+                            <td>${stats['75%'].toFixed(2)}</td>
+                            <td>${stats.max.toFixed(2)}</td>
+                        </tr>
+                    `;
+                });
+                
+                numericHTML += `</tbody></table>`;
+                
+                // Categorical features
+                let categoricalHTML = `<h4>Categorical Features</h4>
+                                    <p>Type distribution:</p>
+                                    <table class="stats-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Type</th>
+                                                <th>Count</th>
+                                                <th>Percentage</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>`;
+                
+                const typeStats = edaResults.categoricalStats.Type;
+                const total = Object.values(typeStats).reduce((a, b) => a + b, 0);
+                
+                for (const [type, count] of Object.entries(typeStats)) {
+                    const percentage = ((count / total) * 100).toFixed(2);
+                    categoricalHTML += `
+                        <tr>
+                            <td>${type}</td>
+                            <td>${count}</td>
+                            <td>${percentage}%</td>
+                        </tr>
+                    `;
+                }
+                
+                categoricalHTML += `</tbody></table>`;
+                
+                // Correlation matrix
+                let correlationHTML = `<h4>Correlation Matrix</h4>
+                                    <table class="correlation-matrix">
+                                        <thead>
+                                            <tr>
+                                                <th></th>
+                                                <th>Air Temp</th>
+                                                <th>Process Temp</th>
+                                                <th>Rotational Speed</th>
+                                                <th>Torque</th>
+                                                <th>Tool Wear</th>
+                                                <th>Failure</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>`;
+                
+                const featureLabels = ['Air Temp', 'Process Temp', 'Rotational Speed', 'Torque', 'Tool Wear', 'Failure'];
+                
+                for (let i = 0; i < edaResults.correlationMatrix.length; i++) {
+                    correlationHTML += `<tr><th>${featureLabels[i]}</th>`;
+                    for (let j = 0; j < edaResults.correlationMatrix[i].length; j++) {
+                        const correlation = edaResults.correlationMatrix[i][j];
+                        let cellClass = '';
+                        
+                        if (Math.abs(correlation) > 0.7) cellClass = 'high-correlation';
+                        else if (Math.abs(correlation) > 0.3) cellClass = 'medium-correlation';
+                        else if (Math.abs(correlation) > 0.1) cellClass = 'low-correlation';
+                        
+                        correlationHTML += `<td class="${cellClass}">${correlation.toFixed(3)}</td>`;
+                    }
+                    correlationHTML += `</tr>`;
+                }
+                
+                correlationHTML += `</tbody></table>`;
+                
+                edaContent.innerHTML = numericHTML + categoricalHTML + correlationHTML;
+            }
+            
+            // Preprocess data
+            preprocessBtn.addEventListener('click', function() {
+                loadingText.textContent = "Preprocessing data...";
+                loading.style.display = 'block';
+                
+                setTimeout(() => {
+                    const preprocessingResults = mlPipeline.preprocessData();
+                    
+                    // Update preprocessing content
+                    document.getElementById('preprocessing-content').innerHTML = `
+                        <p>Data preprocessing completed:</p>
+                        <ul>
+                            <li>Training set: ${preprocessingResults.trainData.length} records</li>
+                            <li>Testing set: ${preprocessingResults.testData.length} records</li>
+                            <li>Categorical variable (Type) encoded as numerical values</li>
+                            <li>Numerical features normalized to [0, 1] range</li>
+                        </ul>
+                    `;
+                    
+                    trainBtn.style.display = 'inline-block';
+                    loading.style.display = 'none';
+                    updatePipelineStep(4, 'complete');
+                    
+                    // Switch to preprocessing tab
+                    switchTab('preprocessing');
+                }, 1500);
+            });
+            
+            // Train model
             trainBtn.addEventListener('click', function() {
                 loadingText.textContent = "Training neural network model...";
                 loading.style.display = 'block';
@@ -1467,19 +1739,61 @@
                 setTimeout(() => {
                     const trainingLoss = mlPipeline.trainModel(50);
                     
-                    // Update training chart
-                    trainingChart.data.labels = Array.from({length: trainingLoss.length}, (_, i) => i + 1);
-                    trainingChart.data.datasets[0].data = trainingLoss;
-                    trainingChart.update();
+                    // Update training content
+                    document.getElementById('training-content').innerHTML = `
+                        <p>Model training completed with ${trainingLoss.length} epochs.</p>
+                        <p>Final training loss: ${trainingLoss[trainingLoss.length - 1].toFixed(6)}</p>
+                        <div class="chart-container">
+                            <canvas id="training-chart"></canvas>
+                        </div>
+                    `;
                     
+                    // Create training loss chart
+                    const trainingCtx = document.getElementById('training-chart').getContext('2d');
+                    new Chart(trainingCtx, {
+                        type: 'line',
+                        data: {
+                            labels: Array.from({length: trainingLoss.length}, (_, i) => i + 1),
+                            datasets: [{
+                                label: 'Training Loss',
+                                data: trainingLoss,
+                                borderColor: 'rgb(52, 152, 219)',
+                                backgroundColor: 'rgba(52, 152, 219, 0.1)',
+                                tension: 0.4,
+                                fill: true
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            scales: {
+                                y: {
+                                    beginAtZero: true,
+                                    title: {
+                                        display: true,
+                                        text: 'Loss'
+                                    }
+                                },
+                                x: {
+                                    title: {
+                                        display: true,
+                                        text: 'Epoch'
+                                    }
+                                }
+                            }
+                        }
+                    });
+                    
+                    evaluateBtn.style.display = 'inline-block';
                     loading.style.display = 'none';
-                    updatePipelineStep(4, 'complete');
+                    updatePipelineStep(5, 'complete');
                     
                     // Switch to training tab
                     switchTab('training');
                 }, 2000);
             });
             
+            // Evaluate model
             evaluateBtn.addEventListener('click', function() {
                 loadingText.textContent = "Evaluating model performance...";
                 loading.style.display = 'block';
@@ -1494,11 +1808,43 @@
                     document.getElementById('recall').textContent = (metrics.recall * 100).toFixed(1) + '%';
                     document.getElementById('f1-score').textContent = (metrics.f1 * 100).toFixed(1) + '%';
                     
-                    // Update confusion matrix
-                    document.getElementById('true-positive').textContent = metrics.confusionMatrix[0];
-                    document.getElementById('false-positive').textContent = metrics.confusionMatrix[1];
-                    document.getElementById('false-negative').textContent = metrics.confusionMatrix[2];
-                    document.getElementById('true-negative').textContent = metrics.confusionMatrix[3];
+                    // Update evaluation content
+                    document.getElementById('evaluation-content').innerHTML = `
+                        <p>Performance metrics on test dataset:</p>
+                        <div class="metrics-grid">
+                            <div class="metric">
+                                <div class="metric-label">Accuracy</div>
+                                <div class="metric-value">${(metrics.accuracy * 100).toFixed(1)}%</div>
+                            </div>
+                            <div class="metric">
+                                <div class="metric-label">Precision</div>
+                                <div class="metric-value">${(metrics.precision * 100).toFixed(1)}%</div>
+                            </div>
+                            <div class="metric">
+                                <div class="metric-label">Recall</div>
+                                <div class="metric-value">${(metrics.recall * 100).toFixed(1)}%</div>
+                            </div>
+                            <div class="metric">
+                                <div class="metric-label">F1-Score</div>
+                                <div class="metric-value">${(metrics.f1 * 100).toFixed(1)}%</div>
+                            </div>
+                        </div>
+                        
+                        <h3 style="margin-top: 30px;">Confusion Matrix</h3>
+                        <div class="confusion-matrix">
+                            <div class="matrix-cell matrix-header"></div>
+                            <div class="matrix-cell matrix-header">Predicted: Failure</div>
+                            <div class="matrix-cell matrix-header">Predicted: Normal</div>
+                            
+                            <div class="matrix-cell matrix-header">Actual: Failure</div>
+                            <div class="matrix-cell true-positive">${metrics.confusionMatrix[0]}</div>
+                            <div class="matrix-cell false-negative">${metrics.confusionMatrix[2]}</div>
+                            
+                            <div class="matrix-cell matrix-header">Actual: Normal</div>
+                            <div class="matrix-cell false-positive">${metrics.confusionMatrix[1]}</div>
+                            <div class="matrix-cell true-negative">${metrics.confusionMatrix[3]}</div>
+                        </div>
+                    `;
                     
                     // Update performance chart
                     performanceChart.data.datasets[0].data = [
@@ -1521,8 +1867,9 @@
                     document.getElementById('recall-display').textContent = (metrics.recall * 100).toFixed(1) + '%';
                     document.getElementById('f1-score-display').textContent = (metrics.f1 * 100).toFixed(1) + '%';
                     
+                    predictionReadyBtn.style.display = 'inline-block';
                     loading.style.display = 'none';
-                    updatePipelineStep(5, 'complete');
+                    updatePipelineStep(6, 'complete');
                     
                     // Switch to evaluation tab
                     switchTab('evaluation');
@@ -1532,11 +1879,35 @@
             predictionReadyBtn.addEventListener('click', function() {
                 // Enable prediction functionality
                 predictBtn.disabled = false;
-                uploadBtn.disabled = false;
                 riskLevel.textContent = 'Model Ready - Enter Parameters';
                 
                 alert('Model is now ready for predictions! You can now use the prediction form.');
             });
+            
+            // Update pipeline step status
+            function updatePipelineStep(stepNumber, status) {
+                const step = document.getElementById(`step${stepNumber}`);
+                const badge = step.querySelector('.status-badge');
+                
+                step.classList.remove('step-active');
+                badge.className = 'status-badge';
+                
+                if (status === 'complete') {
+                    badge.classList.add('status-complete');
+                    badge.textContent = 'Complete';
+                    
+                    // Activate next step if available
+                    if (stepNumber < 6) {
+                        document.getElementById(`step${stepNumber + 1}`).classList.add('step-active');
+                    }
+                } else if (status === 'pending') {
+                    badge.classList.add('status-pending');
+                    badge.textContent = 'Pending';
+                } else if (status === 'error') {
+                    badge.classList.add('status-error');
+                    badge.textContent = 'Error';
+                }
+            }
             
             // Tab switching
             function switchTab(tabId) {
@@ -1584,28 +1955,6 @@
                 updatePredictionUI(0);
             });
             
-            uploadBtn.addEventListener('click', function() {
-                fileInput.click();
-            });
-            
-            fileInput.addEventListener('change', function(e) {
-                if (e.target.files.length > 0) {
-                    const fileName = e.target.files[0].name;
-                    fileUploadArea.innerHTML = `<p>File selected: ${fileName}</p><button type="button" class="btn btn-success" id="process-btn">Process Batch</button>`;
-                    
-                    document.getElementById('process-btn').addEventListener('click', function() {
-                        loading.style.display = 'block';
-                        loadingText.textContent = "Processing batch predictions...";
-                        
-                        // Simulate batch processing
-                        setTimeout(() => {
-                            alert('Batch processing complete! 125 predictions generated.');
-                            loading.style.display = 'none';
-                        }, 2000);
-                    });
-                }
-            });
-            
             // Helper functions
             function updatePredictionUI(prediction) {
                 const percentage = Math.round(prediction * 100);
@@ -1628,9 +1977,6 @@
                     riskLevel.textContent = 'High Risk - Maintenance Recommended';
                 }
             }
-            
-            // Initialize the application
-            initApp();
         });
     </script>
 </body>
