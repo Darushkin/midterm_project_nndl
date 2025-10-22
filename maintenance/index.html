@@ -546,13 +546,22 @@
         .chart-item-full {
             flex: 100%;
         }
+        
+        .eda-section {
+            margin-bottom: 30px;
+        }
+        
+        .eda-section h3 {
+            margin-bottom: 15px;
+            color: var(--primary);
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <header>
             <h1>Machine Failure Prediction System</h1>
-            <p class="subtitle">Complete ML Pipeline with CSV Upload and Enhanced EDA</p>
+            <p class="subtitle">Complete ML Pipeline with CSV Upload and Comprehensive EDA</p>
         </header>
         
         <div class="ml-pipeline">
@@ -561,7 +570,7 @@
                 <div class="pipeline-step step-active" id="step1">
                     <div class="step-number">1</div>
                     <h3>Data Upload</h3>
-                    <p>Upload and preview CSV data</p>
+                    <p>Upload your CSV dataset</p>
                     <div class="status-badge status-pending">Pending</div>
                 </div>
                 <div class="pipeline-step" id="step2">
@@ -1018,6 +1027,7 @@
                 this.numericStats = {};
                 this.categoricalStats = {};
                 this.correlationMatrix = [];
+                this.normalizationParams = {};
             }
             
             // Load data from CSV
@@ -1076,12 +1086,25 @@
                 
                 // Calculate categorical statistics
                 const typeCounts = {};
+                const typeFailures = {};
                 this.dataset.forEach(d => {
                     typeCounts[d.Type] = (typeCounts[d.Type] || 0) + 1;
+                    if (d.Failure === 1) {
+                        typeFailures[d.Type] = (typeFailures[d.Type] || 0) + 1;
+                    }
                 });
                 
+                // Calculate failure rates by type
+                const typeFailureRates = {};
+                for (const type in typeCounts) {
+                    typeFailureRates[type] = ((typeFailures[type] || 0) / typeCounts[type] * 100).toFixed(2);
+                }
+                
                 this.categoricalStats = {
-                    Type: typeCounts
+                    Type: {
+                        counts: typeCounts,
+                        failureRates: typeFailureRates
+                    }
                 };
                 
                 // Calculate correlation matrix
@@ -1161,11 +1184,10 @@
                 
                 // Calculate normalization parameters from training data only
                 const numericFeatures = ['AirTemp', 'ProcessTemp', 'RotationalSpeed', 'Torque', 'ToolWear'];
-                const normalizationParams = {};
                 
                 numericFeatures.forEach(feature => {
                     const values = trainDataset.map(d => d[feature]);
-                    normalizationParams[feature] = {
+                    this.normalizationParams[feature] = {
                         min: Math.min(...values),
                         max: Math.max(...values)
                     };
@@ -1177,16 +1199,16 @@
                     const typeValue = record.Type === 'L' ? 0 : record.Type === 'M' ? 0.5 : 1;
                     
                     // Normalize numerical features to [0, 1]
-                    const normalizedAirTemp = (record.AirTemp - normalizationParams.AirTemp.min) / 
-                                            (normalizationParams.AirTemp.max - normalizationParams.AirTemp.min);
-                    const normalizedProcessTemp = (record.ProcessTemp - normalizationParams.ProcessTemp.min) / 
-                                                (normalizationParams.ProcessTemp.max - normalizationParams.ProcessTemp.min);
-                    const normalizedRpm = (record.RotationalSpeed - normalizationParams.RotationalSpeed.min) / 
-                                        (normalizationParams.RotationalSpeed.max - normalizationParams.RotationalSpeed.min);
-                    const normalizedTorque = (record.Torque - normalizationParams.Torque.min) / 
-                                            (normalizationParams.Torque.max - normalizationParams.Torque.min);
-                    const normalizedToolWear = (record.ToolWear - normalizationParams.ToolWear.min) / 
-                                            (normalizationParams.ToolWear.max - normalizationParams.ToolWear.min);
+                    const normalizedAirTemp = (record.AirTemp - this.normalizationParams.AirTemp.min) / 
+                                            (this.normalizationParams.AirTemp.max - this.normalizationParams.AirTemp.min);
+                    const normalizedProcessTemp = (record.ProcessTemp - this.normalizationParams.ProcessTemp.min) / 
+                                                (this.normalizationParams.ProcessTemp.max - this.normalizationParams.ProcessTemp.min);
+                    const normalizedRpm = (record.RotationalSpeed - this.normalizationParams.RotationalSpeed.min) / 
+                                        (this.normalizationParams.RotationalSpeed.max - this.normalizationParams.RotationalSpeed.min);
+                    const normalizedTorque = (record.Torque - this.normalizationParams.Torque.min) / 
+                                            (this.normalizationParams.Torque.max - this.normalizationParams.Torque.min);
+                    const normalizedToolWear = (record.ToolWear - this.normalizationParams.ToolWear.min) / 
+                                            (this.normalizationParams.ToolWear.max - this.normalizationParams.ToolWear.min);
                     
                     return {
                         features: [
@@ -1207,16 +1229,16 @@
                     const typeValue = record.Type === 'L' ? 0 : record.Type === 'M' ? 0.5 : 1;
                     
                     // Normalize numerical features to [0, 1] using training params
-                    const normalizedAirTemp = (record.AirTemp - normalizationParams.AirTemp.min) / 
-                                            (normalizationParams.AirTemp.max - normalizationParams.AirTemp.min);
-                    const normalizedProcessTemp = (record.ProcessTemp - normalizationParams.ProcessTemp.min) / 
-                                                (normalizationParams.ProcessTemp.max - normalizationParams.ProcessTemp.min);
-                    const normalizedRpm = (record.RotationalSpeed - normalizationParams.RotationalSpeed.min) / 
-                                        (normalizationParams.RotationalSpeed.max - normalizationParams.RotationalSpeed.min);
-                    const normalizedTorque = (record.Torque - normalizationParams.Torque.min) / 
-                                            (normalizationParams.Torque.max - normalizationParams.Torque.min);
-                    const normalizedToolWear = (record.ToolWear - normalizationParams.ToolWear.min) / 
-                                            (normalizationParams.ToolWear.max - normalizationParams.ToolWear.min);
+                    const normalizedAirTemp = (record.AirTemp - this.normalizationParams.AirTemp.min) / 
+                                            (this.normalizationParams.AirTemp.max - this.normalizationParams.AirTemp.min);
+                    const normalizedProcessTemp = (record.ProcessTemp - this.normalizationParams.ProcessTemp.min) / 
+                                                (this.normalizationParams.ProcessTemp.max - this.normalizationParams.ProcessTemp.min);
+                    const normalizedRpm = (record.RotationalSpeed - this.normalizationParams.RotationalSpeed.min) / 
+                                        (this.normalizationParams.RotationalSpeed.max - this.normalizationParams.RotationalSpeed.min);
+                    const normalizedTorque = (record.Torque - this.normalizationParams.Torque.min) / 
+                                            (this.normalizationParams.Torque.max - this.normalizationParams.Torque.min);
+                    const normalizedToolWear = (record.ToolWear - this.normalizationParams.ToolWear.min) / 
+                                            (this.normalizationParams.ToolWear.max - this.normalizationParams.ToolWear.min);
                     
                     return {
                         features: [
@@ -1236,7 +1258,7 @@
                 return {
                     trainData: this.trainData,
                     testData: this.testData,
-                    normalizationParams
+                    normalizationParams: this.normalizationParams
                 };
             }
             
@@ -1325,16 +1347,20 @@
             predict(features) {
                 if (!this.model) return null;
                 
-                // Normalize the input features using the same parameters as training
-                // In a real implementation, we would save and reuse the normalization params
+                // Normalize the input features using the saved normalization parameters
                 const typeValue = features[0] === 'L' ? 0 : features[0] === 'M' ? 0.5 : 1;
                 
-                // Use approximate normalization based on expected ranges
-                const normalizedAirTemp = (features[1] - 295) / 10;
-                const normalizedProcessTemp = (features[2] - 305) / 10;
-                const normalizedRpm = (features[3] - 1168) / 1718;
-                const normalizedTorque = (features[4] - 3.8) / 72.8;
-                const normalizedToolWear = features[5] / 253;
+                // Use the normalization parameters from training
+                const normalizedAirTemp = (features[1] - this.normalizationParams.AirTemp.min) / 
+                                        (this.normalizationParams.AirTemp.max - this.normalizationParams.AirTemp.min);
+                const normalizedProcessTemp = (features[2] - this.normalizationParams.ProcessTemp.min) / 
+                                            (this.normalizationParams.ProcessTemp.max - this.normalizationParams.ProcessTemp.min);
+                const normalizedRpm = (features[3] - this.normalizationParams.RotationalSpeed.min) / 
+                                    (this.normalizationParams.RotationalSpeed.max - this.normalizationParams.RotationalSpeed.min);
+                const normalizedTorque = (features[4] - this.normalizationParams.Torque.min) / 
+                                        (this.normalizationParams.Torque.max - this.normalizationParams.Torque.min);
+                const normalizedToolWear = (features[5] - this.normalizationParams.ToolWear.min) / 
+                                        (this.normalizationParams.ToolWear.max - this.normalizationParams.ToolWear.min);
                 
                 const normalizedFeatures = [
                     typeValue,
@@ -1599,7 +1625,8 @@
                 const edaContent = document.getElementById('eda-content');
                 
                 // Numeric features statistics
-                let numericHTML = `<h4>Numeric Features Statistics</h4>
+                let numericHTML = `<div class="eda-section">
+                                <h3>Numeric Features Statistics</h3>
                                 <table class="stats-table">
                                     <thead>
                                         <tr>
@@ -1634,10 +1661,11 @@
                     `;
                 });
                 
-                numericHTML += `</tbody></table>`;
+                numericHTML += `</tbody></table></div>`;
                 
                 // Categorical features
-                let categoricalHTML = `<h4>Categorical Features</h4>
+                let categoricalHTML = `<div class="eda-section">
+                                    <h3>Categorical Features</h3>
                                     <p>Type distribution:</p>
                                     <table class="stats-table">
                                         <thead>
@@ -1645,28 +1673,32 @@
                                                 <th>Type</th>
                                                 <th>Count</th>
                                                 <th>Percentage</th>
+                                                <th>Failure Rate</th>
                                             </tr>
                                         </thead>
                                         <tbody>`;
                 
                 const typeStats = edaResults.categoricalStats.Type;
-                const total = Object.values(typeStats).reduce((a, b) => a + b, 0);
+                const total = Object.values(typeStats.counts).reduce((a, b) => a + b, 0);
                 
-                for (const [type, count] of Object.entries(typeStats)) {
+                for (const [type, count] of Object.entries(typeStats.counts)) {
                     const percentage = ((count / total) * 100).toFixed(2);
+                    const failureRate = typeStats.failureRates[type] || '0.00';
                     categoricalHTML += `
                         <tr>
                             <td>${type}</td>
                             <td>${count}</td>
                             <td>${percentage}%</td>
+                            <td>${failureRate}%</td>
                         </tr>
                     `;
                 }
                 
-                categoricalHTML += `</tbody></table>`;
+                categoricalHTML += `</tbody></table></div>`;
                 
                 // Correlation matrix
-                let correlationHTML = `<h4>Correlation Matrix</h4>
+                let correlationHTML = `<div class="eda-section">
+                                    <h3>Correlation Matrix</h3>
                                     <table class="correlation-matrix">
                                         <thead>
                                             <tr>
@@ -1698,9 +1730,202 @@
                     correlationHTML += `</tr>`;
                 }
                 
-                correlationHTML += `</tbody></table>`;
+                correlationHTML += `</tbody></table></div>`;
                 
-                edaContent.innerHTML = numericHTML + categoricalHTML + correlationHTML;
+                // Add charts section
+                const chartsHTML = `<div class="eda-section">
+                                <h3>Visualizations</h3>
+                                <div class="chart-row">
+                                    <div class="chart-item">
+                                        <h4>Type Distribution</h4>
+                                        <div class="chart-container">
+                                            <canvas id="type-chart"></canvas>
+                                        </div>
+                                    </div>
+                                    <div class="chart-item">
+                                        <h4>Failure Rate by Type</h4>
+                                        <div class="chart-container">
+                                            <canvas id="failure-chart"></canvas>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="chart-row">
+                                    <div class="chart-item">
+                                        <h4>Air Temperature Distribution</h4>
+                                        <div class="chart-container">
+                                            <canvas id="airtemp-chart"></canvas>
+                                        </div>
+                                    </div>
+                                    <div class="chart-item">
+                                        <h4>Tool Wear Distribution</h4>
+                                        <div class="chart-container">
+                                            <canvas id="toolwear-chart"></canvas>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>`;
+                
+                edaContent.innerHTML = numericHTML + categoricalHTML + correlationHTML + chartsHTML;
+                
+                // Create charts
+                createEDACharts(edaResults);
+            }
+            
+            // Create EDA charts
+            function createEDACharts(edaResults) {
+                // Type distribution chart
+                const typeCtx = document.getElementById('type-chart').getContext('2d');
+                const typeLabels = Object.keys(edaResults.categoricalStats.Type.counts);
+                const typeData = Object.values(edaResults.categoricalStats.Type.counts);
+                
+                new Chart(typeCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: typeLabels,
+                        datasets: [{
+                            label: 'Count',
+                            data: typeData,
+                            backgroundColor: [
+                                'rgba(52, 152, 219, 0.7)',
+                                'rgba(46, 204, 113, 0.7)',
+                                'rgba(241, 196, 15, 0.7)'
+                            ],
+                            borderColor: [
+                                'rgb(52, 152, 219)',
+                                'rgb(46, 204, 113)',
+                                'rgb(241, 196, 15)'
+                            ],
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                display: false
+                            }
+                        }
+                    }
+                });
+                
+                // Failure rate by type chart
+                const failureCtx = document.getElementById('failure-chart').getContext('2d');
+                const failureData = Object.values(edaResults.categoricalStats.Type.failureRates).map(v => parseFloat(v));
+                
+                new Chart(failureCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: typeLabels,
+                        datasets: [{
+                            label: 'Failure Rate (%)',
+                            data: failureData,
+                            backgroundColor: 'rgba(231, 76, 60, 0.7)',
+                            borderColor: 'rgb(231, 76, 60)',
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                title: {
+                                    display: true,
+                                    text: 'Failure Rate (%)'
+                                }
+                            }
+                        },
+                        plugins: {
+                            legend: {
+                                display: false
+                            }
+                        }
+                    }
+                });
+                
+                // Air temperature distribution
+                const airTempCtx = document.getElementById('airtemp-chart').getContext('2d');
+                const airTempData = mlPipeline.dataset.map(d => d.AirTemp);
+                
+                new Chart(airTempCtx, {
+                    type: 'histogram',
+                    data: {
+                        datasets: [{
+                            label: 'Air Temperature',
+                            data: airTempData,
+                            backgroundColor: 'rgba(52, 152, 219, 0.7)',
+                            borderColor: 'rgb(52, 152, 219)',
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            x: {
+                                title: {
+                                    display: true,
+                                    text: 'Air Temperature (K)'
+                                }
+                            },
+                            y: {
+                                title: {
+                                    display: true,
+                                    text: 'Frequency'
+                                },
+                                beginAtZero: true
+                            }
+                        },
+                        plugins: {
+                            legend: {
+                                display: false
+                            }
+                        }
+                    }
+                });
+                
+                // Tool wear distribution
+                const toolWearCtx = document.getElementById('toolwear-chart').getContext('2d');
+                const toolWearData = mlPipeline.dataset.map(d => d.ToolWear);
+                
+                new Chart(toolWearCtx, {
+                    type: 'histogram',
+                    data: {
+                        datasets: [{
+                            label: 'Tool Wear',
+                            data: toolWearData,
+                            backgroundColor: 'rgba(46, 204, 113, 0.7)',
+                            borderColor: 'rgb(46, 204, 113)',
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            x: {
+                                title: {
+                                    display: true,
+                                    text: 'Tool Wear (min)'
+                                }
+                            },
+                            y: {
+                                title: {
+                                    display: true,
+                                    text: 'Frequency'
+                                },
+                                beginAtZero: true
+                            }
+                        },
+                        plugins: {
+                            legend: {
+                                display: false
+                            }
+                        }
+                    }
+                });
             }
             
             // Preprocess data
@@ -1720,6 +1945,43 @@
                             <li>Categorical variable (Type) encoded as numerical values</li>
                             <li>Numerical features normalized to [0, 1] range</li>
                         </ul>
+                        <h4>Normalization Parameters:</h4>
+                        <table class="stats-table">
+                            <thead>
+                                <tr>
+                                    <th>Feature</th>
+                                    <th>Min</th>
+                                    <th>Max</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>Air Temperature</td>
+                                    <td>${preprocessingResults.normalizationParams.AirTemp.min.toFixed(2)}</td>
+                                    <td>${preprocessingResults.normalizationParams.AirTemp.max.toFixed(2)}</td>
+                                </tr>
+                                <tr>
+                                    <td>Process Temperature</td>
+                                    <td>${preprocessingResults.normalizationParams.ProcessTemp.min.toFixed(2)}</td>
+                                    <td>${preprocessingResults.normalizationParams.ProcessTemp.max.toFixed(2)}</td>
+                                </tr>
+                                <tr>
+                                    <td>Rotational Speed</td>
+                                    <td>${preprocessingResults.normalizationParams.RotationalSpeed.min.toFixed(2)}</td>
+                                    <td>${preprocessingResults.normalizationParams.RotationalSpeed.max.toFixed(2)}</td>
+                                </tr>
+                                <tr>
+                                    <td>Torque</td>
+                                    <td>${preprocessingResults.normalizationParams.Torque.min.toFixed(2)}</td>
+                                    <td>${preprocessingResults.normalizationParams.Torque.max.toFixed(2)}</td>
+                                </tr>
+                                <tr>
+                                    <td>Tool Wear</td>
+                                    <td>${preprocessingResults.normalizationParams.ToolWear.min.toFixed(2)}</td>
+                                    <td>${preprocessingResults.normalizationParams.ToolWear.max.toFixed(2)}</td>
+                                </tr>
+                            </tbody>
+                        </table>
                     `;
                     
                     trainBtn.style.display = 'inline-block';
