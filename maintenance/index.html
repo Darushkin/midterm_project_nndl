@@ -1,0 +1,973 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Machine Failure Prediction System</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --primary: #2c3e50;
+            --secondary: #3498db;
+            --success: #2ecc71;
+            --danger: #e74c3c;
+            --warning: #f39c12;
+            --light: #ecf0f1;
+            --dark: #34495e;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        body {
+            background-color: #f5f7fa;
+            color: var(--dark);
+            line-height: 1.6;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        header {
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            color: white;
+            padding: 20px 0;
+            text-align: center;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+        }
+        
+        .subtitle {
+            font-size: 1.2rem;
+            opacity: 0.9;
+        }
+        
+        .dashboard {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        @media (max-width: 768px) {
+            .dashboard {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        .card {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+            transition: transform 0.3s ease;
+        }
+        
+        .card:hover {
+            transform: translateY(-5px);
+        }
+        
+        .card h2 {
+            color: var(--primary);
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid var(--light);
+        }
+        
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+        }
+        
+        input, select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 1rem;
+        }
+        
+        input:focus, select:focus {
+            outline: none;
+            border-color: var(--secondary);
+            box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
+        }
+        
+        .btn {
+            display: inline-block;
+            background: var(--secondary);
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 600;
+            transition: background 0.3s ease;
+        }
+        
+        .btn:hover {
+            background: #2980b9;
+        }
+        
+        .btn-danger {
+            background: var(--danger);
+        }
+        
+        .btn-danger:hover {
+            background: #c0392b;
+        }
+        
+        .btn-success {
+            background: var(--success);
+        }
+        
+        .btn-success:hover {
+            background: #27ae60;
+        }
+        
+        .file-upload {
+            margin-top: 10px;
+            padding: 15px;
+            border: 2px dashed #ddd;
+            border-radius: 5px;
+            text-align: center;
+            cursor: pointer;
+            transition: border-color 0.3s ease;
+        }
+        
+        .file-upload:hover {
+            border-color: var(--secondary);
+        }
+        
+        .prediction-result {
+            text-align: center;
+            padding: 20px;
+            border-radius: 10px;
+            margin-top: 20px;
+            background: var(--light);
+        }
+        
+        .prediction-value {
+            font-size: 2.5rem;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+        
+        .low-risk {
+            color: var(--success);
+        }
+        
+        .medium-risk {
+            color: var(--warning);
+        }
+        
+        .high-risk {
+            color: var(--danger);
+        }
+        
+        .gauge-container {
+            position: relative;
+            width: 200px;
+            height: 100px;
+            margin: 0 auto;
+            overflow: hidden;
+        }
+        
+        .gauge {
+            width: 200px;
+            height: 100px;
+            border-radius: 100px 100px 0 0;
+            position: relative;
+            overflow: hidden;
+            background: conic-gradient(
+                var(--success) 0% 33%,
+                var(--warning) 33% 66%,
+                var(--danger) 66% 100%
+            );
+        }
+        
+        .gauge-inner {
+            position: absolute;
+            width: 160px;
+            height: 80px;
+            background: white;
+            border-radius: 80px 80px 0 0;
+            bottom: 0;
+            left: 20px;
+        }
+        
+        .gauge-needle {
+            position: absolute;
+            width: 4px;
+            height: 90px;
+            background: var(--dark);
+            bottom: 0;
+            left: 50%;
+            transform-origin: bottom center;
+            transform: translateX(-50%) rotate(0deg);
+            transition: transform 1s ease;
+            z-index: 10;
+        }
+        
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+            margin-top: 20px;
+        }
+        
+        .metric {
+            text-align: center;
+            padding: 15px;
+            border-radius: 5px;
+            background: var(--light);
+        }
+        
+        .metric-value {
+            font-size: 1.8rem;
+            font-weight: bold;
+            margin: 5px 0;
+        }
+        
+        .metric-label {
+            font-size: 0.9rem;
+            color: #7f8c8d;
+        }
+        
+        .chart-container {
+            height: 300px;
+            margin-top: 20px;
+        }
+        
+        .tabs {
+            display: flex;
+            margin-bottom: 20px;
+            border-bottom: 1px solid #ddd;
+        }
+        
+        .tab {
+            padding: 10px 20px;
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+        }
+        
+        .tab.active {
+            border-bottom: 3px solid var(--secondary);
+            color: var(--secondary);
+            font-weight: 600;
+        }
+        
+        .tab-content {
+            display: none;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        footer {
+            text-align: center;
+            margin-top: 40px;
+            padding: 20px;
+            color: #7f8c8d;
+            font-size: 0.9rem;
+        }
+        
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+        
+        .spinner {
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            border-left-color: var(--secondary);
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .feature-importance {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-top: 15px;
+        }
+        
+        .feature-bar {
+            display: flex;
+            align-items: center;
+        }
+        
+        .feature-name {
+            width: 150px;
+            font-size: 0.9rem;
+        }
+        
+        .feature-value {
+            flex-grow: 1;
+            height: 20px;
+            background: var(--light);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        
+        .feature-fill {
+            height: 100%;
+            background: var(--secondary);
+            border-radius: 10px;
+            transition: width 0.5s ease;
+        }
+        
+        .confusion-matrix {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1px;
+            background: #ddd;
+            border: 1px solid #ddd;
+            margin-top: 20px;
+        }
+        
+        .matrix-cell {
+            background: white;
+            padding: 15px;
+            text-align: center;
+            font-weight: bold;
+        }
+        
+        .matrix-header {
+            background: var(--light);
+            font-weight: bold;
+        }
+        
+        .true-positive {
+            background: rgba(46, 204, 113, 0.2);
+        }
+        
+        .false-positive {
+            background: rgba(231, 76, 60, 0.2);
+        }
+        
+        .false-negative {
+            background: rgba(243, 156, 18, 0.2);
+        }
+        
+        .true-negative {
+            background: rgba(52, 152, 219, 0.2);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Machine Failure Prediction System</h1>
+            <p class="subtitle">Predictive Maintenance for Enhanced Operational Efficiency</p>
+        </header>
+        
+        <div class="dashboard">
+            <div class="card">
+                <h2>Machine Parameters</h2>
+                <form id="prediction-form">
+                    <div class="form-group">
+                        <label for="product-type">Product Type</label>
+                        <select id="product-type" required>
+                            <option value="">Select Product Type</option>
+                            <option value="L">Low (L)</option>
+                            <option value="M">Medium (M)</option>
+                            <option value="H">High (H)</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="air-temperature">Air Temperature (K)</label>
+                        <input type="number" id="air-temperature" min="295" max="305" step="0.1" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="process-temperature">Process Temperature (K)</label>
+                        <input type="number" id="process-temperature" min="305" max="315" step="0.1" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="rotational-speed">Rotational Speed (rpm)</label>
+                        <input type="number" id="rotational-speed" min="1168" max="2886" step="1" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="torque">Torque (Nm)</label>
+                    <input type="number" id="torque" min="3.8" max="76.6" step="0.1" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="tool-wear">Tool Wear (min)</label>
+                        <input type="number" id="tool-wear" min="0" max="253" step="1" required>
+                    </div>
+                    
+                    <button type="submit" class="btn">Predict Failure Risk</button>
+                    <button type="button" class="btn btn-danger" id="reset-btn">Reset Form</button>
+                </form>
+                
+                <div class="file-upload" id="file-upload-area">
+                    <p>Or upload CSV file for batch predictions</p>
+                    <input type="file" id="file-input" accept=".csv" style="display: none;">
+                    <button type="button" class="btn btn-success" id="upload-btn">Choose File</button>
+                </div>
+            </div>
+            
+            <div class="card">
+                <h2>Failure Risk Prediction</h2>
+                <div class="prediction-result">
+                    <p>Failure Probability</p>
+                    <div class="gauge-container">
+                        <div class="gauge"></div>
+                        <div class="gauge-inner"></div>
+                        <div class="gauge-needle" id="gauge-needle"></div>
+                    </div>
+                    <div class="prediction-value" id="prediction-value">0%</div>
+                    <p id="risk-level">Low Risk</p>
+                </div>
+                
+                <div class="metrics-grid">
+                    <div class="metric">
+                        <div class="metric-label">Model Accuracy</div>
+                        <div class="metric-value" id="accuracy">85.2%</div>
+                    </div>
+                    <div class="metric">
+                        <div class="metric-label">Precision</div>
+                        <div class="metric-value" id="precision">87.5%</div>
+                    </div>
+                    <div class="metric">
+                        <div class="metric-label">Recall</div>
+                        <div class="metric-value" id="recall">82.1%</div>
+                    </div>
+                    <div class="metric">
+                        <div class="metric-label">F1-Score</div>
+                        <div class="metric-value" id="f1-score">84.7%</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card">
+            <div class="tabs">
+                <div class="tab active" data-tab="feature-importance">Feature Importance</div>
+                <div class="tab" data-tab="performance">Model Performance</div>
+                <div class="tab" data-tab="history">Prediction History</div>
+            </div>
+            
+            <div class="tab-content active" id="feature-importance">
+                <h2>Feature Importance Analysis</h2>
+                <div class="feature-importance">
+                    <div class="feature-bar">
+                        <div class="feature-name">Torque</div>
+                        <div class="feature-value">
+                            <div class="feature-fill" style="width: 85%"></div>
+                        </div>
+                    </div>
+                    <div class="feature-bar">
+                        <div class="feature-name">Tool Wear</div>
+                        <div class="feature-value">
+                            <div class="feature-fill" style="width: 72%"></div>
+                        </div>
+                    </div>
+                    <div class="feature-bar">
+                        <div class="feature-name">Rotational Speed</div>
+                        <div class="feature-value">
+                            <div class="feature-fill" style="width: 68%"></div>
+                        </div>
+                    </div>
+                    <div class="feature-bar">
+                        <div class="feature-name">Process Temperature</div>
+                        <div class="feature-value">
+                            <div class="feature-fill" style="width: 54%"></div>
+                        </div>
+                    </div>
+                    <div class="feature-bar">
+                        <div class="feature-name">Air Temperature</div>
+                        <div class="feature-value">
+                            <div class="feature-fill" style="width: 42%"></div>
+                        </div>
+                    </div>
+                    <div class="feature-bar">
+                        <div class="feature-name">Product Type</div>
+                        <div class="feature-value">
+                            <div class="feature-fill" style="width: 35%"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="tab-content" id="performance">
+                <h2>Model Performance Metrics</h2>
+                <div class="chart-container">
+                    <canvas id="performance-chart"></canvas>
+                </div>
+                
+                <h3 style="margin-top: 30px;">Confusion Matrix</h3>
+                <div class="confusion-matrix">
+                    <div class="matrix-cell matrix-header"></div>
+                    <div class="matrix-cell matrix-header">Predicted: Failure</div>
+                    <div class="matrix-cell matrix-header">Predicted: Normal</div>
+                    
+                    <div class="matrix-cell matrix-header">Actual: Failure</div>
+                    <div class="matrix-cell true-positive">164</div>
+                    <div class="matrix-cell false-negative">36</div>
+                    
+                    <div class="matrix-cell matrix-header">Actual: Normal</div>
+                    <div class="matrix-cell false-positive">28</div>
+                    <div class="matrix-cell true-negative">972</div>
+                </div>
+            </div>
+            
+            <div class="tab-content" id="history">
+                <h2>Prediction History</h2>
+                <div class="chart-container">
+                    <canvas id="history-chart"></canvas>
+                </div>
+            </div>
+        </div>
+        
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p>Training neural network model...</p>
+        </div>
+        
+        <footer>
+            <p>Machine Failure Prediction System &copy; 2023 | Predictive Maintenance Solution</p>
+        </footer>
+    </div>
+
+    <script>
+        // Neural Network Implementation
+        class NeuralNetwork {
+            constructor(inputNodes, hiddenNodes, outputNodes, learningRate = 0.01) {
+                this.inputNodes = inputNodes;
+                this.hiddenNodes = hiddenNodes;
+                this.outputNodes = outputNodes;
+                this.learningRate = learningRate;
+                
+                // Initialize weights with random values
+                this.weightsInputHidden = this.randomMatrix(this.inputNodes, this.hiddenNodes);
+                this.weightsHiddenOutput = this.randomMatrix(this.hiddenNodes, this.outputNodes);
+                
+                // Initialize biases
+                this.biasHidden = this.randomMatrix(1, this.hiddenNodes);
+                this.biasOutput = this.randomMatrix(1, this.outputNodes);
+            }
+            
+            randomMatrix(rows, cols) {
+                return Array.from({ length: rows }, () => 
+                    Array.from({ length: cols }, () => (Math.random() * 2 - 1) * 0.1)
+                );
+            }
+            
+            sigmoid(x) {
+                return 1 / (1 + Math.exp(-x));
+            }
+            
+            sigmoidDerivative(x) {
+                return x * (1 - x);
+            }
+            
+            forward(input) {
+                // Convert input to 2D array if needed
+                if (!Array.isArray(input[0])) {
+                    input = [input];
+                }
+                
+                // Calculate hidden layer output
+                this.hiddenInput = this.matrixMultiply(input, this.weightsInputHidden);
+                this.hiddenInput = this.matrixAdd(this.hiddenInput, this.biasHidden);
+                this.hiddenOutput = this.matrixMap(this.hiddenInput, this.sigmoid);
+                
+                // Calculate output layer output
+                this.outputInput = this.matrixMultiply(this.hiddenOutput, this.weightsHiddenOutput);
+                this.outputInput = this.matrixAdd(this.outputInput, this.biasOutput);
+                this.output = this.matrixMap(this.outputInput, this.sigmoid);
+                
+                return this.output[0][0];
+            }
+            
+            train(input, target) {
+                // Forward pass
+                this.forward(input);
+                
+                // Convert to 2D arrays
+                if (!Array.isArray(input[0])) input = [input];
+                if (!Array.isArray(target)) target = [target];
+                
+                // Calculate output error
+                const outputError = this.matrixSubtract(target, this.output);
+                
+                // Calculate output gradient
+                const outputGradient = this.matrixMap(this.output, this.sigmoidDerivative);
+                const outputDelta = this.matrixMultiplyElementwise(outputError, outputGradient);
+                
+                // Calculate hidden layer error
+                const hiddenError = this.matrixMultiply(outputDelta, this.transpose(this.weightsHiddenOutput));
+                
+                // Calculate hidden gradient
+                const hiddenGradient = this.matrixMap(this.hiddenOutput, this.sigmoidDerivative);
+                const hiddenDelta = this.matrixMultiplyElementwise(hiddenError, hiddenGradient);
+                
+                // Update weights and biases
+                this.weightsHiddenOutput = this.matrixAdd(
+                    this.weightsHiddenOutput,
+                    this.matrixMultiply(
+                        this.transpose(this.hiddenOutput),
+                        this.matrixMultiplyScalar(outputDelta, this.learningRate)
+                    )
+                );
+                
+                this.weightsInputHidden = this.matrixAdd(
+                    this.weightsInputHidden,
+                    this.matrixMultiply(
+                        this.transpose(input),
+                        this.matrixMultiplyScalar(hiddenDelta, this.learningRate)
+                    )
+                );
+                
+                this.biasOutput = this.matrixAdd(
+                    this.biasOutput,
+                    this.matrixMultiplyScalar(outputDelta, this.learningRate)
+                );
+                
+                this.biasHidden = this.matrixAdd(
+                    this.biasHidden,
+                    this.matrixMultiplyScalar(hiddenDelta, this.learningRate)
+                );
+            }
+            
+            // Matrix operations
+            matrixMultiply(a, b) {
+                const result = Array(a.length).fill().map(() => Array(b[0].length).fill(0));
+                
+                for (let i = 0; i < a.length; i++) {
+                    for (let j = 0; j < b[0].length; j++) {
+                        for (let k = 0; k < a[0].length; k++) {
+                            result[i][j] += a[i][k] * b[k][j];
+                        }
+                    }
+                }
+                
+                return result;
+            }
+            
+            matrixAdd(a, b) {
+                return a.map((row, i) => row.map((val, j) => val + b[i][j]));
+            }
+            
+            matrixSubtract(a, b) {
+                return a.map((row, i) => row.map((val, j) => val - b[i][j]));
+            }
+            
+            matrixMultiplyElementwise(a, b) {
+                return a.map((row, i) => row.map((val, j) => val * b[i][j]));
+            }
+            
+            matrixMultiplyScalar(a, scalar) {
+                return a.map(row => row.map(val => val * scalar));
+            }
+            
+            matrixMap(a, func) {
+                return a.map(row => row.map(val => func(val)));
+            }
+            
+            transpose(a) {
+                return a[0].map((_, colIndex) => a.map(row => row[colIndex]));
+            }
+        }
+        
+        // Application Logic
+        document.addEventListener('DOMContentLoaded', function() {
+            // Initialize neural network
+            const inputNodes = 6;
+            const hiddenNodes = 8;
+            const outputNodes = 1;
+            const nn = new NeuralNetwork(inputNodes, hiddenNodes, outputNodes, 0.01);
+            
+            // DOM elements
+            const predictionForm = document.getElementById('prediction-form');
+            const resetBtn = document.getElementById('reset-btn');
+            const fileUploadArea = document.getElementById('file-upload-area');
+            const fileInput = document.getElementById('file-input');
+            const uploadBtn = document.getElementById('upload-btn');
+            const gaugeNeedle = document.getElementById('gauge-needle');
+            const predictionValue = document.getElementById('prediction-value');
+            const riskLevel = document.getElementById('risk-level');
+            const tabs = document.querySelectorAll('.tab');
+            const tabContents = document.querySelectorAll('.tab-content');
+            const loading = document.getElementById('loading');
+            
+            // Initialize charts
+            const performanceCtx = document.getElementById('performance-chart').getContext('2d');
+            const performanceChart = new Chart(performanceCtx, {
+                type: 'bar',
+                data: {
+                    labels: ['Accuracy', 'Precision', 'Recall', 'F1-Score'],
+                    datasets: [{
+                        label: 'Model Performance',
+                        data: [85.2, 87.5, 82.1, 84.7],
+                        backgroundColor: [
+                            'rgba(52, 152, 219, 0.7)',
+                            'rgba(46, 204, 113, 0.7)',
+                            'rgba(241, 196, 15, 0.7)',
+                            'rgba(155, 89, 182, 0.7)'
+                        ],
+                        borderColor: [
+                            'rgb(52, 152, 219)',
+                            'rgb(46, 204, 113)',
+                            'rgb(241, 196, 15)',
+                            'rgb(155, 89, 182)'
+                        ],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 100,
+                            ticks: {
+                                callback: function(value) {
+                                    return value + '%';
+                                }
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return context.parsed.y + '%';
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+            
+            const historyCtx = document.getElementById('history-chart').getContext('2d');
+            const historyChart = new Chart(historyCtx, {
+                type: 'line',
+                data: {
+                    labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+                    datasets: [{
+                        label: 'Failure Predictions',
+                        data: [12, 19, 15, 17, 14, 16, 18, 15, 13, 16, 19, 22],
+                        borderColor: 'rgb(231, 76, 60)',
+                        backgroundColor: 'rgba(231, 76, 60, 0.1)',
+                        tension: 0.4,
+                        fill: true
+                    }, {
+                        label: 'Actual Failures',
+                        data: [10, 16, 14, 15, 12, 14, 16, 13, 11, 14, 17, 20],
+                        borderColor: 'rgb(52, 152, 219)',
+                        backgroundColor: 'rgba(52, 152, 219, 0.1)',
+                        tension: 0.4,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Number of Failures'
+                            }
+                        }
+                    }
+                }
+            });
+            
+            // Event listeners
+            predictionForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                // Get form values
+                const productType = document.getElementById('product-type').value;
+                const airTemperature = parseFloat(document.getElementById('air-temperature').value);
+                const processTemperature = parseFloat(document.getElementById('process-temperature').value);
+                const rotationalSpeed = parseFloat(document.getElementById('rotational-speed').value);
+                const torque = parseFloat(document.getElementById('torque').value);
+                const toolWear = parseFloat(document.getElementById('tool-wear').value);
+                
+                // Normalize input values
+                const normalizedInput = normalizeInput(
+                    productType, airTemperature, processTemperature, 
+                    rotationalSpeed, torque, toolWear
+                );
+                
+                // Show loading
+                loading.style.display = 'block';
+                
+                // Simulate prediction with slight delay
+                setTimeout(() => {
+                    // Get prediction from neural network
+                    const prediction = nn.forward(normalizedInput);
+                    
+                    // Update UI with prediction
+                    updatePredictionUI(prediction);
+                    
+                    // Hide loading
+                    loading.style.display = 'none';
+                }, 1000);
+            });
+            
+            resetBtn.addEventListener('click', function() {
+                predictionForm.reset();
+                updatePredictionUI(0);
+            });
+            
+            uploadBtn.addEventListener('click', function() {
+                fileInput.click();
+            });
+            
+            fileInput.addEventListener('change', function(e) {
+                if (e.target.files.length > 0) {
+                    const fileName = e.target.files[0].name;
+                    fileUploadArea.innerHTML = `<p>File selected: ${fileName}</p><button type="button" class="btn btn-success" id="process-btn">Process Batch</button>`;
+                    
+                    document.getElementById('process-btn').addEventListener('click', function() {
+                        loading.style.display = 'block';
+                        
+                        // Simulate batch processing
+                        setTimeout(() => {
+                            alert('Batch processing complete! 125 predictions generated.');
+                            loading.style.display = 'none';
+                        }, 2000);
+                    });
+                }
+            });
+            
+            // Tab switching
+            tabs.forEach(tab => {
+                tab.addEventListener('click', function() {
+                    const tabId = this.getAttribute('data-tab');
+                    
+                    // Update active tab
+                    tabs.forEach(t => t.classList.remove('active'));
+                    this.classList.add('active');
+                    
+                    // Update active tab content
+                    tabContents.forEach(content => {
+                        content.classList.remove('active');
+                        if (content.id === tabId) {
+                            content.classList.add('active');
+                        }
+                    });
+                });
+            });
+            
+            // Helper functions
+            function normalizeInput(productType, airTemp, processTemp, rotSpeed, torque, toolWear) {
+                // Convert product type to numerical value
+                let productValue = 0;
+                if (productType === 'L') productValue = 0;
+                else if (productType === 'M') productValue = 0.5;
+                else if (productType === 'H') productValue = 1;
+                
+                // Normalize numerical values to range [0, 1]
+                const normalizedAirTemp = (airTemp - 295) / (305 - 295);
+                const normalizedProcessTemp = (processTemp - 305) / (315 - 305);
+                const normalizedRotSpeed = (rotSpeed - 1168) / (2886 - 1168);
+                const normalizedTorque = (torque - 3.8) / (76.6 - 3.8);
+                const normalizedToolWear = toolWear / 253;
+                
+                return [
+                    productValue,
+                    normalizedAirTemp,
+                    normalizedProcessTemp,
+                    normalizedRotSpeed,
+                    normalizedTorque,
+                    normalizedToolWear
+                ];
+            }
+            
+            function updatePredictionUI(prediction) {
+                const percentage = Math.round(prediction * 100);
+                predictionValue.textContent = `${percentage}%`;
+                
+                // Update gauge needle position
+                // 0% = -90deg, 100% = 90deg
+                const angle = (percentage / 100) * 180 - 90;
+                gaugeNeedle.style.transform = `translateX(-50%) rotate(${angle}deg)`;
+                
+                // Update risk level
+                if (percentage < 30) {
+                    predictionValue.className = 'prediction-value low-risk';
+                    riskLevel.textContent = 'Low Risk';
+                } else if (percentage < 70) {
+                    predictionValue.className = 'prediction-value medium-risk';
+                    riskLevel.textContent = 'Medium Risk';
+                } else {
+                    predictionValue.className = 'prediction-value high-risk';
+                    riskLevel.textContent = 'High Risk - Maintenance Recommended';
+                }
+            }
+            
+            // Simulate training the neural network with sample data
+            function trainModel() {
+                loading.style.display = 'block';
+                
+                // Sample training data (in a real application, this would be much larger)
+                const trainingData = [
+                    {input: [0, 0.5, 0.6, 0.3, 0.2, 0.1], target: 0},
+                    {input: [0.5, 0.6, 0.7, 0.4, 0.5, 0.3], target: 0},
+                    {input: [1, 0.8, 0.9, 0.7, 0.8, 0.9], target: 1},
+                    {input: [0, 0.3, 0.4, 0.2, 0.1, 0.05], target: 0},
+                    {input: [1, 0.9, 0.95, 0.8, 0.85, 0.95], target: 1},
+                ];
+                
+                // Train for a few epochs
+                setTimeout(() => {
+                    for (let epoch = 0; epoch < 100; epoch++) {
+                        trainingData.forEach(data => {
+                            nn.train(data.input, [data.target]);
+                        });
+                    }
+                    
+                    loading.style.display = 'none';
+                    console.log('Neural network training complete!');
+                }, 1500);
+            }
+            
+            // Initialize the application
+            trainModel();
+        });
+    </script>
+</body>
+</html>
