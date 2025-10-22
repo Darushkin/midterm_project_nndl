@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Predictive Maintenance Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.10.0"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.3.0"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .dashboard {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        .card {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            border-left: 4px solid #007bff;
+        }
+        .prediction-result {
+            font-size: 1.2em;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+        .safe {
+            color: #28a745;
+        }
+        .warning {
+            color: #ffc107;
+        }
+        .danger {
+            color: #dc3545;
+        }
+        .input-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input, select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        button:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+        }
+        .chart-container {
+            height: 300px;
+            margin-top: 20px;
+        }
+        .training-status {
+            margin-top: 20px;
+            padding: 15px;
+            background: #e9ecef;
+            border-radius: 4px;
+        }
+        .file-upload {
+            border: 2px dashed #007bff;
+            padding: 20px;
+            text-align: center;
+            margin: 10px 0;
+            border-radius: 8px;
+            background: #f8f9fa;
+        }
+        .file-info {
+            margin: 10px 0;
+            padding: 10px;
+            background: #e9ecef;
+            border-radius: 4px;
+        }
+        .hidden {
+            display: none;
+        }
+        .button-group {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔧 Predictive Maintenance Dashboard</h1>
+            <p>Neural Network-based Machine Failure Prediction</p>
+        </div>
+
+        <div class="dashboard">
+            <div class="card">
+                <h3>Data & Model Training</h3>
+                
+                <div class="file-upload">
+                    <h4>📁 Upload Your CSV Dataset</h4>
+                    <input type="file" id="csvFile" accept=".csv" class="hidden">
+                    <button onclick="document.getElementById('csvFile').click()">Choose CSV File</button>
+                    <div id="fileInfo" class="file-info">
+                        No file selected. Please upload your machine_failure.csv
+                    </div>
+                    <div class="button-group">
+                        <button id="analyzeBtn" disabled>Analyze Data</button>
+                        <button id="trainBtn" disabled>Train Neural Network</button>
+                    </div>
+                </div>
+
+                <div class="input-group">
+                    <label for="epochs">Training Epochs:</label>
+                    <input type="number" id="epochs" value="100" min="10" max="1000">
+                </div>
+
+                <div class="training-status" id="trainingStatus">
+                    Please upload your CSV file to begin training.
+                </div>
+            </div>
+
+            <div class="card">
+                <h3>Real-time Prediction</h3>
+                <div class="input-group">
+                    <label for="type">Machine Type:</label>
+                    <select id="type">
+                        <option value="0">L (Low)</option>
+                        <option value="1">M (Medium)</option>
+                        <option value="2">H (High)</option>
+                    </select>
+                </div>
+                <div class="input-group">
+                    <label for="airTemp">Air Temperature (K):</label>
+                    <input type="number" id="airTemp" value="298.5" step="0.1">
+                </div>
+                <div class="input-group">
+                    <label for="processTemp">Process Temperature (K):</label>
+                    <input type="number" id="processTemp" value="308.5" step="0.1">
+                </div>
+                <div class="input-group">
+                    <label for="rotationalSpeed">Rotational Speed (rpm):</label>
+                    <input type="number" id="rotationalSpeed" value="1500">
+                </div>
+                <div class="input-group">
+                    <label for="torque">Torque (Nm):</label>
+                    <input type="number" id="torque" value="40.0" step="0.1">
+                </div>
+                <div class="input-group">
+                    <label for="toolWear">Tool Wear (min):</label>
+                    <input type="number" id="toolWear" value="100">
+                </div>
+                <button id="predictBtn" disabled>Predict Failure</button>
+                <div class="prediction-result" id="predictionResult"></div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h3>Training Progress</h3>
+            <div class="chart-container">
+                <canvas id="trainingChart"></canvas>
+            </div>
+        </div>
+
+        <div class="card">
+            <h3>Dataset Analysis</h3>
+            <div id="dataAnalysis">
+                <p>Upload a CSV file to see dataset analysis</p>
+            </div>
+        </div>
+
+        <div class="card">
+            <h3>Model Information</h3>
+            <div id="modelInfo">
+                <p><strong>Architecture:</strong> Neural Network with 3 hidden layers</p>
+                <p><strong>Input Features:</strong> 6 (Type, Temperatures, Speed, Torque, Tool Wear)</p>
+                <p><strong>Output:</strong> Failure Probability (0-1)</p>
+                <p><strong>Activation:</strong> ReLU (hidden), Sigmoid (output)</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
