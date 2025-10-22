@@ -562,6 +562,26 @@
             border-radius: 5px;
             margin-top: 15px;
         }
+        
+        .missing-values-section {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 5px;
+            padding: 15px;
+            margin-top: 15px;
+        }
+        
+        .missing-values-options {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        
+        .preview-table {
+            max-height: 400px;
+            overflow-y: auto;
+            margin-top: 15px;
+        }
     </style>
 </head>
 <body>
@@ -684,6 +704,10 @@
                         </div>
                     </div>
                     
+                    <div id="missing-values-section" style="display: none;">
+                        <!-- Missing values info will be populated here -->
+                    </div>
+                    
                     <button class="btn btn-warning" id="eda-btn" style="margin-top: 15px; display: none;">Perform EDA</button>
                 </div>
                 
@@ -700,6 +724,20 @@
                     <h3>Data Preprocessing</h3>
                     <div id="preprocessing-content">
                         <p>Please complete EDA first to preprocess data</p>
+                    </div>
+                    
+                    <div id="preprocessed-preview" style="display: none;">
+                        <h4>Preprocessed Data Preview (First 10 rows)</h4>
+                        <div class="preview-table">
+                            <table id="preprocessed-table">
+                                <thead id="preprocessed-table-head">
+                                    <!-- Headers will be populated by JavaScript -->
+                                </thead>
+                                <tbody id="preprocessed-table-body">
+                                    <!-- Data will be populated by JavaScript -->
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                     
                     <button class="btn btn-warning" id="train-btn" style="margin-top: 15px; display: none;">Train Model</button>
@@ -725,6 +763,7 @@
             </div>
         </div>
         
+        <!-- Rest of the HTML remains the same -->
         <div class="dashboard">
             <div class="card">
                 <h2>Machine Parameters</h2>
@@ -939,9 +978,6 @@
                     }
                     
                     return transformedRow;
-                }).filter(row => {
-                    // Filter out rows with missing critical values
-                    return row.type !== null && row.failure !== null;
                 });
                 
                 return {
@@ -993,7 +1029,462 @@
             }
         }
 
-        // Neural Network Implementation
+        // Enhanced ML Pipeline with Missing Value Handling
+        class MLPipeline {
+            constructor() {
+                this.csvParser = new FlexibleCSVParser();
+                this.rawData = [];
+                this.dataset = [];
+                this.processedData = [];
+                this.trainData = [];
+                this.testData = [];
+                this.model = null;
+                this.featureImportance = [0, 0, 0, 0, 0, 0];
+                this.modelMetrics = {
+                    accuracy: 0,
+                    precision: 0,
+                    recall: 0,
+                    f1: 0,
+                    confusionMatrix: [0, 0, 0, 0]
+                };
+                this.numericStats = {};
+                this.categoricalStats = {};
+                this.correlationMatrix = [];
+                this.normalizationParams = {};
+                this.columnMapping = {};
+                this.missingValues = {};
+                this.hasMissingValues = false;
+            }
+            
+            loadData(csvText) {
+                try {
+                    const parsedData = this.csvParser.parseCSV(csvText);
+                    this.rawData = parsedData.data;
+                    this.columnMapping = parsedData.columnMapping;
+                    
+                    // Calculate missing values
+                    this.calculateMissingValues();
+                    
+                    this.dataset = this.rawData.map(row => {
+                        return {
+                            Type: row.type,
+                            AirTemp: row.airtemp,
+                            ProcessTemp: row.processtemp,
+                            RotationalSpeed: row.rotationalspeed,
+                            Torque: row.torque,
+                            ToolWear: row.toolwear,
+                            Failure: row.failure
+                        };
+                    });
+                    
+                    return {
+                        dataset: this.dataset,
+                        columnMapping: this.columnMapping,
+                        totalRecords: this.dataset.length,
+                        missingValues: this.missingValues,
+                        hasMissingValues: this.hasMissingValues
+                    };
+                } catch (error) {
+                    throw new Error(`Failed to parse CSV: ${error.message}`);
+                }
+            }
+            
+            calculateMissingValues() {
+                this.missingValues = {};
+                this.hasMissingValues = false;
+                
+                for (const [key, actualHeader] of Object.entries(this.columnMapping)) {
+                    const missingCount = this.rawData.filter(row => row[key] === null).length;
+                    this.missingValues[key] = missingCount;
+                    if (missingCount > 0) {
+                        this.hasMissingValues = true;
+                    }
+                }
+            }
+            
+            handleMissingValues(strategy) {
+                if (!this.hasMissingValues) return;
+                
+                if (strategy === 'delete') {
+                    // Delete rows with any missing values
+                    this.rawData = this.rawData.filter(row => {
+                        return Object.values(row).every(value => value !== null);
+                    });
+                } else if (strategy === 'fill') {
+                    // Fill missing values with median for numeric, mode for categorical
+                    for (const [key, actualHeader] of Object.entries(this.columnMapping)) {
+                        const values = this.rawData.map(row => row[key]).filter(val => val !== null);
+                        
+                        if (values.length === 0) continue;
+                        
+                        let fillValue;
+                        if (['airtemp', 'processtemp', 'rotationalspeed', 'torque', 'toolwear'].includes(key)) {
+                            // Numeric - use median
+                            values.sort((a, b) => a - b);
+                            fillValue = values[Math.floor(values.length / 2)];
+                        } else if (key === 'type') {
+                            // Categorical - use mode
+                            const frequency = {};
+                            values.forEach(val => {
+                                frequency[val] = (frequency[val] || 0) + 1;
+                            });
+                            fillValue = Object.keys(frequency).reduce((a, b) => frequency[a] > frequency[b] ? a : b);
+                        } else if (key === 'failure') {
+                            // Binary - use mode
+                            const zeros = values.filter(val => val === 0).length;
+                            const ones = values.filter(val => val === 1).length;
+                            fillValue = zeros > ones ? 0 : 1;
+                        }
+                        
+                        // Fill missing values
+                        this.rawData.forEach(row => {
+                            if (row[key] === null) {
+                                row[key] = fillValue;
+                            }
+                        });
+                    }
+                }
+                
+                // Recalculate missing values
+                this.calculateMissingValues();
+                
+                // Update dataset
+                this.dataset = this.rawData.map(row => {
+                    return {
+                        Type: row.type,
+                        AirTemp: row.airtemp,
+                        ProcessTemp: row.processtemp,
+                        RotationalSpeed: row.rotationalspeed,
+                        Torque: row.torque,
+                        ToolWear: row.toolwear,
+                        Failure: row.failure
+                    };
+                });
+            }
+            
+            getDatasetInfo() {
+                const totalRecords = this.dataset.length;
+                const failureCount = this.dataset.filter(d => d.Failure === 1).length;
+                const failureRate = (failureCount / totalRecords * 100).toFixed(2);
+                
+                return {
+                    totalRecords,
+                    failureCount,
+                    failureRate,
+                    features: 6,
+                    missingValues: this.missingValues,
+                    hasMissingValues: this.hasMissingValues
+                };
+            }
+            
+            performEDA() {
+                const numericFeatures = ['AirTemp', 'ProcessTemp', 'RotationalSpeed', 'Torque', 'ToolWear'];
+                this.numericStats = {};
+                
+                numericFeatures.forEach(feature => {
+                    const values = this.dataset.map(d => d[feature]).filter(val => val !== null);
+                    if (values.length === 0) return;
+                    
+                    this.numericStats[feature] = {
+                        count: values.length,
+                        mean: values.reduce((a, b) => a + b, 0) / values.length,
+                        std: Math.sqrt(values.reduce((sq, n) => sq + Math.pow(n - values.reduce((a, b) => a + b, 0) / values.length, 2), 0) / values.length),
+                        min: Math.min(...values),
+                        '25%': this.percentile(values, 25),
+                        '50%': this.percentile(values, 50),
+                        '75%': this.percentile(values, 75),
+                        max: Math.max(...values)
+                    };
+                });
+                
+                const typeCounts = {};
+                const typeFailures = {};
+                this.dataset.forEach(d => {
+                    if (d.Type !== null) {
+                        typeCounts[d.Type] = (typeCounts[d.Type] || 0) + 1;
+                        if (d.Failure === 1) {
+                            typeFailures[d.Type] = (typeFailures[d.Type] || 0) + 1;
+                        }
+                    }
+                });
+                
+                const typeFailureRates = {};
+                for (const type in typeCounts) {
+                    typeFailureRates[type] = ((typeFailures[type] || 0) / typeCounts[type] * 100).toFixed(2);
+                }
+                
+                this.categoricalStats = {
+                    Type: {
+                        counts: typeCounts,
+                        failureRates: typeFailureRates
+                    }
+                };
+                
+                this.calculateCorrelationMatrix();
+                
+                return {
+                    numericStats: this.numericStats,
+                    categoricalStats: this.categoricalStats,
+                    correlationMatrix: this.correlationMatrix
+                };
+            }
+            
+            percentile(arr, p) {
+                const sorted = [...arr].sort((a, b) => a - b);
+                const index = (p / 100) * (sorted.length - 1);
+                const lower = Math.floor(index);
+                const upper = lower + 1;
+                const weight = index - lower;
+                
+                if (upper >= sorted.length) return sorted[lower];
+                return sorted[lower] * (1 - weight) + sorted[upper] * weight;
+            }
+            
+            calculateCorrelationMatrix() {
+                const numericFeatures = ['AirTemp', 'ProcessTemp', 'RotationalSpeed', 'Torque', 'ToolWear', 'Failure'];
+                this.correlationMatrix = [];
+                
+                for (let i = 0; i < numericFeatures.length; i++) {
+                    this.correlationMatrix[i] = [];
+                    for (let j = 0; j < numericFeatures.length; j++) {
+                        this.correlationMatrix[i][j] = 0;
+                    }
+                }
+                
+                for (let i = 0; i < numericFeatures.length; i++) {
+                    for (let j = i; j < numericFeatures.length; j++) {
+                        const feature1 = numericFeatures[i];
+                        const feature2 = numericFeatures[j];
+                        
+                        const values1 = this.dataset.map(d => d[feature1]).filter(val => val !== null);
+                        const values2 = this.dataset.map(d => d[feature2]).filter(val => val !== null);
+                        
+                        // Ensure we have the same number of non-null values for both features
+                        const minLength = Math.min(values1.length, values2.length);
+                        const validValues1 = values1.slice(0, minLength);
+                        const validValues2 = values2.slice(0, minLength);
+                        
+                        const correlation = this.calculateCorrelation(validValues1, validValues2);
+                        this.correlationMatrix[i][j] = correlation;
+                        this.correlationMatrix[j][i] = correlation;
+                    }
+                }
+                
+                return this.correlationMatrix;
+            }
+            
+            calculateCorrelation(x, y) {
+                const n = x.length;
+                if (n === 0) return 0;
+                
+                const sum_x = x.reduce((a, b) => a + b, 0);
+                const sum_y = y.reduce((a, b) => a + b, 0);
+                const sum_xy = x.reduce((sum, val, i) => sum + val * y[i], 0);
+                const sum_x2 = x.reduce((sum, val) => sum + val * val, 0);
+                const sum_y2 = y.reduce((sum, val) => sum + val * val, 0);
+                
+                const numerator = n * sum_xy - sum_x * sum_y;
+                const denominator = Math.sqrt((n * sum_x2 - sum_x * sum_x) * (n * sum_y2 - sum_y * sum_y));
+                
+                return denominator === 0 ? 0 : numerator / denominator;
+            }
+            
+            preprocessData() {
+                // Handle any remaining missing values with median/mode imputation
+                if (this.hasMissingValues) {
+                    this.handleMissingValues('fill');
+                }
+                
+                // Split into train and test sets (80/20)
+                const splitIndex = Math.floor(this.dataset.length * 0.8);
+                const trainDataset = this.dataset.slice(0, splitIndex);
+                const testDataset = this.dataset.slice(splitIndex);
+                
+                // Calculate normalization parameters from training data only
+                const numericFeatures = ['AirTemp', 'ProcessTemp', 'RotationalSpeed', 'Torque', 'ToolWear'];
+                
+                numericFeatures.forEach(feature => {
+                    const values = trainDataset.map(d => d[feature]);
+                    this.normalizationParams[feature] = {
+                        min: Math.min(...values),
+                        max: Math.max(...values),
+                        mean: values.reduce((a, b) => a + b, 0) / values.length,
+                        std: Math.sqrt(values.reduce((sq, n) => sq + Math.pow(n - values.reduce((a, b) => a + b, 0) / values.length, 2), 0) / values.length)
+                    };
+                });
+                
+                // Process training data
+                this.trainData = trainDataset.map(record => {
+                    // Convert categorical to numerical (one-hot encoding)
+                    const typeL = record.Type === 'L' ? 1 : 0;
+                    const typeM = record.Type === 'M' ? 1 : 0;
+                    const typeH = record.Type === 'H' ? 1 : 0;
+                    
+                    // Standardize numerical features (z-score normalization)
+                    const standardizedAirTemp = (record.AirTemp - this.normalizationParams.AirTemp.mean) / this.normalizationParams.AirTemp.std;
+                    const standardizedProcessTemp = (record.ProcessTemp - this.normalizationParams.ProcessTemp.mean) / this.normalizationParams.ProcessTemp.std;
+                    const standardizedRpm = (record.RotationalSpeed - this.normalizationParams.RotationalSpeed.mean) / this.normalizationParams.RotationalSpeed.std;
+                    const standardizedTorque = (record.Torque - this.normalizationParams.Torque.mean) / this.normalizationParams.Torque.std;
+                    const standardizedToolWear = (record.ToolWear - this.normalizationParams.ToolWear.mean) / this.normalizationParams.ToolWear.std;
+                    
+                    return {
+                        features: [
+                            typeL,
+                            typeM,
+                            typeH,
+                            standardizedAirTemp,
+                            standardizedProcessTemp,
+                            standardizedRpm,
+                            standardizedTorque,
+                            standardizedToolWear
+                        ],
+                        target: record.Failure,
+                        original: record // Keep original data for display
+                    };
+                });
+                
+                // Process test data using same normalization parameters
+                this.testData = testDataset.map(record => {
+                    const typeL = record.Type === 'L' ? 1 : 0;
+                    const typeM = record.Type === 'M' ? 1 : 0;
+                    const typeH = record.Type === 'H' ? 1 : 0;
+                    
+                    const standardizedAirTemp = (record.AirTemp - this.normalizationParams.AirTemp.mean) / this.normalizationParams.AirTemp.std;
+                    const standardizedProcessTemp = (record.ProcessTemp - this.normalizationParams.ProcessTemp.mean) / this.normalizationParams.ProcessTemp.std;
+                    const standardizedRpm = (record.RotationalSpeed - this.normalizationParams.RotationalSpeed.mean) / this.normalizationParams.RotationalSpeed.std;
+                    const standardizedTorque = (record.Torque - this.normalizationParams.Torque.mean) / this.normalizationParams.Torque.std;
+                    const standardizedToolWear = (record.ToolWear - this.normalizationParams.ToolWear.mean) / this.normalizationParams.ToolWear.std;
+                    
+                    return {
+                        features: [
+                            typeL,
+                            typeM,
+                            typeH,
+                            standardizedAirTemp,
+                            standardizedProcessTemp,
+                            standardizedRpm,
+                            standardizedTorque,
+                            standardizedToolWear
+                        ],
+                        target: record.Failure,
+                        original: record
+                    };
+                });
+                
+                this.processedData = [...this.trainData, ...this.testData];
+                
+                return {
+                    trainData: this.trainData,
+                    testData: this.testData,
+                    normalizationParams: this.normalizationParams,
+                    processedData: this.processedData
+                };
+            }
+            
+            // ... (rest of the methods remain the same)
+            calculateFeatureImportance() {
+                const correlations = [0, 0, 0, 0, 0, 0, 0, 0]; // Now 8 features due to one-hot encoding
+                const featureNames = ['Type_L', 'Type_M', 'Type_H', 'AirTemp', 'ProcessTemp', 'RotationalSpeed', 'Torque', 'ToolWear'];
+                
+                this.processedData.forEach(record => {
+                    for (let i = 0; i < 8; i++) {
+                        correlations[i] += record.features[i] * record.target;
+                    }
+                });
+                
+                const maxCorrelation = Math.max(...correlations.map(Math.abs));
+                this.featureImportance = correlations.map(c => (Math.abs(c) / maxCorrelation) * 100);
+                
+                return this.featureImportance;
+            }
+            
+            trainModel(epochs = 100) {
+                this.model = new NeuralNetwork(8, 8, 1, 0.01); // Updated to 8 input nodes
+                const trainingLoss = [];
+                
+                for (let epoch = 0; epoch < epochs; epoch++) {
+                    let epochLoss = 0;
+                    
+                    this.trainData.forEach(data => {
+                        this.model.train(data.features, [data.target]);
+                        
+                        const prediction = this.model.forward(data.features);
+                        const error = data.target - prediction;
+                        epochLoss += error * error;
+                    });
+                    
+                    epochLoss /= this.trainData.length;
+                    trainingLoss.push(epochLoss);
+                }
+                
+                return trainingLoss;
+            }
+            
+            evaluateModel() {
+                if (!this.model) return null;
+                
+                let truePositives = 0;
+                let falsePositives = 0;
+                let falseNegatives = 0;
+                let trueNegatives = 0;
+                
+                this.testData.forEach(data => {
+                    const prediction = this.model.forward(data.features);
+                    const predictedClass = prediction > 0.5 ? 1 : 0;
+                    
+                    if (predictedClass === 1 && data.target === 1) truePositives++;
+                    else if (predictedClass === 1 && data.target === 0) falsePositives++;
+                    else if (predictedClass === 0 && data.target === 1) falseNegatives++;
+                    else if (predictedClass === 0 && data.target === 0) trueNegatives++;
+                });
+                
+                const accuracy = (truePositives + trueNegatives) / this.testData.length;
+                const precision = truePositives / (truePositives + falsePositives) || 0;
+                const recall = truePositives / (truePositives + falseNegatives) || 0;
+                const f1 = 2 * (precision * recall) / (precision + recall) || 0;
+                
+                this.modelMetrics = {
+                    accuracy,
+                    precision,
+                    recall,
+                    f1,
+                    confusionMatrix: [truePositives, falsePositives, falseNegatives, trueNegatives]
+                };
+                
+                return this.modelMetrics;
+            }
+            
+            predict(features) {
+                if (!this.model) return null;
+                
+                // Convert categorical to numerical (one-hot encoding)
+                const typeL = features[0] === 'L' ? 1 : 0;
+                const typeM = features[0] === 'M' ? 1 : 0;
+                const typeH = features[0] === 'H' ? 1 : 0;
+                
+                // Standardize numerical features using training parameters
+                const standardizedAirTemp = (features[1] - this.normalizationParams.AirTemp.mean) / this.normalizationParams.AirTemp.std;
+                const standardizedProcessTemp = (features[2] - this.normalizationParams.ProcessTemp.mean) / this.normalizationParams.ProcessTemp.std;
+                const standardizedRpm = (features[3] - this.normalizationParams.RotationalSpeed.mean) / this.normalizationParams.RotationalSpeed.std;
+                const standardizedTorque = (features[4] - this.normalizationParams.Torque.mean) / this.normalizationParams.Torque.std;
+                const standardizedToolWear = (features[5] - this.normalizationParams.ToolWear.mean) / this.normalizationParams.ToolWear.std;
+                
+                const processedFeatures = [
+                    typeL,
+                    typeM,
+                    typeH,
+                    standardizedAirTemp,
+                    standardizedProcessTemp,
+                    standardizedRpm,
+                    standardizedTorque,
+                    standardizedToolWear
+                ];
+                
+                return this.model.forward(processedFeatures);
+            }
+        }
+
+        // Neural Network Implementation (updated for 8 input features)
         class NeuralNetwork {
             constructor(inputNodes, hiddenNodes, outputNodes, learningRate = 0.01) {
                 this.inputNodes = inputNodes;
@@ -1119,352 +1610,6 @@
             
             transpose(a) {
                 return a[0].map((_, colIndex) => a.map(row => row[colIndex]));
-            }
-        }
-
-        // Enhanced ML Pipeline with Flexible CSV Support
-        class MLPipeline {
-            constructor() {
-                this.csvParser = new FlexibleCSVParser();
-                this.rawData = [];
-                this.dataset = [];
-                this.processedData = [];
-                this.trainData = [];
-                this.testData = [];
-                this.model = null;
-                this.featureImportance = [0, 0, 0, 0, 0, 0];
-                this.modelMetrics = {
-                    accuracy: 0,
-                    precision: 0,
-                    recall: 0,
-                    f1: 0,
-                    confusionMatrix: [0, 0, 0, 0]
-                };
-                this.numericStats = {};
-                this.categoricalStats = {};
-                this.correlationMatrix = [];
-                this.normalizationParams = {};
-                this.columnMapping = {};
-            }
-            
-            loadData(csvText) {
-                try {
-                    const parsedData = this.csvParser.parseCSV(csvText);
-                    this.rawData = parsedData.data;
-                    this.columnMapping = parsedData.columnMapping;
-                    
-                    this.dataset = this.rawData.map(row => {
-                        return {
-                            Type: row.type,
-                            AirTemp: row.airtemp,
-                            ProcessTemp: row.processtemp,
-                            RotationalSpeed: row.rotationalspeed,
-                            Torque: row.torque,
-                            ToolWear: row.toolwear,
-                            Failure: row.failure
-                        };
-                    });
-                    
-                    return {
-                        dataset: this.dataset,
-                        columnMapping: this.columnMapping,
-                        totalRecords: this.dataset.length
-                    };
-                } catch (error) {
-                    throw new Error(`Failed to parse CSV: ${error.message}`);
-                }
-            }
-            
-            getDatasetInfo() {
-                const totalRecords = this.dataset.length;
-                const failureCount = this.dataset.filter(d => d.Failure === 1).length;
-                const failureRate = (failureCount / totalRecords * 100).toFixed(2);
-                
-                return {
-                    totalRecords,
-                    failureCount,
-                    failureRate,
-                    features: 6
-                };
-            }
-            
-            performEDA() {
-                const numericFeatures = ['AirTemp', 'ProcessTemp', 'RotationalSpeed', 'Torque', 'ToolWear'];
-                this.numericStats = {};
-                
-                numericFeatures.forEach(feature => {
-                    const values = this.dataset.map(d => d[feature]);
-                    this.numericStats[feature] = {
-                        count: values.length,
-                        mean: values.reduce((a, b) => a + b, 0) / values.length,
-                        std: Math.sqrt(values.reduce((sq, n) => sq + Math.pow(n - values.reduce((a, b) => a + b, 0) / values.length, 2), 0) / values.length),
-                        min: Math.min(...values),
-                        '25%': this.percentile(values, 25),
-                        '50%': this.percentile(values, 50),
-                        '75%': this.percentile(values, 75),
-                        max: Math.max(...values)
-                    };
-                });
-                
-                const typeCounts = {};
-                const typeFailures = {};
-                this.dataset.forEach(d => {
-                    typeCounts[d.Type] = (typeCounts[d.Type] || 0) + 1;
-                    if (d.Failure === 1) {
-                        typeFailures[d.Type] = (typeFailures[d.Type] || 0) + 1;
-                    }
-                });
-                
-                const typeFailureRates = {};
-                for (const type in typeCounts) {
-                    typeFailureRates[type] = ((typeFailures[type] || 0) / typeCounts[type] * 100).toFixed(2);
-                }
-                
-                this.categoricalStats = {
-                    Type: {
-                        counts: typeCounts,
-                        failureRates: typeFailureRates
-                    }
-                };
-                
-                this.calculateCorrelationMatrix();
-                
-                return {
-                    numericStats: this.numericStats,
-                    categoricalStats: this.categoricalStats,
-                    correlationMatrix: this.correlationMatrix
-                };
-            }
-            
-            percentile(arr, p) {
-                const sorted = [...arr].sort((a, b) => a - b);
-                const index = (p / 100) * (sorted.length - 1);
-                const lower = Math.floor(index);
-                const upper = lower + 1;
-                const weight = index - lower;
-                
-                if (upper >= sorted.length) return sorted[lower];
-                return sorted[lower] * (1 - weight) + sorted[upper] * weight;
-            }
-            
-            calculateCorrelationMatrix() {
-                const numericFeatures = ['AirTemp', 'ProcessTemp', 'RotationalSpeed', 'Torque', 'ToolWear', 'Failure'];
-                this.correlationMatrix = [];
-                
-                for (let i = 0; i < numericFeatures.length; i++) {
-                    this.correlationMatrix[i] = [];
-                    for (let j = 0; j < numericFeatures.length; j++) {
-                        this.correlationMatrix[i][j] = 0;
-                    }
-                }
-                
-                for (let i = 0; i < numericFeatures.length; i++) {
-                    for (let j = i; j < numericFeatures.length; j++) {
-                        const feature1 = numericFeatures[i];
-                        const feature2 = numericFeatures[j];
-                        
-                        const values1 = this.dataset.map(d => d[feature1]);
-                        const values2 = this.dataset.map(d => d[feature2]);
-                        
-                        const correlation = this.calculateCorrelation(values1, values2);
-                        this.correlationMatrix[i][j] = correlation;
-                        this.correlationMatrix[j][i] = correlation;
-                    }
-                }
-                
-                return this.correlationMatrix;
-            }
-            
-            calculateCorrelation(x, y) {
-                const n = x.length;
-                const sum_x = x.reduce((a, b) => a + b, 0);
-                const sum_y = y.reduce((a, b) => a + b, 0);
-                const sum_xy = x.reduce((sum, val, i) => sum + val * y[i], 0);
-                const sum_x2 = x.reduce((sum, val) => sum + val * val, 0);
-                const sum_y2 = y.reduce((sum, val) => sum + val * val, 0);
-                
-                const numerator = n * sum_xy - sum_x * sum_y;
-                const denominator = Math.sqrt((n * sum_x2 - sum_x * sum_x) * (n * sum_y2 - sum_y * sum_y));
-                
-                return denominator === 0 ? 0 : numerator / denominator;
-            }
-            
-            preprocessData() {
-                const splitIndex = Math.floor(this.dataset.length * 0.8);
-                const trainDataset = this.dataset.slice(0, splitIndex);
-                const testDataset = this.dataset.slice(splitIndex);
-                
-                const numericFeatures = ['AirTemp', 'ProcessTemp', 'RotationalSpeed', 'Torque', 'ToolWear'];
-                
-                numericFeatures.forEach(feature => {
-                    const values = trainDataset.map(d => d[feature]);
-                    this.normalizationParams[feature] = {
-                        min: Math.min(...values),
-                        max: Math.max(...values)
-                    };
-                });
-                
-                this.trainData = trainDataset.map(record => {
-                    const typeValue = record.Type === 'L' ? 0 : record.Type === 'M' ? 0.5 : 1;
-                    
-                    const normalizedAirTemp = (record.AirTemp - this.normalizationParams.AirTemp.min) / 
-                                            (this.normalizationParams.AirTemp.max - this.normalizationParams.AirTemp.min);
-                    const normalizedProcessTemp = (record.ProcessTemp - this.normalizationParams.ProcessTemp.min) / 
-                                                (this.normalizationParams.ProcessTemp.max - this.normalizationParams.ProcessTemp.min);
-                    const normalizedRpm = (record.RotationalSpeed - this.normalizationParams.RotationalSpeed.min) / 
-                                        (this.normalizationParams.RotationalSpeed.max - this.normalizationParams.RotationalSpeed.min);
-                    const normalizedTorque = (record.Torque - this.normalizationParams.Torque.min) / 
-                                            (this.normalizationParams.Torque.max - this.normalizationParams.Torque.min);
-                    const normalizedToolWear = (record.ToolWear - this.normalizationParams.ToolWear.min) / 
-                                            (this.normalizationParams.ToolWear.max - this.normalizationParams.ToolWear.min);
-                    
-                    return {
-                        features: [
-                            typeValue,
-                            normalizedAirTemp,
-                            normalizedProcessTemp,
-                            normalizedRpm,
-                            normalizedTorque,
-                            normalizedToolWear
-                        ],
-                        target: record.Failure
-                    };
-                });
-                
-                this.testData = testDataset.map(record => {
-                    const typeValue = record.Type === 'L' ? 0 : record.Type === 'M' ? 0.5 : 1;
-                    
-                    const normalizedAirTemp = (record.AirTemp - this.normalizationParams.AirTemp.min) / 
-                                            (this.normalizationParams.AirTemp.max - this.normalizationParams.AirTemp.min);
-                    const normalizedProcessTemp = (record.ProcessTemp - this.normalizationParams.ProcessTemp.min) / 
-                                                (this.normalizationParams.ProcessTemp.max - this.normalizationParams.ProcessTemp.min);
-                    const normalizedRpm = (record.RotationalSpeed - this.normalizationParams.RotationalSpeed.min) / 
-                                        (this.normalizationParams.RotationalSpeed.max - this.normalizationParams.RotationalSpeed.min);
-                    const normalizedTorque = (record.Torque - this.normalizationParams.Torque.min) / 
-                                            (this.normalizationParams.Torque.max - this.normalizationParams.Torque.min);
-                    const normalizedToolWear = (record.ToolWear - this.normalizationParams.ToolWear.min) / 
-                                            (this.normalizationParams.ToolWear.max - this.normalizationParams.ToolWear.min);
-                    
-                    return {
-                        features: [
-                            typeValue,
-                            normalizedAirTemp,
-                            normalizedProcessTemp,
-                            normalizedRpm,
-                            normalizedTorque,
-                            normalizedToolWear
-                        ],
-                        target: record.Failure
-                    };
-                });
-                
-                this.processedData = [...this.trainData, ...this.testData];
-                
-                return {
-                    trainData: this.trainData,
-                    testData: this.testData,
-                    normalizationParams: this.normalizationParams
-                };
-            }
-            
-            calculateFeatureImportance() {
-                const correlations = [0, 0, 0, 0, 0, 0];
-                const featureNames = ['Type', 'AirTemp', 'ProcessTemp', 'RotationalSpeed', 'Torque', 'ToolWear'];
-                
-                this.processedData.forEach(record => {
-                    for (let i = 0; i < 6; i++) {
-                        correlations[i] += record.features[i] * record.target;
-                    }
-                });
-                
-                const maxCorrelation = Math.max(...correlations.map(Math.abs));
-                this.featureImportance = correlations.map(c => (Math.abs(c) / maxCorrelation) * 100);
-                
-                return this.featureImportance;
-            }
-            
-            trainModel(epochs = 100) {
-                this.model = new NeuralNetwork(6, 8, 1, 0.01);
-                const trainingLoss = [];
-                
-                for (let epoch = 0; epoch < epochs; epoch++) {
-                    let epochLoss = 0;
-                    
-                    this.trainData.forEach(data => {
-                        this.model.train(data.features, [data.target]);
-                        
-                        const prediction = this.model.forward(data.features);
-                        const error = data.target - prediction;
-                        epochLoss += error * error;
-                    });
-                    
-                    epochLoss /= this.trainData.length;
-                    trainingLoss.push(epochLoss);
-                }
-                
-                return trainingLoss;
-            }
-            
-            evaluateModel() {
-                if (!this.model) return null;
-                
-                let truePositives = 0;
-                let falsePositives = 0;
-                let falseNegatives = 0;
-                let trueNegatives = 0;
-                
-                this.testData.forEach(data => {
-                    const prediction = this.model.forward(data.features);
-                    const predictedClass = prediction > 0.5 ? 1 : 0;
-                    
-                    if (predictedClass === 1 && data.target === 1) truePositives++;
-                    else if (predictedClass === 1 && data.target === 0) falsePositives++;
-                    else if (predictedClass === 0 && data.target === 1) falseNegatives++;
-                    else if (predictedClass === 0 && data.target === 0) trueNegatives++;
-                });
-                
-                const accuracy = (truePositives + trueNegatives) / this.testData.length;
-                const precision = truePositives / (truePositives + falsePositives) || 0;
-                const recall = truePositives / (truePositives + falseNegatives) || 0;
-                const f1 = 2 * (precision * recall) / (precision + recall) || 0;
-                
-                this.modelMetrics = {
-                    accuracy,
-                    precision,
-                    recall,
-                    f1,
-                    confusionMatrix: [truePositives, falsePositives, falseNegatives, trueNegatives]
-                };
-                
-                return this.modelMetrics;
-            }
-            
-            predict(features) {
-                if (!this.model) return null;
-                
-                const typeValue = features[0] === 'L' ? 0 : features[0] === 'M' ? 0.5 : 1;
-                
-                const normalizedAirTemp = (features[1] - this.normalizationParams.AirTemp.min) / 
-                                        (this.normalizationParams.AirTemp.max - this.normalizationParams.AirTemp.min);
-                const normalizedProcessTemp = (features[2] - this.normalizationParams.ProcessTemp.min) / 
-                                            (this.normalizationParams.ProcessTemp.max - this.normalizationParams.ProcessTemp.min);
-                const normalizedRpm = (features[3] - this.normalizationParams.RotationalSpeed.min) / 
-                                    (this.normalizationParams.RotationalSpeed.max - this.normalizationParams.RotationalSpeed.min);
-                const normalizedTorque = (features[4] - this.normalizationParams.Torque.min) / 
-                                        (this.normalizationParams.Torque.max - this.normalizationParams.Torque.min);
-                const normalizedToolWear = (features[5] - this.normalizationParams.ToolWear.min) / 
-                                        (this.normalizationParams.ToolWear.max - this.normalizationParams.ToolWear.min);
-                
-                const normalizedFeatures = [
-                    typeValue,
-                    normalizedAirTemp,
-                    normalizedProcessTemp,
-                    normalizedRpm,
-                    normalizedTorque,
-                    normalizedToolWear
-                ];
-                
-                return this.model.forward(normalizedFeatures);
             }
         }
 
@@ -1623,11 +1768,64 @@
                     const row = document.createElement('tr');
                     for (const internalName of Object.keys(columnMapping)) {
                         const td = document.createElement('td');
-                        td.textContent = record[internalName];
+                        td.textContent = record[internalName] !== null ? record[internalName] : 'NULL';
+                        if (record[internalName] === null) {
+                            td.style.color = 'red';
+                            td.style.fontWeight = 'bold';
+                        }
                         row.appendChild(td);
                     }
                     tableBody.appendChild(row);
                 });
+            }
+            
+            function displayPreprocessedData(preprocessedData) {
+                const tableHead = document.getElementById('preprocessed-table-head');
+                const tableBody = document.getElementById('preprocessed-table-body');
+                
+                tableHead.innerHTML = '';
+                tableBody.innerHTML = '';
+                
+                // Create headers
+                const headerRow = document.createElement('tr');
+                const headers = ['Type_L', 'Type_M', 'Type_H', 'AirTemp_std', 'ProcessTemp_std', 'RotationalSpeed_std', 'Torque_std', 'ToolWear_std', 'Failure'];
+                
+                headers.forEach(header => {
+                    const th = document.createElement('th');
+                    th.textContent = header;
+                    headerRow.appendChild(th);
+                });
+                tableHead.appendChild(headerRow);
+                
+                // Add data rows (first 10)
+                preprocessedData.slice(0, 10).forEach(record => {
+                    const row = document.createElement('tr');
+                    
+                    // Add one-hot encoded type features
+                    row.appendChild(createTableCell(record.features[0].toFixed(4)));
+                    row.appendChild(createTableCell(record.features[1].toFixed(4)));
+                    row.appendChild(createTableCell(record.features[2].toFixed(4)));
+                    
+                    // Add standardized numerical features
+                    row.appendChild(createTableCell(record.features[3].toFixed(4)));
+                    row.appendChild(createTableCell(record.features[4].toFixed(4)));
+                    row.appendChild(createTableCell(record.features[5].toFixed(4)));
+                    row.appendChild(createTableCell(record.features[6].toFixed(4)));
+                    row.appendChild(createTableCell(record.features[7].toFixed(4)));
+                    
+                    // Add target
+                    row.appendChild(createTableCell(record.target));
+                    
+                    tableBody.appendChild(row);
+                });
+                
+                document.getElementById('preprocessed-preview').style.display = 'block';
+            }
+            
+            function createTableCell(content) {
+                const td = document.createElement('td');
+                td.textContent = content;
+                return td;
             }
             
             // File upload handling
@@ -1703,6 +1901,51 @@
                         The failure rate is ${datasetInfo.failureRate}% (${datasetInfo.failureCount} failures out of ${datasetInfo.totalRecords} records).</p>
                     `;
                     
+                    // Display missing values information
+                    const missingValuesSection = document.getElementById('missing-values-section');
+                    if (datasetInfo.hasMissingValues) {
+                        let missingValuesHTML = `<div class="missing-values-section">
+                            <h4>Missing Values Detected</h4>
+                            <p>The following columns have missing values:</p>
+                            <ul>`;
+                        
+                        for (const [column, count] of Object.entries(datasetInfo.missingValues)) {
+                            if (count > 0) {
+                                missingValuesHTML += `<li><strong>${column}</strong>: ${count} missing values</li>`;
+                            }
+                        }
+                        
+                        missingValuesHTML += `</ul>
+                            <p>Please choose how to handle missing values:</p>
+                            <div class="missing-values-options">
+                                <button class="btn btn-warning" id="delete-missing-btn">Delete Rows with Missing Values</button>
+                                <button class="btn btn-success" id="fill-missing-btn">Fill with Median/Mode</button>
+                            </div>
+                        </div>`;
+                        
+                        missingValuesSection.innerHTML = missingValuesHTML;
+                        missingValuesSection.style.display = 'block';
+                        
+                        // Add event listeners for missing value handling buttons
+                        document.getElementById('delete-missing-btn').addEventListener('click', function() {
+                            mlPipeline.handleMissingValues('delete');
+                            const updatedInfo = mlPipeline.getDatasetInfo();
+                            document.getElementById('total-records').textContent = updatedInfo.totalRecords;
+                            missingValuesSection.style.display = 'none';
+                            alert(`Deleted rows with missing values. New dataset has ${updatedInfo.totalRecords} records.`);
+                        });
+                        
+                        document.getElementById('fill-missing-btn').addEventListener('click', function() {
+                            mlPipeline.handleMissingValues('fill');
+                            const updatedInfo = mlPipeline.getDatasetInfo();
+                            document.getElementById('total-records').textContent = updatedInfo.totalRecords;
+                            missingValuesSection.style.display = 'none';
+                            alert('Missing values filled with median/mode.');
+                        });
+                    } else {
+                        missingValuesSection.style.display = 'none';
+                    }
+                    
                     edaBtn.style.display = 'inline-block';
                     loading.style.display = 'none';
                     updatePipelineStep(2, 'complete');
@@ -1728,7 +1971,7 @@
                 }, 1500);
             });
             
-            // Display EDA results
+            // Display EDA results with charts
             function displayEDAResults(edaResults) {
                 const edaContent = document.getElementById('eda-content');
                 
@@ -1754,19 +1997,21 @@
                 const numericFeatures = ['AirTemp', 'ProcessTemp', 'RotationalSpeed', 'Torque', 'ToolWear'];
                 numericFeatures.forEach(feature => {
                     const stats = edaResults.numericStats[feature];
-                    numericHTML += `
-                        <tr>
-                            <td>${feature}</td>
-                            <td>${stats.count}</td>
-                            <td>${stats.mean.toFixed(2)}</td>
-                            <td>${stats.std.toFixed(2)}</td>
-                            <td>${stats.min.toFixed(2)}</td>
-                            <td>${stats['25%'].toFixed(2)}</td>
-                            <td>${stats['50%'].toFixed(2)}</td>
-                            <td>${stats['75%'].toFixed(2)}</td>
-                            <td>${stats.max.toFixed(2)}</td>
-                        </tr>
-                    `;
+                    if (stats) {
+                        numericHTML += `
+                            <tr>
+                                <td>${feature}</td>
+                                <td>${stats.count}</td>
+                                <td>${stats.mean.toFixed(2)}</td>
+                                <td>${stats.std.toFixed(2)}</td>
+                                <td>${stats.min.toFixed(2)}</td>
+                                <td>${stats['25%'].toFixed(2)}</td>
+                                <td>${stats['50%'].toFixed(2)}</td>
+                                <td>${stats['75%'].toFixed(2)}</td>
+                                <td>${stats.max.toFixed(2)}</td>
+                            </tr>
+                        `;
+                    }
                 });
                 
                 numericHTML += `</tbody></table></div>`;
@@ -1840,7 +2085,199 @@
                 
                 correlationHTML += `</tbody></table></div>`;
                 
-                edaContent.innerHTML = numericHTML + categoricalHTML + correlationHTML;
+                // Charts section
+                const chartsHTML = `<div class="eda-section">
+                                <h3>Data Visualizations</h3>
+                                <div class="chart-row">
+                                    <div class="chart-item">
+                                        <h4>Type Distribution</h4>
+                                        <div class="chart-container">
+                                            <canvas id="type-distribution-chart"></canvas>
+                                        </div>
+                                    </div>
+                                    <div class="chart-item">
+                                        <h4>Failure Rate by Type</h4>
+                                        <div class="chart-container">
+                                            <canvas id="failure-rate-chart"></canvas>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="chart-row">
+                                    <div class="chart-item">
+                                        <h4>Air Temperature Distribution</h4>
+                                        <div class="chart-container">
+                                            <canvas id="airtemp-distribution-chart"></canvas>
+                                        </div>
+                                    </div>
+                                    <div class="chart-item">
+                                        <h4>Tool Wear Distribution</h4>
+                                        <div class="chart-container">
+                                            <canvas id="toolwear-distribution-chart"></canvas>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="chart-row">
+                                    <div class="chart-item">
+                                        <h4>Torque Distribution</h4>
+                                        <div class="chart-container">
+                                            <canvas id="torque-distribution-chart"></canvas>
+                                        </div>
+                                    </div>
+                                    <div class="chart-item">
+                                        <h4>Rotational Speed Distribution</h4>
+                                        <div class="chart-container">
+                                            <canvas id="rotationalspeed-distribution-chart"></canvas>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>`;
+                
+                edaContent.innerHTML = numericHTML + categoricalHTML + correlationHTML + chartsHTML;
+                
+                // Create charts
+                createEDACharts(edaResults);
+            }
+            
+            function createEDACharts(edaResults) {
+                // Type distribution chart
+                const typeCtx = document.getElementById('type-distribution-chart').getContext('2d');
+                const typeLabels = Object.keys(edaResults.categoricalStats.Type.counts);
+                const typeData = Object.values(edaResults.categoricalStats.Type.counts);
+                
+                new Chart(typeCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: typeLabels,
+                        datasets: [{
+                            label: 'Count',
+                            data: typeData,
+                            backgroundColor: [
+                                'rgba(52, 152, 219, 0.7)',
+                                'rgba(46, 204, 113, 0.7)',
+                                'rgba(241, 196, 15, 0.7)'
+                            ],
+                            borderColor: [
+                                'rgb(52, 152, 219)',
+                                'rgb(46, 204, 113)',
+                                'rgb(241, 196, 15)'
+                            ],
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                display: false
+                            }
+                        }
+                    }
+                });
+                
+                // Failure rate by type chart
+                const failureCtx = document.getElementById('failure-rate-chart').getContext('2d');
+                const failureData = Object.values(edaResults.categoricalStats.Type.failureRates).map(v => parseFloat(v));
+                
+                new Chart(failureCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: Object.keys(edaResults.categoricalStats.Type.counts),
+                        datasets: [{
+                            label: 'Failure Rate (%)',
+                            data: failureData,
+                            backgroundColor: 'rgba(231, 76, 60, 0.7)',
+                            borderColor: 'rgb(231, 76, 60)',
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                title: {
+                                    display: true,
+                                    text: 'Failure Rate (%)'
+                                }
+                            }
+                        },
+                        plugins: {
+                            legend: {
+                                display: false
+                            }
+                        }
+                    }
+                });
+                
+                // Histograms for numeric features
+                createHistogram('airtemp-distribution-chart', 'Air Temperature', mlPipeline.dataset.map(d => d.AirTemp).filter(val => val !== null), 'Air Temperature (K)');
+                createHistogram('toolwear-distribution-chart', 'Tool Wear', mlPipeline.dataset.map(d => d.ToolWear).filter(val => val !== null), 'Tool Wear (min)');
+                createHistogram('torque-distribution-chart', 'Torque', mlPipeline.dataset.map(d => d.Torque).filter(val => val !== null), 'Torque (Nm)');
+                createHistogram('rotationalspeed-distribution-chart', 'Rotational Speed', mlPipeline.dataset.map(d => d.RotationalSpeed).filter(val => val !== null), 'Rotational Speed (rpm)');
+            }
+            
+            function createHistogram(canvasId, title, data, xLabel) {
+                if (data.length === 0) return;
+                
+                const ctx = document.getElementById(canvasId).getContext('2d');
+                
+                // Calculate histogram bins
+                const min = Math.min(...data);
+                const max = Math.max(...data);
+                const binCount = Math.min(20, Math.ceil(Math.sqrt(data.length)));
+                const binWidth = (max - min) / binCount;
+                
+                const bins = Array(binCount).fill(0);
+                data.forEach(value => {
+                    const binIndex = Math.min(Math.floor((value - min) / binWidth), binCount - 1);
+                    bins[binIndex]++;
+                });
+                
+                const binLabels = Array.from({length: binCount}, (_, i) => {
+                    const binStart = min + i * binWidth;
+                    const binEnd = min + (i + 1) * binWidth;
+                    return `${binStart.toFixed(1)}-${binEnd.toFixed(1)}`;
+                });
+                
+                new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: binLabels,
+                        datasets: [{
+                            label: 'Frequency',
+                            data: bins,
+                            backgroundColor: 'rgba(52, 152, 219, 0.7)',
+                            borderColor: 'rgb(52, 152, 219)',
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            x: {
+                                title: {
+                                    display: true,
+                                    text: xLabel
+                                }
+                            },
+                            y: {
+                                title: {
+                                    display: true,
+                                    text: 'Frequency'
+                                },
+                                beginAtZero: true
+                            }
+                        },
+                        plugins: {
+                            legend: {
+                                display: false
+                            }
+                        }
+                    }
+                });
             }
             
             // Preprocess data
@@ -1856,47 +2293,50 @@
                         <ul>
                             <li>Training set: ${preprocessingResults.trainData.length} records</li>
                             <li>Testing set: ${preprocessingResults.testData.length} records</li>
-                            <li>Categorical variable (Type) encoded as numerical values</li>
-                            <li>Numerical features normalized to [0, 1] range</li>
+                            <li>Categorical variable (Type) encoded using one-hot encoding</li>
+                            <li>Numerical features standardized using z-score normalization</li>
                         </ul>
-                        <h4>Normalization Parameters:</h4>
+                        <h4>Standardization Parameters:</h4>
                         <table class="stats-table">
                             <thead>
                                 <tr>
                                     <th>Feature</th>
-                                    <th>Min</th>
-                                    <th>Max</th>
+                                    <th>Mean</th>
+                                    <th>Standard Deviation</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 <tr>
                                     <td>Air Temperature</td>
-                                    <td>${preprocessingResults.normalizationParams.AirTemp.min.toFixed(2)}</td>
-                                    <td>${preprocessingResults.normalizationParams.AirTemp.max.toFixed(2)}</td>
+                                    <td>${preprocessingResults.normalizationParams.AirTemp.mean.toFixed(2)}</td>
+                                    <td>${preprocessingResults.normalizationParams.AirTemp.std.toFixed(2)}</td>
                                 </tr>
                                 <tr>
                                     <td>Process Temperature</td>
-                                    <td>${preprocessingResults.normalizationParams.ProcessTemp.min.toFixed(2)}</td>
-                                    <td>${preprocessingResults.normalizationParams.ProcessTemp.max.toFixed(2)}</td>
+                                    <td>${preprocessingResults.normalizationParams.ProcessTemp.mean.toFixed(2)}</td>
+                                    <td>${preprocessingResults.normalizationParams.ProcessTemp.std.toFixed(2)}</td>
                                 </tr>
                                 <tr>
                                     <td>Rotational Speed</td>
-                                    <td>${preprocessingResults.normalizationParams.RotationalSpeed.min.toFixed(2)}</td>
-                                    <td>${preprocessingResults.normalizationParams.RotationalSpeed.max.toFixed(2)}</td>
+                                    <td>${preprocessingResults.normalizationParams.RotationalSpeed.mean.toFixed(2)}</td>
+                                    <td>${preprocessingResults.normalizationParams.RotationalSpeed.std.toFixed(2)}</td>
                                 </tr>
                                 <tr>
                                     <td>Torque</td>
-                                    <td>${preprocessingResults.normalizationParams.Torque.min.toFixed(2)}</td>
-                                    <td>${preprocessingResults.normalizationParams.Torque.max.toFixed(2)}</td>
+                                    <td>${preprocessingResults.normalizationParams.Torque.mean.toFixed(2)}</td>
+                                    <td>${preprocessingResults.normalizationParams.Torque.std.toFixed(2)}</td>
                                 </tr>
                                 <tr>
                                     <td>Tool Wear</td>
-                                    <td>${preprocessingResults.normalizationParams.ToolWear.min.toFixed(2)}</td>
-                                    <td>${preprocessingResults.normalizationParams.ToolWear.max.toFixed(2)}</td>
+                                    <td>${preprocessingResults.normalizationParams.ToolWear.mean.toFixed(2)}</td>
+                                    <td>${preprocessingResults.normalizationParams.ToolWear.std.toFixed(2)}</td>
                                 </tr>
                             </tbody>
                         </table>
                     `;
+                    
+                    // Display preprocessed data preview
+                    displayPreprocessedData(preprocessingResults.processedData);
                     
                     trainBtn.style.display = 'inline-block';
                     loading.style.display = 'none';
@@ -2019,9 +2459,14 @@
                     ];
                     performanceChart.update();
                     
+                    // Update feature importance display
                     const featureFills = document.querySelectorAll('.feature-fill');
+                    const featureNames = ['Type_L', 'Type_M', 'Type_H', 'AirTemp', 'ProcessTemp', 'RotationalSpeed', 'Torque', 'ToolWear'];
+                    
                     featureFills.forEach((fill, index) => {
-                        fill.style.width = featureImportance[index].toFixed(1) + '%';
+                        if (index < featureImportance.length) {
+                            fill.style.width = featureImportance[index].toFixed(1) + '%';
+                        }
                     });
                     
                     document.getElementById('accuracy-display').textContent = (metrics.accuracy * 100).toFixed(1) + '%';
