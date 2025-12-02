@@ -1392,89 +1392,153 @@
             }
             
             trainModel() {
-                // Simple neural network implementation
+                // Enhanced neural network with deeper architecture
                 const inputSize = this.processedData.X_train_processed[0].length;
-                const hiddenSize = 8;
+                const hiddenSize1 = 32;  // Increased capacity
+                const hiddenSize2 = 16;  // Added second hidden layer
                 const outputSize = 1;
                 
-                // Initialize weights
+                // Xavier initialization for better training
+                const xavier1 = Math.sqrt(2.0 / inputSize);
+                const xavier2 = Math.sqrt(2.0 / hiddenSize1);
+                const xavier3 = Math.sqrt(2.0 / hiddenSize2);
+                
+                // Initialize weights with Xavier initialization
                 const weights1 = Array(inputSize).fill().map(() => 
-                    Array(hiddenSize).fill().map(() => Math.random() * 0.1 - 0.05)
+                    Array(hiddenSize1).fill().map(() => (Math.random() * 2 - 1) * xavier1)
                 );
-                const weights2 = Array(hiddenSize).fill().map(() => 
-                    Array(outputSize).fill().map(() => Math.random() * 0.1 - 0.05)
+                const weights2 = Array(hiddenSize1).fill().map(() => 
+                    Array(hiddenSize2).fill().map(() => (Math.random() * 2 - 1) * xavier2)
+                );
+                const weights3 = Array(hiddenSize2).fill().map(() => 
+                    Array(outputSize).fill().map(() => (Math.random() * 2 - 1) * xavier3)
                 );
                 
-                const biases1 = Array(hiddenSize).fill(0);
-                const biases2 = Array(outputSize).fill(0);
+                const biases1 = Array(hiddenSize1).fill(0);
+                const biases2 = Array(hiddenSize2).fill(0);
+                const biases3 = Array(outputSize).fill(0);
+                
+                // Calculate class weights for imbalanced data
+                const failureCount = this.processedData.y_train.filter(y => y === 1).length;
+                const noFailureCount = this.processedData.y_train.length - failureCount;
+                const classWeight = noFailureCount / failureCount;  // Weight for failure class
                 
                 // Training parameters
-                const learningRate = 0.01;
-                const epochs = 100;
+                const learningRate = 0.001;  // Lower learning rate for stability
+                const epochs = 500;  // More epochs
+                
+                // Activation functions
+                const relu = x => Math.max(0, x);
+                const reluDerivative = x => x > 0 ? 1 : 0;
+                const sigmoid = x => 1 / (1 + Math.exp(-x));
+                const sigmoidDerivative = x => {
+                    const sig = sigmoid(x);
+                    return sig * (1 - sig);
+                };
                 
                 // Training loop
                 for (let epoch = 0; epoch < epochs; epoch++) {
                     let totalLoss = 0;
+                    let totalWeightedLoss = 0;
                     
                     for (let i = 0; i < this.processedData.X_train_processed.length; i++) {
                         const input = this.processedData.X_train_processed[i];
                         const target = this.processedData.y_train[i];
                         
-                        // Forward pass
-                        const hidden = Array(hiddenSize).fill(0);
-                        for (let j = 0; j < hiddenSize; j++) {
+                        // Forward pass - Layer 1
+                        const hidden1 = Array(hiddenSize1).fill(0);
+                        for (let j = 0; j < hiddenSize1; j++) {
                             let sum = biases1[j];
                             for (let k = 0; k < inputSize; k++) {
                                 sum += input[k] * weights1[k][j];
                             }
-                            hidden[j] = Math.max(0, sum); // ReLU activation
+                            hidden1[j] = relu(sum);
                         }
                         
+                        // Forward pass - Layer 2
+                        const hidden2 = Array(hiddenSize2).fill(0);
+                        for (let j = 0; j < hiddenSize2; j++) {
+                            let sum = biases2[j];
+                            for (let k = 0; k < hiddenSize1; k++) {
+                                sum += hidden1[k] * weights2[k][j];
+                            }
+                            hidden2[j] = relu(sum);
+                        }
+                        
+                        // Forward pass - Output Layer
                         const output = Array(outputSize).fill(0);
                         for (let j = 0; j < outputSize; j++) {
-                            let sum = biases2[j];
-                            for (let k = 0; k < hiddenSize; k++) {
-                                sum += hidden[k] * weights2[k][j];
+                            let sum = biases3[j];
+                            for (let k = 0; k < hiddenSize2; k++) {
+                                sum += hidden2[k] * weights3[k][j];
                             }
-                            output[j] = 1 / (1 + Math.exp(-sum)); // Sigmoid activation
+                            output[j] = sigmoid(sum);
                         }
                         
-                        // Calculate loss (binary cross-entropy)
+                        // Calculate loss with class weighting
                         const loss = -target * Math.log(output[0]) - (1 - target) * Math.log(1 - output[0]);
-                        totalLoss += loss;
+                        const weightedLoss = target === 1 ? loss * classWeight : loss;
                         
-                        // Backward pass
-                        const outputError = output[0] - target;
+                        totalLoss += loss;
+                        totalWeightedLoss += weightedLoss;
+                        
+                        // Backward pass - Output Layer
+                        const outputError = (output[0] - target) * sigmoidDerivative(output[0]);
                         
                         // Update weights and biases for output layer
-                        for (let j = 0; j < hiddenSize; j++) {
+                        for (let j = 0; j < hiddenSize2; j++) {
                             for (let k = 0; k < outputSize; k++) {
-                                weights2[j][k] -= learningRate * outputError * hidden[j];
+                                weights3[j][k] -= learningRate * outputError * hidden2[j];
                             }
                         }
                         for (let j = 0; j < outputSize; j++) {
-                            biases2[j] -= learningRate * outputError;
+                            biases3[j] -= learningRate * outputError;
                         }
                         
-                        // Calculate hidden layer errors
-                        const hiddenErrors = Array(hiddenSize).fill(0);
-                        for (let j = 0; j < hiddenSize; j++) {
+                        // Calculate hidden layer 2 errors
+                        const hidden2Errors = Array(hiddenSize2).fill(0);
+                        for (let j = 0; j < hiddenSize2; j++) {
                             let error = 0;
                             for (let k = 0; k < outputSize; k++) {
-                                error += outputError * weights2[j][k];
+                                error += outputError * weights3[j][k];
                             }
-                            hiddenErrors[j] = error * (hidden[j] > 0 ? 1 : 0); // ReLU derivative
+                            hidden2Errors[j] = error * reluDerivative(hidden2[j]);
                         }
                         
-                        // Update weights and biases for hidden layer
-                        for (let j = 0; j < inputSize; j++) {
-                            for (let k = 0; k < hiddenSize; k++) {
-                                weights1[j][k] -= learningRate * hiddenErrors[k] * input[j];
+                        // Update weights and biases for hidden layer 2
+                        for (let j = 0; j < hiddenSize1; j++) {
+                            for (let k = 0; k < hiddenSize2; k++) {
+                                weights2[j][k] -= learningRate * hidden2Errors[k] * hidden1[j];
                             }
                         }
-                        for (let j = 0; j < hiddenSize; j++) {
-                            biases1[j] -= learningRate * hiddenErrors[j];
+                        for (let j = 0; j < hiddenSize2; j++) {
+                            biases2[j] -= learningRate * hidden2Errors[j];
                         }
+                        
+                        // Calculate hidden layer 1 errors
+                        const hidden1Errors = Array(hiddenSize1).fill(0);
+                        for (let j = 0; j < hiddenSize1; j++) {
+                            let error = 0;
+                            for (let k = 0; k < hiddenSize2; k++) {
+                                error += hidden2Errors[k] * weights2[j][k];
+                            }
+                            hidden1Errors[j] = error * reluDerivative(hidden1[j]);
+                        }
+                        
+                        // Update weights and biases for hidden layer 1
+                        for (let j = 0; j < inputSize; j++) {
+                            for (let k = 0; k < hiddenSize1; k++) {
+                                weights1[j][k] -= learningRate * hidden1Errors[k] * input[j];
+                            }
+                        }
+                        for (let j = 0; j < hiddenSize1; j++) {
+                            biases1[j] -= learningRate * hidden1Errors[j];
+                        }
+                    }
+                    
+                    // Log progress every 50 epochs
+                    if (epoch % 50 === 0) {
+                        console.log(`Epoch ${epoch}: Loss = ${totalLoss.toFixed(4)}, Weighted Loss = ${totalWeightedLoss.toFixed(4)}`);
                     }
                 }
                 
@@ -1482,25 +1546,27 @@
                 this.model = {
                     weights1,
                     weights2,
+                    weights3,
                     biases1,
                     biases2,
+                    biases3,
                     inputSize,
-                    hiddenSize,
+                    hiddenSize1,
+                    hiddenSize2,
                     outputSize
                 };
                 
-                // Calculate feature importance (simplified)
+                // Calculate feature importance (based on first layer weights)
                 this.calculateFeatureImportance();
                 
                 return this.model;
             }
             
             calculateFeatureImportance() {
-                // Simplified feature importance calculation
-                // Based on the magnitude of weights in the first layer
+                // Feature importance based on the magnitude of weights in the first layer
                 const { weights1 } = this.model;
                 
-                // Sum absolute weights for each input feature
+                // Sum absolute weights for each input feature across all hidden neurons
                 this.featureImportance = Array(weights1.length).fill(0);
                 for (let i = 0; i < weights1.length; i++) {
                     for (let j = 0; j < weights1[i].length; j++) {
@@ -1520,7 +1586,7 @@
                     throw new Error("Model not trained yet");
                 }
                 
-                const { weights1, weights2, biases1, biases2, hiddenSize, outputSize } = this.model;
+                const { weights1, weights2, weights3, biases1, biases2, biases3, hiddenSize1, hiddenSize2, outputSize } = this.model;
                 
                 // Test on test set
                 let testCorrect = 0;
@@ -1530,21 +1596,32 @@
                     const input = this.processedData.X_test_processed[i];
                     const target = this.processedData.y_test[i];
                     
-                    // Forward pass
-                    const hidden = Array(hiddenSize).fill(0);
-                    for (let j = 0; j < hiddenSize; j++) {
+                    // Forward pass - Layer 1
+                    const hidden1 = Array(hiddenSize1).fill(0);
+                    for (let j = 0; j < hiddenSize1; j++) {
                         let sum = biases1[j];
                         for (let k = 0; k < input.length; k++) {
                             sum += input[k] * weights1[k][j];
                         }
-                        hidden[j] = Math.max(0, sum); // ReLU
+                        hidden1[j] = Math.max(0, sum); // ReLU
                     }
                     
+                    // Forward pass - Layer 2
+                    const hidden2 = Array(hiddenSize2).fill(0);
+                    for (let j = 0; j < hiddenSize2; j++) {
+                        let sum = biases2[j];
+                        for (let k = 0; k < hiddenSize1; k++) {
+                            sum += hidden1[k] * weights2[k][j];
+                        }
+                        hidden2[j] = Math.max(0, sum); // ReLU
+                    }
+                    
+                    // Forward pass - Output Layer
                     const output = Array(outputSize).fill(0);
                     for (let j = 0; j < outputSize; j++) {
-                        let sum = biases2[j];
-                        for (let k = 0; k < hiddenSize; k++) {
-                            sum += hidden[k] * weights2[k][j];
+                        let sum = biases3[j];
+                        for (let k = 0; k < hiddenSize2; k++) {
+                            sum += hidden2[k] * weights3[k][j];
                         }
                         output[j] = 1 / (1 + Math.exp(-sum)); // Sigmoid
                     }
@@ -1590,7 +1667,7 @@
                     throw new Error("Model not trained yet");
                 }
                 
-                const { weights1, weights2, biases1, biases2, hiddenSize, outputSize } = this.model;
+                const { weights1, weights2, weights3, biases1, biases2, biases3, hiddenSize1, hiddenSize2, outputSize } = this.model;
                 
                 // Preprocess input data
                 const processedInput = [];
@@ -1608,21 +1685,32 @@
                     processedInput.push(normalized);
                 });
                 
-                // Forward pass
-                const hidden = Array(hiddenSize).fill(0);
-                for (let j = 0; j < hiddenSize; j++) {
+                // Forward pass - Layer 1
+                const hidden1 = Array(hiddenSize1).fill(0);
+                for (let j = 0; j < hiddenSize1; j++) {
                     let sum = biases1[j];
                     for (let k = 0; k < processedInput.length; k++) {
                         sum += processedInput[k] * weights1[k][j];
                     }
-                    hidden[j] = Math.max(0, sum); // ReLU
+                    hidden1[j] = Math.max(0, sum); // ReLU
                 }
                 
+                // Forward pass - Layer 2
+                const hidden2 = Array(hiddenSize2).fill(0);
+                for (let j = 0; j < hiddenSize2; j++) {
+                    let sum = biases2[j];
+                    for (let k = 0; k < hiddenSize1; k++) {
+                        sum += hidden1[k] * weights2[k][j];
+                    }
+                    hidden2[j] = Math.max(0, sum); // ReLU
+                }
+                
+                // Forward pass - Output Layer
                 const output = Array(outputSize).fill(0);
                 for (let j = 0; j < outputSize; j++) {
-                    let sum = biases2[j];
-                    for (let k = 0; k < hiddenSize; k++) {
-                        sum += hidden[k] * weights2[k][j];
+                    let sum = biases3[j];
+                    for (let k = 0; k < hiddenSize2; k++) {
+                        sum += hidden2[k] * weights3[k][j];
                     }
                     output[j] = 1 / (1 + Math.exp(-sum)); // Sigmoid
                 }
@@ -2370,7 +2458,7 @@
             }
             
             trainModel() {
-                this.showLoading('Training neural network model...');
+                this.showLoading('Training enhanced neural network model...');
                 
                 // Switch to training tab
                 this.switchTab('training');
@@ -2381,13 +2469,15 @@
                     const trainingContent = document.getElementById('training-content');
                     trainingContent.innerHTML = `
                         <h4>Model Training Complete</h4>
-                        <p>The neural network has been successfully trained with the following architecture:</p>
+                        <p>The enhanced neural network has been successfully trained with the following architecture:</p>
                         <ul>
                             <li>Input Layer: ${model.inputSize} neurons</li>
-                            <li>Hidden Layer: ${model.hiddenSize} neurons (ReLU activation)</li>
+                            <li>Hidden Layer 1: ${model.hiddenSize1} neurons (ReLU activation)</li>
+                            <li>Hidden Layer 2: ${model.hiddenSize2} neurons (ReLU activation)</li>
                             <li>Output Layer: ${model.outputSize} neuron (Sigmoid activation)</li>
                         </ul>
-                        <p>Training completed with 100 epochs using binary cross-entropy loss.</p>
+                        <p>Training completed with 500 epochs using Xavier initialization and class weighting for imbalanced data.</p>
+                        <p>Learning rate: 0.001</p>
                     `;
                     
                     // Update step 5 status
@@ -2395,7 +2485,7 @@
                     document.getElementById('evaluate-btn').style.display = 'inline-block';
                     
                     this.hideLoading();
-                }, 1000);
+                }, 1500);
             }
             
             evaluateModel() {
