@@ -2064,13 +2064,12 @@
                         </div>
                     </div>
                     
-                    <h4 style="margin-top: 20px;">Preprocessing Details for Mixed Data:</h4>
+                    <h4 style="margin-top: 20px;">Preprocessing Details:</h4>
                     <ul>
                         <li><strong>Categorical Feature (Type):</strong> One-Hot Encoding applied (L, M, H → 3 binary features)</li>
                         <li><strong>Numeric Features (5 features):</strong> Standardized using StandardScaler (mean=0, std=1)</li>
-                        <li><strong>Clustering Results Integrated:</strong> Cluster labels from K-Prototypes added as feature</li>
                         <li><strong>Target Variable:</strong> Machine failure (0/1) - kept as is</li>
-                        <li><strong>Total Features after Encoding:</strong> 9 (5 numeric + 3 encoded categorical + 1 cluster label)</li>
+                        <li><strong>Total Features after Encoding:</strong> 8 (5 numeric + 3 encoded categorical)</li>
                         <li><strong>Data Split:</strong> Training (70%), Validation (15%), Test (15%)</li>
                     </ul>
                 </div>
@@ -2102,13 +2101,6 @@
                                 <td>0.33</td>
                                 <td>0.47</td>
                             </tr>
-                            <tr>
-                                <td>Cluster Feature (1)</td>
-                                <td>Cluster Label</td>
-                                <td>Integer Encoding</td>
-                                <td>Varies</td>
-                                <td>Varies</td>
-                            </tr>
                         </tbody>
                     </table>
                 </div>
@@ -2124,7 +2116,7 @@
             document.getElementById('training-content').innerHTML = `
                 <div class="loading" id="training-loading">
                     <div class="spinner"></div>
-                    <p>Training Autoencoder Model with Mixed Data Features...</p>
+                    <p>Training Autoencoder Model...</p>
                 </div>
                 
                 <div id="training-results" style="display: none;">
@@ -2140,7 +2132,7 @@
                         </div>
                         <div class="info-card">
                             <div class="info-label">Input Features</div>
-                            <div class="info-value" id="training-epochs">9</div>
+                            <div class="info-value" id="training-epochs">8</div>
                         </div>
                     </div>
                     <div class="chart-item-full">
@@ -2191,7 +2183,7 @@
                         plugins: {
                             title: {
                                 display: true,
-                                text: 'Autoencoder Training History (Mixed Data)'
+                                text: 'Autoencoder Training History'
                             }
                         },
                         scales: {
@@ -2213,7 +2205,7 @@
                 });
                 
                 evaluateBtn.style.display = 'inline-block';
-                alert('Autoencoder training completed successfully with mixed data features!');
+                alert('Autoencoder training completed successfully!');
             }, 3000);
         }
         
@@ -2248,14 +2240,13 @@
                 </div>
                 
                 <div style="margin-top: 20px;">
-                    <h4>Model Performance Summary (with Mixed Data Features)</h4>
-                    <p>The autoencoder model with mixed data features (5 numeric + 1 categorical + cluster labels) shows improved performance:</p>
+                    <h4>Model Performance Summary</h4>
+                    <p>The autoencoder model shows good performance:</p>
                     <ul>
-                        <li><strong>Higher accuracy</strong> due to better feature representation</li>
-                        <li><strong>Improved precision</strong> with cluster information</li>
-                        <li><strong>Better recall</strong> capturing more failure patterns</li>
-                        <li><strong>Enhanced F1-score</strong> for balanced performance</li>
-                        <li><strong>Cluster-augmented features</strong> provide better anomaly detection</li>
+                        <li><strong>High accuracy</strong> in detecting machine failures</li>
+                        <li><strong>Good precision</strong> minimizing false alarms</li>
+                        <li><strong>Strong recall</strong> capturing most failure cases</li>
+                        <li><strong>Excellent F1-score</strong> for balanced performance</li>
                     </ul>
                 </div>
                 
@@ -2290,50 +2281,24 @@
             new Chart(ctx, {
                 type: 'bar',
                 data: {
-                    labels: ['Without Clusters', 'With Mixed Data Clusters'],
-                    datasets: [
-                        {
-                            label: 'Accuracy',
-                            data: [85.2, accuracy * 100],
-                            backgroundColor: ['#3498db80', '#3498db'],
-                            borderColor: ['#2980b9', '#2980b9'],
-                            borderWidth: 1
-                        },
-                        {
-                            label: 'Precision',
-                            data: [82.7, precision * 100],
-                            backgroundColor: ['#2ecc7180', '#2ecc71'],
-                            borderColor: ['#27ae60', '#27ae60'],
-                            borderWidth: 1
-                        },
-                        {
-                            label: 'Recall',
-                            data: [80.5, recall * 100],
-                            backgroundColor: ['#e74c3c80', '#e74c3c'],
-                            borderColor: ['#c0392b', '#c0392b'],
-                            borderWidth: 1
-                        },
-                        {
-                            label: 'F1-Score',
-                            data: [86.3, f1 * 100],
-                            backgroundColor: ['#f39c1280', '#f39c12'],
-                            borderColor: ['#d68910', '#d68910'],
-                            borderWidth: 1
-                        }
-                    ]
+                    labels: ['Accuracy', 'Precision', 'Recall', 'F1-Score'],
+                    datasets: [{
+                        label: 'Performance Metrics',
+                        data: [accuracy * 100, precision * 100, recall * 100, f1 * 100],
+                        backgroundColor: ['#3498db', '#2ecc71', '#e74c3c', '#f39c12'],
+                        borderColor: ['#2980b9', '#27ae60', '#c0392b', '#d68910'],
+                        borderWidth: 1
+                    }]
                 },
                 options: {
                     responsive: true,
                     plugins: {
                         title: {
                             display: true,
-                            text: 'Performance Comparison: With vs Without Mixed Data Clustering'
+                            text: 'Model Performance Metrics'
                         }
                     },
                     scales: {
-                        x: {
-                            stacked: false,
-                        },
                         y: {
                             beginAtZero: true,
                             max: 100,
@@ -2350,15 +2315,14 @@
         }
         
         function updateFeatureImportance() {
-            // Simulate feature importance values with cluster features
+            // Simulate feature importance values
             const importances = {
                 'Torque': Math.random() * 0.25 + 0.65,
                 'Tool Wear': Math.random() * 0.2 + 0.55,
                 'Rotational Speed': Math.random() * 0.2 + 0.45,
                 'Process Temp': Math.random() * 0.15 + 0.35,
                 'Air Temp': Math.random() * 0.1 + 0.25,
-                'Product Type': Math.random() * 0.15 + 0.15,
-                'Cluster Feature': Math.random() * 0.2 + 0.4
+                'Product Type': Math.random() * 0.15 + 0.15
             };
             
             // Update feature bars
@@ -2444,14 +2408,6 @@
             // Tool wear effect
             const wearNorm = formData.toolWear / 253;
             score += wearNorm * 0.2;
-            
-            // Cluster-based adjustment (simulated)
-            let clusterAdjustment = 0;
-            if (formData.type === 'H' && formData.torque > 60) clusterAdjustment = 0.3;
-            else if (formData.type === 'M' && formData.toolWear > 150) clusterAdjustment = 0.2;
-            else if (formData.type === 'L' && formData.rotationalSpeed > 2500) clusterAdjustment = 0.15;
-            
-            score += clusterAdjustment;
             
             // Add some randomness to simulate model uncertainty
             score += (Math.random() - 0.5) * 0.08;
