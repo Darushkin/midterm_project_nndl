@@ -939,7 +939,11 @@
                         <div class="feature-value"><div class="feature-fill" style="width: 0%"></div></div>
                     </div>
                     <div class="feature-bar">
-                        <div class="feature-name">Product Type</div>
+                        <div class="feature-name">Product Type (M)</div>
+                        <div class="feature-value"><div class="feature-fill" style="width: 0%"></div></div>
+                    </div>
+                    <div class="feature-bar">
+                        <div class="feature-name">Product Type (H)</div>
                         <div class="feature-value"><div class="feature-fill" style="width: 0%"></div></div>
                     </div>
                 </div>
@@ -2052,7 +2056,7 @@
                     <div class="dataset-info">
                         <div class="info-card">
                             <div class="info-label">Categorical Encoding</div>
-                            <div class="info-value">One-Hot</div>
+                            <div class="info-value">One-Hot (n-1)</div>
                         </div>
                         <div class="info-card">
                             <div class="info-label">Numeric Scaling</div>
@@ -2066,10 +2070,11 @@
                     
                     <h4 style="margin-top: 20px;">Preprocessing Details:</h4>
                     <ul>
-                        <li><strong>Categorical Feature (Type):</strong> One-Hot Encoding applied (L, M, H → 3 binary features)</li>
+                        <li><strong>Categorical Feature (Type):</strong> One-Hot Encoding with drop first (L as reference category)</li>
+                        <li><strong>Encoded Features:</strong> Type_M, Type_H (Type_L dropped to avoid multicollinearity)</li>
                         <li><strong>Numeric Features (5 features):</strong> Standardized using StandardScaler (mean=0, std=1)</li>
                         <li><strong>Target Variable:</strong> Machine failure (0/1) - kept as is</li>
-                        <li><strong>Total Features after Encoding:</strong> 8 (5 numeric + 3 encoded categorical)</li>
+                        <li><strong>Total Features after Encoding:</strong> 7 (5 numeric + 2 encoded categorical)</li>
                         <li><strong>Data Split:</strong> Training (70%), Validation (15%), Test (15%)</li>
                     </ul>
                 </div>
@@ -2095,14 +2100,15 @@
                                 <td>1.0</td>
                             </tr>
                             <tr>
-                                <td>Categorical (3)</td>
-                                <td>Type_L, Type_M, Type_H</td>
-                                <td>One-Hot Encoding</td>
-                                <td>0.33</td>
-                                <td>0.47</td>
+                                <td>Categorical (2)</td>
+                                <td>Type_M, Type_H</td>
+                                <td>One-Hot (drop first)</td>
+                                <td>0.22</td>
+                                <td>0.41</td>
                             </tr>
                         </tbody>
                     </table>
+                    <p><em>Note: Type_L is used as the reference category (dropped to avoid the dummy variable trap)</em></p>
                 </div>
             `;
             
@@ -2132,7 +2138,7 @@
                         </div>
                         <div class="info-card">
                             <div class="info-label">Input Features</div>
-                            <div class="info-value" id="training-epochs">8</div>
+                            <div class="info-value" id="training-epochs">7</div>
                         </div>
                     </div>
                     <div class="chart-item-full">
@@ -2322,11 +2328,12 @@
                 'Rotational Speed': Math.random() * 0.2 + 0.45,
                 'Process Temp': Math.random() * 0.15 + 0.35,
                 'Air Temp': Math.random() * 0.1 + 0.25,
-                'Product Type': Math.random() * 0.15 + 0.15
+                'Product Type (M)': Math.random() * 0.15 + 0.15,
+                'Product Type (H)': Math.random() * 0.2 + 0.25
             };
             
             // Update feature bars
-            const features = ['Torque', 'Tool Wear', 'Rotational Speed', 'Process Temp', 'Air Temp', 'Product Type'];
+            const features = ['Torque', 'Tool Wear', 'Rotational Speed', 'Process Temp', 'Air Temp', 'Product Type (M)', 'Product Type (H)'];
             features.forEach((feature, index) => {
                 const fillElement = document.querySelectorAll('.feature-fill')[index];
                 const width = importances[feature] * 100;
@@ -2389,8 +2396,9 @@
             // Enhanced risk calculation with cluster awareness
             let score = 0;
             
-            // Product type weight
-            const typeWeights = { 'L': 0.1, 'M': 0.3, 'H': 0.5 };
+            // Product type weight (using n-1 encoding)
+            // Type_L is reference (0 weight), Type_M = 0.3, Type_H = 0.5
+            const typeWeights = { 'L': 0, 'M': 0.3, 'H': 0.5 };
             score += typeWeights[formData.type] || 0;
             
             // Temperature effects (normalized)
