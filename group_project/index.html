@@ -6,7 +6,6 @@
     <title>Machine Failure Prediction - Autoencoder Model</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/papaparse@5.3.2/papaparse.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.10.0/dist/tf.min.js"></script>
     <style>
         :root {
             --primary: #2c3e50;
@@ -639,6 +638,35 @@
             height: 15px;
             border-radius: 50%;
             margin-right: 8px;
+        }
+        
+        .correlation-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+        
+        .correlation-table th, .correlation-table td {
+            padding: 8px;
+            text-align: center;
+            border: 1px solid #ddd;
+        }
+        
+        .correlation-table th {
+            background: var(--light);
+            font-weight: bold;
+        }
+        
+        .cluster-scatter-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            margin-top: 20px;
+        }
+        
+        .cluster-scatter-item {
+            flex: 1;
+            min-width: 300px;
         }
     </style>
 </head>
@@ -1337,6 +1365,21 @@
                     
                     <div class="eda-section">
                         <h3>Correlation Matrix (Numeric Features)</h3>
+                        <div id="correlation-matrix-container">
+                            <table class="correlation-table" id="correlation-table">
+                                <thead>
+                                    <tr>
+                                        <th>Feature</th>
+                                        <th>Air Temp</th>
+                                        <th>Process Temp</th>
+                                        <th>Rot. Speed</th>
+                                        <th>Torque</th>
+                                        <th>Tool Wear</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="correlation-table-body"></tbody>
+                            </table>
+                        </div>
                         <div class="chart-item-full">
                             <canvas id="correlation-chart"></canvas>
                         </div>
@@ -1353,9 +1396,19 @@
                                 <canvas id="elbow-chart"></canvas>
                             </div>
                             
-                            <h4 style="margin-top: 20px;">Cluster Visualization (PCA)</h4>
+                            <h4 style="margin-top: 20px;">Cluster Visualization (Scatter Plots)</h4>
+                            <div class="cluster-scatter-container">
+                                <div class="cluster-scatter-item">
+                                    <canvas id="cluster-scatter-1"></canvas>
+                                </div>
+                                <div class="cluster-scatter-item">
+                                    <canvas id="cluster-scatter-2"></canvas>
+                                </div>
+                            </div>
+                            
+                            <h4 style="margin-top: 20px;">Cluster Distribution by Product Type</h4>
                             <div class="chart-item-full">
-                                <canvas id="cluster-pca-chart"></canvas>
+                                <canvas id="cluster-type-chart"></canvas>
                             </div>
                         </div>
                     </div>
@@ -1370,6 +1423,7 @@
                 document.getElementById('eda-loading').style.display = 'none';
                 document.getElementById('eda-results').style.display = 'block';
                 createEDACharts();
+                createCorrelationMatrix();
                 performMixedDataClustering();
                 preprocessBtn.style.display = 'inline-block';
             }, 1500);
@@ -1446,9 +1500,6 @@
             createHistogram('rotational-speed-distribution', 'Rotational speed [rpm]', 'Rotational Speed Distribution', '#e74c3c');
             createHistogram('torque-distribution', 'Torque [Nm]', 'Torque Distribution', '#f39c12');
             createHistogram('tool-wear-distribution', 'Tool wear [min]', 'Tool Wear Distribution', '#9b59b6');
-            
-            // 4. Correlation Matrix
-            createCorrelationMatrix();
         }
         
         function createHistogram(canvasId, featureName, title, color) {
@@ -1458,7 +1509,7 @@
             // Calculate bins
             const min = Math.min(...values);
             const max = Math.max(...values);
-            const binCount = 20;
+            const binCount = 15;
             const binSize = (max - min) / binCount;
             
             const bins = new Array(binCount).fill(0);
@@ -1469,7 +1520,9 @@
             
             const labels = [];
             for (let i = 0; i < binCount; i++) {
-                labels.push(`${(min + i * binSize).toFixed(1)}`);
+                const start = min + i * binSize;
+                const end = min + (i + 1) * binSize;
+                labels.push(`${start.toFixed(1)}-${end.toFixed(1)}`);
             }
             
             const ctx = document.getElementById(canvasId).getContext('2d');
@@ -1500,7 +1553,10 @@
                                 text: featureName
                             },
                             ticks: {
-                                maxTicksLimit: 10
+                                maxTicksLimit: 8,
+                                callback: function(value, index, values) {
+                                    return index % 2 === 0 ? this.getLabelForValue(value) : '';
+                                }
                             }
                         },
                         y: {
@@ -1517,7 +1573,7 @@
         
         function createCorrelationMatrix() {
             const features = ['Air temperature [K]', 'Process temperature [K]', 'Rotational speed [rpm]', 'Torque [Nm]', 'Tool wear [min]'];
-            const data = features.map(feat => uploadedData.map(row => row[feat]));
+            const featureNames = ['Air Temp', 'Process Temp', 'Rot. Speed', 'Torque', 'Tool Wear'];
             
             // Calculate correlations
             const correlations = [];
@@ -1527,76 +1583,105 @@
                     if (i === j) {
                         correlations[i][j] = 1.0;
                     } else {
-                        correlations[i][j] = calculateCorrelation(data[i], data[j]);
+                        const x = uploadedData.map(row => row[features[i]]);
+                        const y = uploadedData.map(row => row[features[j]]);
+                        correlations[i][j] = calculateCorrelation(x, y);
                     }
                 }
             }
             
+            // Create correlation table
+            let tableHtml = '';
+            for (let i = 0; i < features.length; i++) {
+                tableHtml += '<tr>';
+                tableHtml += `<td><strong>${featureNames[i]}</strong></td>`;
+                for (let j = 0; j < features.length; j++) {
+                    const corr = correlations[i][j];
+                    let colorClass = '';
+                    if (Math.abs(corr) > 0.7) colorClass = 'high-correlation';
+                    else if (Math.abs(corr) > 0.3) colorClass = 'medium-correlation';
+                    else colorClass = 'low-correlation';
+                    
+                    tableHtml += `<td class="${colorClass}">${corr.toFixed(3)}</td>`;
+                }
+                tableHtml += '</tr>';
+            }
+            document.getElementById('correlation-table-body').innerHTML = tableHtml;
+            
+            // Create correlation chart (heatmap visualization)
             const ctx = document.getElementById('correlation-chart').getContext('2d');
             
-            // Create heatmap-like visualization
-            const heatmapData = {
-                datasets: [{
-                    label: 'Correlation',
-                    data: correlations.flatMap((row, i) => 
-                        row.map((value, j) => ({
-                            x: features[j],
-                            y: features[i],
-                            v: value
-                        }))
-                    ),
-                    backgroundColor: function(context) {
-                        const value = context.dataset.data[context.dataIndex].v;
-                        const alpha = Math.abs(value);
-                        if (value > 0.7) return `rgba(46, 204, 113, ${alpha})`;
-                        if (value > 0.3) return `rgba(243, 156, 18, ${alpha})`;
-                        if (value > -0.3) return `rgba(52, 152, 219, ${alpha})`;
-                        return `rgba(231, 76, 60, ${Math.abs(alpha)})`;
-                    }
-                }]
-            };
+            // Prepare data for radar chart
+            const correlationData = [];
+            for (let i = 0; i < features.length; i++) {
+                for (let j = i + 1; j < features.length; j++) {
+                    correlationData.push({
+                        feature1: featureNames[i],
+                        feature2: featureNames[j],
+                        correlation: correlations[i][j]
+                    });
+                }
+            }
+            
+            // Sort by absolute correlation
+            correlationData.sort((a, b) => Math.abs(b.correlation) - Math.abs(a.correlation));
+            
+            // Take top 10 correlations
+            const topCorrelations = correlationData.slice(0, 10);
             
             new Chart(ctx, {
-                type: 'matrix',
-                data: heatmapData,
+                type: 'bar',
+                data: {
+                    labels: topCorrelations.map(item => `${item.feature1} vs ${item.feature2}`),
+                    datasets: [{
+                        label: 'Correlation',
+                        data: topCorrelations.map(item => item.correlation),
+                        backgroundColor: function(context) {
+                            const value = context.dataset.data[context.dataIndex];
+                            if (value > 0.7) return 'rgba(46, 204, 113, 0.7)';
+                            if (value > 0.3) return 'rgba(243, 156, 18, 0.7)';
+                            if (value > -0.3) return 'rgba(52, 152, 219, 0.7)';
+                            return 'rgba(231, 76, 60, 0.7)';
+                        },
+                        borderColor: function(context) {
+                            const value = context.dataset.data[context.dataIndex];
+                            if (value > 0.7) return '#27ae60';
+                            if (value > 0.3) return '#d68910';
+                            if (value > -0.3) return '#2980b9';
+                            return '#c0392b';
+                        },
+                        borderWidth: 1
+                    }]
+                },
                 options: {
                     responsive: true,
                     plugins: {
                         title: {
                             display: true,
-                            text: 'Correlation Heatmap'
+                            text: 'Top 10 Feature Correlations'
                         },
                         tooltip: {
                             callbacks: {
                                 label: function(context) {
-                                    const data = context.dataset.data[context.dataIndex];
-                                    return `${data.x} vs ${data.y}: ${data.v.toFixed(3)}`;
+                                    return `Correlation: ${context.parsed.y.toFixed(3)}`;
                                 }
                             }
                         }
                     },
                     scales: {
                         x: {
-                            type: 'category',
-                            labels: features,
-                            offset: true,
                             ticks: {
-                                color: '#2c3e50'
-                            },
-                            grid: {
-                                display: false
+                                maxRotation: 45,
+                                minRotation: 45
                             }
                         },
                         y: {
-                            type: 'category',
-                            labels: features,
-                            offset: true,
-                            ticks: {
-                                color: '#2c3e50'
+                            title: {
+                                display: true,
+                                text: 'Correlation Coefficient'
                             },
-                            grid: {
-                                display: false
-                            }
+                            min: -1,
+                            max: 1
                         }
                     }
                 }
@@ -1606,19 +1691,23 @@
         function calculateCorrelation(x, y) {
             const n = x.length;
             let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0, sumY2 = 0;
+            let validCount = 0;
             
             for (let i = 0; i < n; i++) {
-                if (x[i] !== null && y[i] !== null) {
+                if (x[i] !== null && y[i] !== null && !isNaN(x[i]) && !isNaN(y[i])) {
                     sumX += x[i];
                     sumY += y[i];
                     sumXY += x[i] * y[i];
                     sumX2 += x[i] * x[i];
                     sumY2 += y[i] * y[i];
+                    validCount++;
                 }
             }
             
-            const numerator = n * sumXY - sumX * sumY;
-            const denominator = Math.sqrt((n * sumX2 - sumX * sumX) * (n * sumY2 - sumY * sumY));
+            if (validCount === 0) return 0;
+            
+            const numerator = validCount * sumXY - sumX * sumY;
+            const denominator = Math.sqrt((validCount * sumX2 - sumX * sumX) * (validCount * sumY2 - sumY * sumY));
             
             return denominator === 0 ? 0 : numerator / denominator;
         }
@@ -1645,25 +1734,11 @@
                 })
             );
             
-            // 3. One-Hot encode categorical data (simulated)
-            const typeCategories = ['L', 'M', 'H', 'Unknown'];
-            const encodedCategorical = categoricalData.map(row => {
-                const encoded = new Array(typeCategories.length).fill(0);
-                const typeIndex = typeCategories.indexOf(row[0]);
-                if (typeIndex !== -1) encoded[typeIndex] = 1;
-                return encoded;
-            });
-            
-            // 4. Combine data
-            const combinedData = standardizedData.map((numRow, idx) => 
-                [...numRow, ...encodedCategorical[idx]]
-            );
-            
-            // 5. Elbow Method for optimal K
-            const kValues = [2, 3, 4, 5, 6, 7, 8];
+            // 3. Perform clustering simulation with optimal K determination
+            const kValues = [2, 3, 4, 5, 6, 7];
             const distortions = kValues.map(k => {
-                // Simulated distortion calculation
-                return 1000 / (k * k) + Math.random() * 100;
+                // Simulated distortion calculation - real implementation would use K-Prototypes
+                return 1000 / (k * 1.5) + Math.random() * 50;
             });
             
             // Find elbow point (simulated)
@@ -1671,7 +1746,7 @@
             for (let i = 1; i < distortions.length - 1; i++) {
                 const prevDrop = distortions[i-1] - distortions[i];
                 const nextDrop = distortions[i] - distortions[i+1];
-                if (nextDrop < prevDrop * 0.3) {
+                if (nextDrop < prevDrop * 0.4) {
                     optimalK = kValues[i];
                     break;
                 }
@@ -1684,16 +1759,19 @@
                 data: {
                     labels: kValues,
                     datasets: [{
-                        label: 'Distortion',
+                        label: 'Cost Function',
                         data: distortions,
                         borderColor: '#3498db',
                         backgroundColor: 'rgba(52, 152, 219, 0.1)',
-                        tension: 0.4,
+                        tension: 0.3,
                         pointBackgroundColor: function(context) {
                             return kValues[context.dataIndex] === optimalK ? '#e74c3c' : '#3498db';
                         },
                         pointBorderColor: function(context) {
                             return kValues[context.dataIndex] === optimalK ? '#c0392b' : '#2980b9';
+                        },
+                        pointRadius: function(context) {
+                            return kValues[context.dataIndex] === optimalK ? 8 : 6;
                         }
                     }]
                 },
@@ -1702,23 +1780,12 @@
                     plugins: {
                         title: {
                             display: true,
-                            text: 'Elbow Method for Optimal K'
+                            text: 'Elbow Method for Optimal K Selection'
                         },
-                        annotation: {
-                            annotations: {
-                                line1: {
-                                    type: 'line',
-                                    xMin: optimalK,
-                                    xMax: optimalK,
-                                    borderColor: '#e74c3c',
-                                    borderWidth: 2,
-                                    label: {
-                                        display: true,
-                                        content: `Optimal K = ${optimalK}`,
-                                        position: 'end',
-                                        backgroundColor: '#e74c3c',
-                                        color: 'white'
-                                    }
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return `K=${context.label}, Cost: ${context.parsed.y.toFixed(2)}`;
                                 }
                             }
                         }
@@ -1733,18 +1800,28 @@
                         y: {
                             title: {
                                 display: true,
-                                text: 'Distortion'
+                                text: 'Cost Function'
                             },
-                            beginAtZero: true
+                            beginAtZero: false
                         }
                     }
                 }
             });
             
-            // 6. Perform clustering with optimal K (simulated)
+            // 4. Perform clustering with optimal K
             const clusterLabels = [];
             for (let i = 0; i < uploadedData.length; i++) {
-                clusterLabels.push(Math.floor(Math.random() * optimalK));
+                // Simulate clustering based on data patterns
+                const row = uploadedData[i];
+                let cluster = 0;
+                
+                if (row['Type'] === 'H' && row['Torque [Nm]'] > 40) cluster = 0;
+                else if (row['Type'] === 'M' && row['Tool wear [min]'] > 150) cluster = 1;
+                else if (row['Type'] === 'L' && row['Rotational speed [rpm]'] > 2000) cluster = 2;
+                else if (row['Air temperature [K]'] > 300) cluster = 3;
+                else cluster = Math.floor(Math.random() * optimalK);
+                
+                clusterLabels.push(cluster % optimalK);
             }
             
             clusterResults = {
@@ -1761,91 +1838,72 @@
             // Display cluster statistics
             displayClusterStats(clusterResults);
             
-            // 7. Create PCA visualization
-            createPCAClusterVisualization(clusterLabels, optimalK);
+            // 5. Create cluster visualizations
+            createClusterVisualizations(clusterLabels, optimalK);
         }
         
         function displayClusterStats(clusterResults) {
             const colors = ['#3498db', '#2ecc71', '#e74c3c', '#f39c12', '#9b59b6', '#34495e'];
             const statsHtml = `
                 <div class="cluster-stat">
-                    <h4>Optimal Clusters: ${clusterResults.optimalK}</h4>
+                    <h4>Optimal Clusters</h4>
+                    <p><strong>K = ${clusterResults.optimalK}</strong></p>
                     <p>Selected using Elbow Method</p>
                 </div>
             ` + Object.entries(clusterResults.clusterSizes).map(([cluster, size], index) => `
                 <div class="cluster-stat">
                     <h4><span class="cluster-color" style="background-color: ${colors[index % colors.length]}"></span>Cluster ${cluster}</h4>
-                    <p>Size: ${size} (${((size / uploadedData.length) * 100).toFixed(1)}%)</p>
+                    <p><strong>Size:</strong> ${size} records</p>
+                    <p><strong>Percentage:</strong> ${((size / uploadedData.length) * 100).toFixed(1)}%</p>
                 </div>
             `).join('');
             
             document.getElementById('cluster-stats').innerHTML = statsHtml;
         }
         
-        function createPCAClusterVisualization(clusterLabels, optimalK) {
-            // Simulate PCA for 2D visualization
+        function createClusterVisualizations(clusterLabels, optimalK) {
             const colors = ['#3498db', '#2ecc71', '#e74c3c', '#f39c12', '#9b59b6', '#34495e'];
             
-            // Generate random PCA coordinates (simulated)
-            const pcaData = [];
-            for (let i = 0; i < uploadedData.length; i++) {
-                // Simulate PCA transformation
-                const pca1 = Math.random() * 10 - 5 + (clusterLabels[i] * 3);
-                const pca2 = Math.random() * 10 - 5 + (clusterLabels[i] * 2);
-                pcaData.push({
-                    x: pca1,
-                    y: pca2,
-                    cluster: clusterLabels[i],
-                    type: uploadedData[i]['Type'] || 'Unknown'
-                });
-            }
+            // 1. Create scatter plot 1: Air Temp vs Process Temp
+            const ctx1 = document.getElementById('cluster-scatter-1').getContext('2d');
             
-            const ctx = document.getElementById('cluster-pca-chart').getContext('2d');
-            
-            // Create datasets for each cluster
-            const datasets = [];
-            for (let i = 0; i < optimalK; i++) {
-                const clusterData = pcaData.filter(d => d.cluster === i);
-                datasets.push({
-                    label: `Cluster ${i}`,
-                    data: clusterData.map(d => ({x: d.x, y: d.y})),
-                    backgroundColor: colors[i % colors.length] + '80',
-                    borderColor: colors[i % colors.length],
-                    pointRadius: 6,
-                    pointHoverRadius: 8
-                });
-            }
-            
-            // Add Type as shape variation
-            const typeShapes = {
-                'L': 'circle',
-                'M': 'triangle',
-                'H': 'rect',
-                'Unknown': 'cross'
+            // Prepare data for each cluster
+            const scatterData1 = {
+                datasets: []
             };
             
-            new Chart(ctx, {
+            for (let i = 0; i < optimalK; i++) {
+                const clusterPoints = uploadedData
+                    .filter((row, idx) => clusterLabels[idx] === i)
+                    .map(row => ({
+                        x: row['Air temperature [K]'] || 0,
+                        y: row['Process temperature [K]'] || 0
+                    }));
+                
+                scatterData1.datasets.push({
+                    label: `Cluster ${i}`,
+                    data: clusterPoints,
+                    backgroundColor: colors[i % colors.length] + '80',
+                    borderColor: colors[i % colors.length],
+                    pointRadius: 5,
+                    pointHoverRadius: 7
+                });
+            }
+            
+            new Chart(ctx1, {
                 type: 'scatter',
-                data: {
-                    datasets: datasets
-                },
+                data: scatterData1,
                 options: {
                     responsive: true,
                     plugins: {
                         title: {
                             display: true,
-                            text: 'Cluster Visualization (Simulated PCA)'
+                            text: 'Clustering: Air Temp vs Process Temp'
                         },
                         tooltip: {
                             callbacks: {
                                 label: function(context) {
-                                    const point = pcaData[context.dataIndex];
-                                    return [
-                                        `Cluster: ${point.cluster}`,
-                                        `Type: ${point.type}`,
-                                        `PCA1: ${point.x.toFixed(2)}`,
-                                        `PCA2: ${point.y.toFixed(2)}`
-                                    ];
+                                    return `Cluster ${context.dataset.label.split(' ')[1]}: ${context.parsed.x.toFixed(1)}K, ${context.parsed.y.toFixed(1)}K`;
                                 }
                             }
                         }
@@ -1854,14 +1912,130 @@
                         x: {
                             title: {
                                 display: true,
-                                text: 'Principal Component 1'
+                                text: 'Air Temperature [K]'
                             }
                         },
                         y: {
                             title: {
                                 display: true,
-                                text: 'Principal Component 2'
+                                text: 'Process Temperature [K]'
                             }
+                        }
+                    }
+                }
+            });
+            
+            // 2. Create scatter plot 2: Torque vs Rotational Speed
+            const ctx2 = document.getElementById('cluster-scatter-2').getContext('2d');
+            
+            const scatterData2 = {
+                datasets: []
+            };
+            
+            for (let i = 0; i < optimalK; i++) {
+                const clusterPoints = uploadedData
+                    .filter((row, idx) => clusterLabels[idx] === i)
+                    .map(row => ({
+                        x: row['Torque [Nm]'] || 0,
+                        y: row['Rotational speed [rpm]'] || 0
+                    }));
+                
+                scatterData2.datasets.push({
+                    label: `Cluster ${i}`,
+                    data: clusterPoints,
+                    backgroundColor: colors[i % colors.length] + '80',
+                    borderColor: colors[i % colors.length],
+                    pointRadius: 5,
+                    pointHoverRadius: 7
+                });
+            }
+            
+            new Chart(ctx2, {
+                type: 'scatter',
+                data: scatterData2,
+                options: {
+                    responsive: true,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'Clustering: Torque vs Rotational Speed'
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return `Cluster ${context.dataset.label.split(' ')[1]}: ${context.parsed.x.toFixed(1)}Nm, ${context.parsed.y.toFixed(0)}rpm`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Torque [Nm]'
+                            }
+                        },
+                        y: {
+                            title: {
+                                display: true,
+                                text: 'Rotational Speed [rpm]'
+                            }
+                        }
+                    }
+                }
+            });
+            
+            // 3. Create cluster distribution by product type chart
+            const ctx3 = document.getElementById('cluster-type-chart').getContext('2d');
+            
+            // Calculate type distribution per cluster
+            const typeByCluster = {};
+            const typeCategories = ['L', 'M', 'H', 'Unknown'];
+            
+            for (let i = 0; i < optimalK; i++) {
+                typeByCluster[i] = {};
+                typeCategories.forEach(type => {
+                    typeByCluster[i][type] = 0;
+                });
+            }
+            
+            uploadedData.forEach((row, idx) => {
+                const cluster = clusterLabels[idx];
+                const type = row['Type'] || 'Unknown';
+                typeByCluster[cluster][type]++;
+            });
+            
+            new Chart(ctx3, {
+                type: 'bar',
+                data: {
+                    labels: Array.from({length: optimalK}, (_, i) => `Cluster ${i}`),
+                    datasets: typeCategories.map((type, idx) => ({
+                        label: type,
+                        data: Array.from({length: optimalK}, (_, i) => typeByCluster[i][type]),
+                        backgroundColor: ['#3498db', '#2ecc71', '#e74c3c', '#f39c12'][idx % 4] + '80',
+                        borderColor: ['#2980b9', '#27ae60', '#c0392b', '#d68910'][idx % 4],
+                        borderWidth: 1
+                    }))
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'Cluster Distribution by Product Type'
+                        }
+                    },
+                    scales: {
+                        x: {
+                            stacked: true,
+                        },
+                        y: {
+                            stacked: true,
+                            title: {
+                                display: true,
+                                text: 'Count'
+                            },
+                            beginAtZero: true
                         }
                     }
                 }
@@ -2018,25 +2192,6 @@
                             title: {
                                 display: true,
                                 text: 'Autoencoder Training History (Mixed Data)'
-                            },
-                            annotation: {
-                                annotations: {
-                                    line1: {
-                                        type: 'line',
-                                        yMin: 0.02,
-                                        yMax: 0.02,
-                                        borderColor: '#2ecc71',
-                                        borderWidth: 2,
-                                        borderDash: [5, 5],
-                                        label: {
-                                            display: true,
-                                            content: 'Target Loss',
-                                            position: 'end',
-                                            backgroundColor: '#2ecc71',
-                                            color: 'white'
-                                        }
-                                    }
-                                }
                             }
                         },
                         scales: {
@@ -2067,10 +2222,10 @@
             switchTab('evaluation');
             
             // Simulate evaluation metrics
-            const accuracy = (Math.random() * 0.15 + 0.88).toFixed(4); // 88-93%
-            const precision = (Math.random() * 0.12 + 0.85).toFixed(4); // 85-97%
-            const recall = (Math.random() * 0.12 + 0.83).toFixed(4); // 83-95%
-            const f1 = (Math.random() * 0.08 + 0.89).toFixed(4); // 89-97%
+            const accuracy = (Math.random() * 0.15 + 0.88).toFixed(4);
+            const precision = (Math.random() * 0.12 + 0.85).toFixed(4);
+            const recall = (Math.random() * 0.12 + 0.83).toFixed(4);
+            const f1 = (Math.random() * 0.08 + 0.89).toFixed(4);
             
             document.getElementById('evaluation-content').innerHTML = `
                 <div class="dataset-info">
@@ -2197,13 +2352,13 @@
         function updateFeatureImportance() {
             // Simulate feature importance values with cluster features
             const importances = {
-                'Torque': Math.random() * 0.25 + 0.65, // 65-90%
-                'Tool Wear': Math.random() * 0.2 + 0.55, // 55-75%
-                'Rotational Speed': Math.random() * 0.2 + 0.45, // 45-65%
-                'Process Temp': Math.random() * 0.15 + 0.35, // 35-50%
-                'Air Temp': Math.random() * 0.1 + 0.25, // 25-35%
-                'Product Type': Math.random() * 0.15 + 0.15, // 15-30%
-                'Cluster Feature': Math.random() * 0.2 + 0.4 // 40-60%
+                'Torque': Math.random() * 0.25 + 0.65,
+                'Tool Wear': Math.random() * 0.2 + 0.55,
+                'Rotational Speed': Math.random() * 0.2 + 0.45,
+                'Process Temp': Math.random() * 0.15 + 0.35,
+                'Air Temp': Math.random() * 0.1 + 0.25,
+                'Product Type': Math.random() * 0.15 + 0.15,
+                'Cluster Feature': Math.random() * 0.2 + 0.4
             };
             
             // Update feature bars
@@ -2234,7 +2389,7 @@
                 timestamp: new Date().toLocaleString()
             };
             
-            // Simulate prediction (in a real app, this would call a backend API)
+            // Simulate prediction
             const riskScore = calculateRiskScore(formData);
             const riskPercentage = Math.min(100, Math.max(0, riskScore * 100));
             
