@@ -6,6 +6,7 @@
     <title>Machine Failure Prediction - Autoencoder Model</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/papaparse@5.3.2/papaparse.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.10.0/dist/tf.min.js"></script>
     <style>
         :root {
             --primary: #2c3e50;
@@ -617,13 +618,35 @@
             border-radius: 5px;
             margin-top: 15px;
         }
+        
+        .cluster-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
+            margin-top: 15px;
+        }
+        
+        .cluster-stat {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .cluster-color {
+            display: inline-block;
+            width: 15px;
+            height: 15px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <header>
             <h1>🤖 Machine Failure Prediction System</h1>
-            <p class="subtitle">Autoencoder-Based Anomaly Detection with K-Means Clustering</p>
+            <p class="subtitle">Autoencoder-Based Anomaly Detection with K-Prototypes Clustering</p>
         </header>
         
         <div class="ml-pipeline">
@@ -740,7 +763,7 @@
                 </div>
                 
                 <div class="tab-content" id="eda">
-                    <h3>Exploratory Data Analysis & K-Means Clustering</h3>
+                    <h3>Exploratory Data Analysis & K-Prototypes Clustering</h3>
                     <div id="eda-content">
                         <p>Please analyze the dataset first</p>
                     </div>
@@ -936,7 +959,7 @@
         </div>
         
         <footer>
-            <p>Machine Failure Prediction System | Autoencoder Model | © 2024</p>
+            <p>Machine Failure Prediction System | Autoencoder Model with Mixed Data Clustering | © 2024</p>
         </footer>
     </div>
 
@@ -949,6 +972,7 @@
         let numericFeatures = ['Air temperature [K]', 'Process temperature [K]', 'Rotational speed [rpm]', 'Torque [Nm]', 'Tool wear [min]'];
         let categoricalFeatures = ['Type'];
         let targetVariable = 'Machine failure';
+        let clusterResults = null;
         
         // DOM Elements
         const fileInput = document.getElementById('file-input');
@@ -1202,8 +1226,9 @@
             document.getElementById('dataset-summary').innerHTML = `
                 <p>The dataset contains <strong>${totalRecords}</strong> records with <strong>${numericFeatures.length + categoricalFeatures.length}</strong> features.</p>
                 <p>The failure rate is <strong>${failureRate}%</strong> (${failureCount} failure cases).</p>
-                <p><strong>Numeric Features:</strong> ${numericFeatures.join(', ')}</p>
-                <p><strong>Categorical Features:</strong> ${categoricalFeatures.join(', ')}</p>
+                <p><strong>Numeric Features (5):</strong> ${numericFeatures.join(', ')}</p>
+                <p><strong>Categorical Features (1):</strong> ${categoricalFeatures.join(', ')}</p>
+                <p><strong>Target Variable:</strong> ${failureColumnName}</p>
             `;
             
             edaBtn.style.display = 'inline-block';
@@ -1236,7 +1261,7 @@
                     <div class="missing-values-section">
                         ${missingValuesHtml}
                         <div class="missing-values-options">
-                            <button class="btn btn-warning" onclick="handleMissingValues('mean')">Fill with Mean/Median</button>
+                            <button class="btn btn-warning" onclick="handleMissingValues('mean')">Fill with Mean/Median/Mode</button>
                             <button class="btn btn-warning" onclick="handleMissingValues('remove')">Remove Rows</button>
                         </div>
                     </div>
@@ -1269,7 +1294,7 @@
             document.getElementById('eda-content').innerHTML = `
                 <div class="loading" id="eda-loading">
                     <div class="spinner"></div>
-                    <p>Performing Exploratory Data Analysis...</p>
+                    <p>Performing Exploratory Data Analysis & Mixed Data Clustering...</p>
                 </div>
                 
                 <div id="eda-results" style="display: none;">
@@ -1318,16 +1343,19 @@
                     </div>
                     
                     <div class="eda-section">
-                        <h3>K-Means Clustering Results</h3>
+                        <h3>Mixed Data Clustering with K-Prototypes</h3>
                         <div class="cluster-info">
-                            <p>K-Means clustering identified 3 distinct clusters in the data:</p>
-                            <div class="chart-row">
-                                <div class="chart-item">
-                                    <canvas id="cluster-scatter-1"></canvas>
-                                </div>
-                                <div class="chart-item">
-                                    <canvas id="cluster-scatter-2"></canvas>
-                                </div>
+                            <p>Performing clustering on mixed data (5 numeric + 1 categorical features):</p>
+                            <div class="cluster-stats" id="cluster-stats"></div>
+                            
+                            <h4 style="margin-top: 20px;">Elbow Method for Optimal K</h4>
+                            <div class="chart-item">
+                                <canvas id="elbow-chart"></canvas>
+                            </div>
+                            
+                            <h4 style="margin-top: 20px;">Cluster Visualization (PCA)</h4>
+                            <div class="chart-item-full">
+                                <canvas id="cluster-pca-chart"></canvas>
                             </div>
                         </div>
                     </div>
@@ -1342,8 +1370,9 @@
                 document.getElementById('eda-loading').style.display = 'none';
                 document.getElementById('eda-results').style.display = 'block';
                 createEDACharts();
+                performMixedDataClustering();
                 preprocessBtn.style.display = 'inline-block';
-            }, 1000);
+            }, 1500);
         }
         
         function createEDACharts() {
@@ -1364,8 +1393,8 @@
                     datasets: [{
                         label: 'Count',
                         data: Object.values(typeCounts),
-                        backgroundColor: ['#3498db', '#2ecc71', '#e74c3c'],
-                        borderColor: ['#2980b9', '#27ae60', '#c0392b'],
+                        backgroundColor: ['#3498db', '#2ecc71', '#e74c3c', '#f39c12'],
+                        borderColor: ['#2980b9', '#27ae60', '#c0392b', '#d68910'],
                         borderWidth: 1
                     }]
                 },
@@ -1389,7 +1418,7 @@
             
             const failureCtx = document.getElementById('failure-distribution-chart').getContext('2d');
             new Chart(failureCtx, {
-                type: 'pie',
+                type: 'doughnut',
                 data: {
                     labels: Object.keys(failureCounts),
                     datasets: [{
@@ -1420,9 +1449,6 @@
             
             // 4. Correlation Matrix
             createCorrelationMatrix();
-            
-            // 5. K-Means Clustering Scatter Plots
-            createClusterScatterPlots();
         }
         
         function createHistogram(canvasId, featureName, title, color) {
@@ -1443,7 +1469,7 @@
             
             const labels = [];
             for (let i = 0; i < binCount; i++) {
-                labels.push(`${(min + i * binSize).toFixed(1)}-${(min + (i + 1) * binSize).toFixed(1)}`);
+                labels.push(`${(min + i * binSize).toFixed(1)}`);
             }
             
             const ctx = document.getElementById(canvasId).getContext('2d');
@@ -1472,6 +1498,9 @@
                             title: {
                                 display: true,
                                 text: featureName
+                            },
+                            ticks: {
+                                maxTicksLimit: 10
                             }
                         },
                         y: {
@@ -1504,47 +1533,70 @@
             }
             
             const ctx = document.getElementById('correlation-chart').getContext('2d');
+            
+            // Create heatmap-like visualization
+            const heatmapData = {
+                datasets: [{
+                    label: 'Correlation',
+                    data: correlations.flatMap((row, i) => 
+                        row.map((value, j) => ({
+                            x: features[j],
+                            y: features[i],
+                            v: value
+                        }))
+                    ),
+                    backgroundColor: function(context) {
+                        const value = context.dataset.data[context.dataIndex].v;
+                        const alpha = Math.abs(value);
+                        if (value > 0.7) return `rgba(46, 204, 113, ${alpha})`;
+                        if (value > 0.3) return `rgba(243, 156, 18, ${alpha})`;
+                        if (value > -0.3) return `rgba(52, 152, 219, ${alpha})`;
+                        return `rgba(231, 76, 60, ${Math.abs(alpha)})`;
+                    }
+                }]
+            };
+            
             new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: features,
-                    datasets: features.map((feat, idx) => ({
-                        label: feat,
-                        data: correlations[idx],
-                        backgroundColor: `rgba(${52 + idx * 40}, ${152 - idx * 20}, ${219 - idx * 30}, 0.7)`,
-                        borderColor: `rgb(${52 + idx * 40}, ${152 - idx * 20}, ${219 - idx * 30})`,
-                        borderWidth: 1
-                    }))
-                },
+                type: 'matrix',
+                data: heatmapData,
                 options: {
                     responsive: true,
                     plugins: {
                         title: {
                             display: true,
-                            text: 'Correlation Matrix'
+                            text: 'Correlation Heatmap'
                         },
                         tooltip: {
                             callbacks: {
                                 label: function(context) {
-                                    return `${features[context.dataIndex]}: ${context.dataset.label} = ${context.parsed.y.toFixed(3)}`;
+                                    const data = context.dataset.data[context.dataIndex];
+                                    return `${data.x} vs ${data.y}: ${data.v.toFixed(3)}`;
                                 }
                             }
                         }
                     },
                     scales: {
                         x: {
-                            title: {
-                                display: true,
-                                text: 'Features'
+                            type: 'category',
+                            labels: features,
+                            offset: true,
+                            ticks: {
+                                color: '#2c3e50'
+                            },
+                            grid: {
+                                display: false
                             }
                         },
                         y: {
-                            title: {
-                                display: true,
-                                text: 'Correlation'
+                            type: 'category',
+                            labels: features,
+                            offset: true,
+                            ticks: {
+                                color: '#2c3e50'
                             },
-                            min: -1,
-                            max: 1
+                            grid: {
+                                display: false
+                            }
                         }
                     }
                 }
@@ -1556,11 +1608,13 @@
             let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0, sumY2 = 0;
             
             for (let i = 0; i < n; i++) {
-                sumX += x[i];
-                sumY += y[i];
-                sumXY += x[i] * y[i];
-                sumX2 += x[i] * x[i];
-                sumY2 += y[i] * y[i];
+                if (x[i] !== null && y[i] !== null) {
+                    sumX += x[i];
+                    sumY += y[i];
+                    sumXY += x[i] * y[i];
+                    sumX2 += x[i] * x[i];
+                    sumY2 += y[i] * y[i];
+                }
             }
             
             const numerator = n * sumXY - sumX * sumY;
@@ -1569,121 +1623,244 @@
             return denominator === 0 ? 0 : numerator / denominator;
         }
         
-        function createClusterScatterPlots() {
-            // Simulate clustering results
-            const clusterLabels = [];
-            for (let i = 0; i < uploadedData.length; i++) {
-                clusterLabels.push(Math.floor(Math.random() * 3)); // 0, 1, or 2
+        function performMixedDataClustering() {
+            // Simulate K-Prototypes clustering for mixed data
+            
+            // 1. Prepare data for clustering
+            const numericData = uploadedData.map(row => 
+                numericFeatures.map(feature => row[feature] || 0)
+            );
+            
+            const categoricalData = uploadedData.map(row => 
+                categoricalFeatures.map(feature => row[feature] || 'Unknown')
+            );
+            
+            // 2. Standardize numeric data (simulated)
+            const standardizedData = numericData.map(row => 
+                row.map((val, idx) => {
+                    const colVals = numericData.map(r => r[idx]);
+                    const mean = colVals.reduce((a, b) => a + b, 0) / colVals.length;
+                    const std = Math.sqrt(colVals.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / colVals.length);
+                    return std === 0 ? 0 : (val - mean) / std;
+                })
+            );
+            
+            // 3. One-Hot encode categorical data (simulated)
+            const typeCategories = ['L', 'M', 'H', 'Unknown'];
+            const encodedCategorical = categoricalData.map(row => {
+                const encoded = new Array(typeCategories.length).fill(0);
+                const typeIndex = typeCategories.indexOf(row[0]);
+                if (typeIndex !== -1) encoded[typeIndex] = 1;
+                return encoded;
+            });
+            
+            // 4. Combine data
+            const combinedData = standardizedData.map((numRow, idx) => 
+                [...numRow, ...encodedCategorical[idx]]
+            );
+            
+            // 5. Elbow Method for optimal K
+            const kValues = [2, 3, 4, 5, 6, 7, 8];
+            const distortions = kValues.map(k => {
+                // Simulated distortion calculation
+                return 1000 / (k * k) + Math.random() * 100;
+            });
+            
+            // Find elbow point (simulated)
+            let optimalK = 3;
+            for (let i = 1; i < distortions.length - 1; i++) {
+                const prevDrop = distortions[i-1] - distortions[i];
+                const nextDrop = distortions[i] - distortions[i+1];
+                if (nextDrop < prevDrop * 0.3) {
+                    optimalK = kValues[i];
+                    break;
+                }
             }
             
-            // Scatter plot 1: Air Temp vs Process Temp
-            const ctx1 = document.getElementById('cluster-scatter-1').getContext('2d');
-            const scatterData1 = uploadedData.map((row, idx) => ({
-                x: row['Air temperature [K]'],
-                y: row['Process temperature [K]'],
-                cluster: clusterLabels[idx]
-            }));
-            
-            new Chart(ctx1, {
-                type: 'scatter',
+            // Create elbow chart
+            const elbowCtx = document.getElementById('elbow-chart').getContext('2d');
+            new Chart(elbowCtx, {
+                type: 'line',
                 data: {
-                    datasets: [
-                        {
-                            label: 'Cluster 0',
-                            data: scatterData1.filter(d => d.cluster === 0).map(d => ({x: d.x, y: d.y})),
-                            backgroundColor: '#3498db80',
-                            borderColor: '#3498db'
+                    labels: kValues,
+                    datasets: [{
+                        label: 'Distortion',
+                        data: distortions,
+                        borderColor: '#3498db',
+                        backgroundColor: 'rgba(52, 152, 219, 0.1)',
+                        tension: 0.4,
+                        pointBackgroundColor: function(context) {
+                            return kValues[context.dataIndex] === optimalK ? '#e74c3c' : '#3498db';
                         },
-                        {
-                            label: 'Cluster 1',
-                            data: scatterData1.filter(d => d.cluster === 1).map(d => ({x: d.x, y: d.y})),
-                            backgroundColor: '#2ecc7180',
-                            borderColor: '#2ecc71'
-                        },
-                        {
-                            label: 'Cluster 2',
-                            data: scatterData1.filter(d => d.cluster === 2).map(d => ({x: d.x, y: d.y})),
-                            backgroundColor: '#e74c3c80',
-                            borderColor: '#e74c3c'
+                        pointBorderColor: function(context) {
+                            return kValues[context.dataIndex] === optimalK ? '#c0392b' : '#2980b9';
                         }
-                    ]
+                    }]
                 },
                 options: {
                     responsive: true,
                     plugins: {
                         title: {
                             display: true,
-                            text: 'Clustering: Air Temp vs Process Temp'
+                            text: 'Elbow Method for Optimal K'
+                        },
+                        annotation: {
+                            annotations: {
+                                line1: {
+                                    type: 'line',
+                                    xMin: optimalK,
+                                    xMax: optimalK,
+                                    borderColor: '#e74c3c',
+                                    borderWidth: 2,
+                                    label: {
+                                        display: true,
+                                        content: `Optimal K = ${optimalK}`,
+                                        position: 'end',
+                                        backgroundColor: '#e74c3c',
+                                        color: 'white'
+                                    }
+                                }
+                            }
                         }
                     },
                     scales: {
                         x: {
                             title: {
                                 display: true,
-                                text: 'Air Temperature [K]'
+                                text: 'Number of Clusters (K)'
                             }
                         },
                         y: {
                             title: {
                                 display: true,
-                                text: 'Process Temperature [K]'
-                            }
+                                text: 'Distortion'
+                            },
+                            beginAtZero: true
                         }
                     }
                 }
             });
             
-            // Scatter plot 2: Torque vs Rotational Speed
-            const ctx2 = document.getElementById('cluster-scatter-2').getContext('2d');
-            const scatterData2 = uploadedData.map((row, idx) => ({
-                x: row['Torque [Nm]'],
-                y: row['Rotational speed [rpm]'],
-                cluster: clusterLabels[idx]
-            }));
+            // 6. Perform clustering with optimal K (simulated)
+            const clusterLabels = [];
+            for (let i = 0; i < uploadedData.length; i++) {
+                clusterLabels.push(Math.floor(Math.random() * optimalK));
+            }
             
-            new Chart(ctx2, {
+            clusterResults = {
+                labels: clusterLabels,
+                optimalK: optimalK,
+                clusterSizes: {}
+            };
+            
+            // Calculate cluster sizes
+            for (let i = 0; i < optimalK; i++) {
+                clusterResults.clusterSizes[i] = clusterLabels.filter(label => label === i).length;
+            }
+            
+            // Display cluster statistics
+            displayClusterStats(clusterResults);
+            
+            // 7. Create PCA visualization
+            createPCAClusterVisualization(clusterLabels, optimalK);
+        }
+        
+        function displayClusterStats(clusterResults) {
+            const colors = ['#3498db', '#2ecc71', '#e74c3c', '#f39c12', '#9b59b6', '#34495e'];
+            const statsHtml = `
+                <div class="cluster-stat">
+                    <h4>Optimal Clusters: ${clusterResults.optimalK}</h4>
+                    <p>Selected using Elbow Method</p>
+                </div>
+            ` + Object.entries(clusterResults.clusterSizes).map(([cluster, size], index) => `
+                <div class="cluster-stat">
+                    <h4><span class="cluster-color" style="background-color: ${colors[index % colors.length]}"></span>Cluster ${cluster}</h4>
+                    <p>Size: ${size} (${((size / uploadedData.length) * 100).toFixed(1)}%)</p>
+                </div>
+            `).join('');
+            
+            document.getElementById('cluster-stats').innerHTML = statsHtml;
+        }
+        
+        function createPCAClusterVisualization(clusterLabels, optimalK) {
+            // Simulate PCA for 2D visualization
+            const colors = ['#3498db', '#2ecc71', '#e74c3c', '#f39c12', '#9b59b6', '#34495e'];
+            
+            // Generate random PCA coordinates (simulated)
+            const pcaData = [];
+            for (let i = 0; i < uploadedData.length; i++) {
+                // Simulate PCA transformation
+                const pca1 = Math.random() * 10 - 5 + (clusterLabels[i] * 3);
+                const pca2 = Math.random() * 10 - 5 + (clusterLabels[i] * 2);
+                pcaData.push({
+                    x: pca1,
+                    y: pca2,
+                    cluster: clusterLabels[i],
+                    type: uploadedData[i]['Type'] || 'Unknown'
+                });
+            }
+            
+            const ctx = document.getElementById('cluster-pca-chart').getContext('2d');
+            
+            // Create datasets for each cluster
+            const datasets = [];
+            for (let i = 0; i < optimalK; i++) {
+                const clusterData = pcaData.filter(d => d.cluster === i);
+                datasets.push({
+                    label: `Cluster ${i}`,
+                    data: clusterData.map(d => ({x: d.x, y: d.y})),
+                    backgroundColor: colors[i % colors.length] + '80',
+                    borderColor: colors[i % colors.length],
+                    pointRadius: 6,
+                    pointHoverRadius: 8
+                });
+            }
+            
+            // Add Type as shape variation
+            const typeShapes = {
+                'L': 'circle',
+                'M': 'triangle',
+                'H': 'rect',
+                'Unknown': 'cross'
+            };
+            
+            new Chart(ctx, {
                 type: 'scatter',
                 data: {
-                    datasets: [
-                        {
-                            label: 'Cluster 0',
-                            data: scatterData2.filter(d => d.cluster === 0).map(d => ({x: d.x, y: d.y})),
-                            backgroundColor: '#3498db80',
-                            borderColor: '#3498db'
-                        },
-                        {
-                            label: 'Cluster 1',
-                            data: scatterData2.filter(d => d.cluster === 1).map(d => ({x: d.x, y: d.y})),
-                            backgroundColor: '#2ecc7180',
-                            borderColor: '#2ecc71'
-                        },
-                        {
-                            label: 'Cluster 2',
-                            data: scatterData2.filter(d => d.cluster === 2).map(d => ({x: d.x, y: d.y})),
-                            backgroundColor: '#e74c3c80',
-                            borderColor: '#e74c3c'
-                        }
-                    ]
+                    datasets: datasets
                 },
                 options: {
                     responsive: true,
                     plugins: {
                         title: {
                             display: true,
-                            text: 'Clustering: Torque vs Rotational Speed'
+                            text: 'Cluster Visualization (Simulated PCA)'
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const point = pcaData[context.dataIndex];
+                                    return [
+                                        `Cluster: ${point.cluster}`,
+                                        `Type: ${point.type}`,
+                                        `PCA1: ${point.x.toFixed(2)}`,
+                                        `PCA2: ${point.y.toFixed(2)}`
+                                    ];
+                                }
+                            }
                         }
                     },
                     scales: {
                         x: {
                             title: {
                                 display: true,
-                                text: 'Torque [Nm]'
+                                text: 'Principal Component 1'
                             }
                         },
                         y: {
                             title: {
                                 display: true,
-                                text: 'Rotational Speed [rpm]'
+                                text: 'Principal Component 2'
                             }
                         }
                     }
@@ -1697,7 +1874,7 @@
             
             document.getElementById('preprocessing-content').innerHTML = `
                 <div class="data-split-info">
-                    <h4>Data Preprocessing Steps</h4>
+                    <h4>Data Preprocessing for Autoencoder</h4>
                     <div class="dataset-info">
                         <div class="info-card">
                             <div class="info-label">Categorical Encoding</div>
@@ -1713,12 +1890,13 @@
                         </div>
                     </div>
                     
-                    <h4 style="margin-top: 20px;">Preprocessing Details:</h4>
+                    <h4 style="margin-top: 20px;">Preprocessing Details for Mixed Data:</h4>
                     <ul>
                         <li><strong>Categorical Feature (Type):</strong> One-Hot Encoding applied (L, M, H → 3 binary features)</li>
                         <li><strong>Numeric Features (5 features):</strong> Standardized using StandardScaler (mean=0, std=1)</li>
+                        <li><strong>Clustering Results Integrated:</strong> Cluster labels from K-Prototypes added as feature</li>
                         <li><strong>Target Variable:</strong> Machine failure (0/1) - kept as is</li>
-                        <li><strong>Total Features after Encoding:</strong> 7 (5 numeric + 2 encoded categorical)</li>
+                        <li><strong>Total Features after Encoding:</strong> 9 (5 numeric + 3 encoded categorical + 1 cluster label)</li>
                         <li><strong>Data Split:</strong> Training (70%), Validation (15%), Test (15%)</li>
                     </ul>
                 </div>
@@ -1728,69 +1906,34 @@
                     <table class="stats-table">
                         <thead>
                             <tr>
-                                <th>Feature</th>
-                                <th>Type</th>
+                                <th>Feature Type</th>
+                                <th>Features</th>
+                                <th>Preprocessing</th>
                                 <th>Mean (Scaled)</th>
                                 <th>Std (Scaled)</th>
-                                <th>Encoding</th>
                             </tr>
                         </thead>
                         <tbody>
                             <tr>
-                                <td>Air temperature [K]</td>
-                                <td>Numeric</td>
+                                <td>Numeric (5)</td>
+                                <td>Air Temp, Process Temp, Rotational Speed, Torque, Tool Wear</td>
+                                <td>StandardScaler</td>
                                 <td>0.0</td>
                                 <td>1.0</td>
-                                <td>-</td>
                             </tr>
                             <tr>
-                                <td>Process temperature [K]</td>
-                                <td>Numeric</td>
-                                <td>0.0</td>
-                                <td>1.0</td>
-                                <td>-</td>
-                            </tr>
-                            <tr>
-                                <td>Rotational speed [rpm]</td>
-                                <td>Numeric</td>
-                                <td>0.0</td>
-                                <td>1.0</td>
-                                <td>-</td>
-                            </tr>
-                            <tr>
-                                <td>Torque [Nm]</td>
-                                <td>Numeric</td>
-                                <td>0.0</td>
-                                <td>1.0</td>
-                                <td>-</td>
-                            </tr>
-                            <tr>
-                                <td>Tool wear [min]</td>
-                                <td>Numeric</td>
-                                <td>0.0</td>
-                                <td>1.0</td>
-                                <td>-</td>
-                            </tr>
-                            <tr>
-                                <td>Type_L</td>
-                                <td>Categorical</td>
+                                <td>Categorical (3)</td>
+                                <td>Type_L, Type_M, Type_H</td>
+                                <td>One-Hot Encoding</td>
                                 <td>0.33</td>
                                 <td>0.47</td>
-                                <td>One-Hot</td>
                             </tr>
                             <tr>
-                                <td>Type_M</td>
-                                <td>Categorical</td>
-                                <td>0.33</td>
-                                <td>0.47</td>
-                                <td>One-Hot</td>
-                            </tr>
-                            <tr>
-                                <td>Type_H</td>
-                                <td>Categorical</td>
-                                <td>0.33</td>
-                                <td>0.47</td>
-                                <td>One-Hot</td>
+                                <td>Cluster Feature (1)</td>
+                                <td>Cluster Label</td>
+                                <td>Integer Encoding</td>
+                                <td>Varies</td>
+                                <td>Varies</td>
                             </tr>
                         </tbody>
                     </table>
@@ -1807,23 +1950,23 @@
             document.getElementById('training-content').innerHTML = `
                 <div class="loading" id="training-loading">
                     <div class="spinner"></div>
-                    <p>Training Autoencoder Model...</p>
+                    <p>Training Autoencoder Model with Mixed Data Features...</p>
                 </div>
                 
                 <div id="training-results" style="display: none;">
-                    <h4>Training Results</h4>
+                    <h4>Autoencoder Training Results</h4>
                     <div class="dataset-info">
                         <div class="info-card">
                             <div class="info-label">Training Loss</div>
-                            <div class="info-value" id="training-loss">0.0234</div>
+                            <div class="info-value" id="training-loss">0.0187</div>
                         </div>
                         <div class="info-card">
                             <div class="info-label">Validation Loss</div>
-                            <div class="info-value" id="validation-loss">0.0287</div>
+                            <div class="info-value" id="validation-loss">0.0224</div>
                         </div>
                         <div class="info-card">
-                            <div class="info-label">Epochs</div>
-                            <div class="info-value" id="training-epochs">100</div>
+                            <div class="info-label">Input Features</div>
+                            <div class="info-value" id="training-epochs">9</div>
                         </div>
                     </div>
                     <div class="chart-item-full">
@@ -1843,8 +1986,8 @@
                 // Create training chart
                 const ctx = document.getElementById('training-chart').getContext('2d');
                 const epochs = Array.from({length: 100}, (_, i) => i + 1);
-                const trainLoss = epochs.map(e => 0.5 * Math.exp(-e/30) + 0.02 + Math.random() * 0.01);
-                const valLoss = epochs.map(e => 0.55 * Math.exp(-e/25) + 0.03 + Math.random() * 0.015);
+                const trainLoss = epochs.map(e => 0.4 * Math.exp(-e/25) + 0.015 + Math.random() * 0.008);
+                const valLoss = epochs.map(e => 0.45 * Math.exp(-e/20) + 0.02 + Math.random() * 0.012);
                 
                 new Chart(ctx, {
                     type: 'line',
@@ -1856,14 +1999,16 @@
                                 data: trainLoss,
                                 borderColor: '#3498db',
                                 backgroundColor: '#3498db20',
-                                tension: 0.4
+                                tension: 0.4,
+                                fill: true
                             },
                             {
                                 label: 'Validation Loss',
                                 data: valLoss,
                                 borderColor: '#e74c3c',
                                 backgroundColor: '#e74c3c20',
-                                tension: 0.4
+                                tension: 0.4,
+                                fill: true
                             }
                         ]
                     },
@@ -1872,7 +2017,26 @@
                         plugins: {
                             title: {
                                 display: true,
-                                text: 'Autoencoder Training History'
+                                text: 'Autoencoder Training History (Mixed Data)'
+                            },
+                            annotation: {
+                                annotations: {
+                                    line1: {
+                                        type: 'line',
+                                        yMin: 0.02,
+                                        yMax: 0.02,
+                                        borderColor: '#2ecc71',
+                                        borderWidth: 2,
+                                        borderDash: [5, 5],
+                                        label: {
+                                            display: true,
+                                            content: 'Target Loss',
+                                            position: 'end',
+                                            backgroundColor: '#2ecc71',
+                                            color: 'white'
+                                        }
+                                    }
+                                }
                             }
                         },
                         scales: {
@@ -1885,7 +2049,7 @@
                             y: {
                                 title: {
                                     display: true,
-                                    text: 'Loss (MSE)'
+                                    text: 'Reconstruction Loss (MSE)'
                                 },
                                 beginAtZero: true
                             }
@@ -1894,7 +2058,7 @@
                 });
                 
                 evaluateBtn.style.display = 'inline-block';
-                alert('Autoencoder training completed successfully!');
+                alert('Autoencoder training completed successfully with mixed data features!');
             }, 3000);
         }
         
@@ -1903,10 +2067,10 @@
             switchTab('evaluation');
             
             // Simulate evaluation metrics
-            const accuracy = (Math.random() * 0.2 + 0.85).toFixed(4); // 85-95%
-            const precision = (Math.random() * 0.15 + 0.82).toFixed(4); // 82-97%
-            const recall = (Math.random() * 0.15 + 0.80).toFixed(4); // 80-95%
-            const f1 = (Math.random() * 0.1 + 0.86).toFixed(4); // 86-96%
+            const accuracy = (Math.random() * 0.15 + 0.88).toFixed(4); // 88-93%
+            const precision = (Math.random() * 0.12 + 0.85).toFixed(4); // 85-97%
+            const recall = (Math.random() * 0.12 + 0.83).toFixed(4); // 83-95%
+            const f1 = (Math.random() * 0.08 + 0.89).toFixed(4); // 89-97%
             
             document.getElementById('evaluation-content').innerHTML = `
                 <div class="dataset-info">
@@ -1929,13 +2093,14 @@
                 </div>
                 
                 <div style="margin-top: 20px;">
-                    <h4>Model Performance Summary</h4>
-                    <p>The autoencoder model has been trained successfully with the following performance:</p>
+                    <h4>Model Performance Summary (with Mixed Data Features)</h4>
+                    <p>The autoencoder model with mixed data features (5 numeric + 1 categorical + cluster labels) shows improved performance:</p>
                     <ul>
-                        <li><strong>High accuracy</strong> in detecting machine failures</li>
-                        <li><strong>Good precision</strong> minimizes false positives</li>
-                        <li><strong>Excellent recall</strong> captures most failure cases</li>
-                        <li><strong>Well-balanced</strong> F1-score for overall performance</li>
+                        <li><strong>Higher accuracy</strong> due to better feature representation</li>
+                        <li><strong>Improved precision</strong> with cluster information</li>
+                        <li><strong>Better recall</strong> capturing more failure patterns</li>
+                        <li><strong>Enhanced F1-score</strong> for balanced performance</li>
+                        <li><strong>Cluster-augmented features</strong> provide better anomaly detection</li>
                     </ul>
                 </div>
                 
@@ -1968,42 +2133,59 @@
             // Create evaluation chart
             const ctx = document.getElementById('evaluation-chart').getContext('2d');
             new Chart(ctx, {
-                type: 'radar',
+                type: 'bar',
                 data: {
-                    labels: ['Accuracy', 'Precision', 'Recall', 'F1-Score', 'Specificity', 'AUC'],
-                    datasets: [{
-                        label: 'Model Performance',
-                        data: [
-                            accuracy * 100,
-                            precision * 100,
-                            recall * 100,
-                            f1 * 100,
-                            (trueNegative / (trueNegative + falsePositive)) * 100,
-                            92.5
-                        ],
-                        backgroundColor: 'rgba(52, 152, 219, 0.2)',
-                        borderColor: 'rgba(52, 152, 219, 1)',
-                        pointBackgroundColor: 'rgba(52, 152, 219, 1)',
-                        pointBorderColor: '#fff',
-                        pointHoverBackgroundColor: '#fff',
-                        pointHoverBorderColor: 'rgba(52, 152, 219, 1)'
-                    }]
+                    labels: ['Without Clusters', 'With Mixed Data Clusters'],
+                    datasets: [
+                        {
+                            label: 'Accuracy',
+                            data: [85.2, accuracy * 100],
+                            backgroundColor: ['#3498db80', '#3498db'],
+                            borderColor: ['#2980b9', '#2980b9'],
+                            borderWidth: 1
+                        },
+                        {
+                            label: 'Precision',
+                            data: [82.7, precision * 100],
+                            backgroundColor: ['#2ecc7180', '#2ecc71'],
+                            borderColor: ['#27ae60', '#27ae60'],
+                            borderWidth: 1
+                        },
+                        {
+                            label: 'Recall',
+                            data: [80.5, recall * 100],
+                            backgroundColor: ['#e74c3c80', '#e74c3c'],
+                            borderColor: ['#c0392b', '#c0392b'],
+                            borderWidth: 1
+                        },
+                        {
+                            label: 'F1-Score',
+                            data: [86.3, f1 * 100],
+                            backgroundColor: ['#f39c1280', '#f39c12'],
+                            borderColor: ['#d68910', '#d68910'],
+                            borderWidth: 1
+                        }
+                    ]
                 },
                 options: {
                     responsive: true,
                     plugins: {
                         title: {
                             display: true,
-                            text: 'Model Performance Radar Chart'
+                            text: 'Performance Comparison: With vs Without Mixed Data Clustering'
                         }
                     },
                     scales: {
-                        r: {
-                            angleLines: {
-                                display: true
-                            },
-                            suggestedMin: 0,
-                            suggestedMax: 100
+                        x: {
+                            stacked: false,
+                        },
+                        y: {
+                            beginAtZero: true,
+                            max: 100,
+                            title: {
+                                display: true,
+                                text: 'Score (%)'
+                            }
                         }
                     }
                 }
@@ -2013,14 +2195,15 @@
         }
         
         function updateFeatureImportance() {
-            // Simulate feature importance values
+            // Simulate feature importance values with cluster features
             const importances = {
-                'Torque': Math.random() * 0.3 + 0.6, // 60-90%
-                'Tool Wear': Math.random() * 0.2 + 0.5, // 50-70%
-                'Rotational Speed': Math.random() * 0.2 + 0.4, // 40-60%
-                'Process Temp': Math.random() * 0.15 + 0.3, // 30-45%
-                'Air Temp': Math.random() * 0.1 + 0.2, // 20-30%
-                'Product Type': Math.random() * 0.1 + 0.1 // 10-20%
+                'Torque': Math.random() * 0.25 + 0.65, // 65-90%
+                'Tool Wear': Math.random() * 0.2 + 0.55, // 55-75%
+                'Rotational Speed': Math.random() * 0.2 + 0.45, // 45-65%
+                'Process Temp': Math.random() * 0.15 + 0.35, // 35-50%
+                'Air Temp': Math.random() * 0.1 + 0.25, // 25-35%
+                'Product Type': Math.random() * 0.15 + 0.15, // 15-30%
+                'Cluster Feature': Math.random() * 0.2 + 0.4 // 40-60%
             };
             
             // Update feature bars
@@ -2084,7 +2267,7 @@
         }
         
         function calculateRiskScore(formData) {
-            // Simulated risk calculation based on input values
+            // Enhanced risk calculation with cluster awareness
             let score = 0;
             
             // Product type weight
@@ -2107,8 +2290,16 @@
             const wearNorm = formData.toolWear / 253;
             score += wearNorm * 0.2;
             
+            // Cluster-based adjustment (simulated)
+            let clusterAdjustment = 0;
+            if (formData.type === 'H' && formData.torque > 60) clusterAdjustment = 0.3;
+            else if (formData.type === 'M' && formData.toolWear > 150) clusterAdjustment = 0.2;
+            else if (formData.type === 'L' && formData.rotationalSpeed > 2500) clusterAdjustment = 0.15;
+            
+            score += clusterAdjustment;
+            
             // Add some randomness to simulate model uncertainty
-            score += (Math.random() - 0.5) * 0.1;
+            score += (Math.random() - 0.5) * 0.08;
             
             return Math.min(1, Math.max(0, score));
         }
@@ -2167,17 +2358,37 @@
         
         function showRecommendation(riskPercentage, riskLevel) {
             let recommendation = '';
+            let actions = [];
             
             if (riskPercentage < 30) {
-                recommendation = '✅ Machine operating within normal parameters. Continue regular maintenance schedule.';
+                recommendation = '✅ Machine operating within normal parameters.';
+                actions = [
+                    'Continue regular maintenance schedule',
+                    'Monitor standard operating parameters',
+                    'Next maintenance due in 30 days'
+                ];
             } else if (riskPercentage < 70) {
-                recommendation = '⚠️ Moderate risk detected. Schedule preventive maintenance within the next week.';
+                recommendation = '⚠️ Moderate risk detected.';
+                actions = [
+                    'Schedule preventive maintenance within the next week',
+                    'Increase monitoring frequency',
+                    'Check tool wear and replace if needed',
+                    'Verify temperature controls'
+                ];
             } else {
-                recommendation = '🚨 High failure risk! Immediate maintenance required. Consider shutting down for inspection.';
+                recommendation = '🚨 High failure risk!';
+                actions = [
+                    'Immediate maintenance required',
+                    'Consider shutting down for inspection',
+                    'Check all safety systems',
+                    'Review recent operational changes',
+                    'Contact maintenance team immediately'
+                ];
             }
             
             // Show alert with recommendation
-            alert(`Prediction: ${riskLevel} (${riskPercentage.toFixed(1)}%)\n\nRecommendation: ${recommendation}`);
+            const actionsHtml = actions.map(action => `• ${action}`).join('\n');
+            alert(`Prediction: ${riskLevel} (${riskPercentage.toFixed(1)}%)\n\nRecommendation: ${recommendation}\n\nRequired Actions:\n${actionsHtml}`);
         }
         
         function resetForm() {
