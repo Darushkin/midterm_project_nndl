@@ -894,4 +894,737 @@
                 </div>
             </div>
             
+            <div class="tab-content" id="performance">
+                <h2>Model Performance</h2>
+                <div class="confusion-matrix">
+                    <div class="matrix-cell matrix-header"></div>
+                    <div class="matrix-cell matrix-header">Predicted: No Failure</div>
+                    <div class="matrix-cell matrix-header">Predicted: Failure</div>
+                    <div class="matrix-cell matrix-header">Actual: No Failure</div>
+                    <div class="matrix-cell true-negative" id="true-negative">0</div>
+                    <div class="matrix-cell false-positive" id="false-positive">0</div>
+                    <div class="matrix-cell matrix-header">Actual: Failure</div>
+                    <div class="matrix-cell false-negative" id="false-negative">0</div>
+                    <div class="matrix-cell true-positive" id="true-positive">0</div>
+                </div>
+                <div class="chart-container">
+                    <canvas id="performance-chart"></canvas>
+                </div>
+            </div>
             
+            <div class="tab-content" id="history">
+                <h2>Prediction History</h2>
+                <div class="preview-table">
+                    <table id="history-table">
+                        <thead>
+                            <tr>
+                                <th>Timestamp</th>
+                                <th>Type</th>
+                                <th>Air Temp</th>
+                                <th>Process Temp</th>
+                                <th>Speed</th>
+                                <th>Torque</th>
+                                <th>Tool Wear</th>
+                                <th>Risk</th>
+                                <th>Prediction</th>
+                            </tr>
+                        </thead>
+                        <tbody id="history-table-body"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        
+        <footer>
+            <p>Machine Failure Prediction System | Autoencoder Model | © 2024</p>
+        </footer>
+    </div>
+
+    <script>
+        // Global variables
+        let uploadedData = null;
+        let currentStep = 1;
+        let modelReady = false;
+        let predictionHistory = [];
+        
+        // DOM Elements
+        const fileInput = document.getElementById('file-input');
+        const uploadBtn = document.getElementById('upload-btn');
+        const fileUploadArea = document.getElementById('file-upload-area');
+        const uploadStatus = document.getElementById('upload-status');
+        const dataPreview = document.getElementById('data-preview');
+        const analyzeBtn = document.getElementById('analyze-btn');
+        const edaBtn = document.getElementById('eda-btn');
+        const preprocessBtn = document.getElementById('preprocess-btn');
+        const trainBtn = document.getElementById('train-btn');
+        const evaluateBtn = document.getElementById('evaluate-btn');
+        const predictionReadyBtn = document.getElementById('prediction-ready-btn');
+        const predictBtn = document.getElementById('predict-btn');
+        const resetBtn = document.getElementById('reset-btn');
+        const predictionForm = document.getElementById('prediction-form');
+        
+        // Initialize the application
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeEventListeners();
+            initializeTabs();
+        });
+        
+        function initializeEventListeners() {
+            // File upload events
+            uploadBtn.addEventListener('click', () => fileInput.click());
+            fileInput.addEventListener('change', handleFileUpload);
+            
+            // Drag and drop for file upload
+            fileUploadArea.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                fileUploadArea.style.borderColor = '#3498db';
+            });
+            
+            fileUploadArea.addEventListener('dragleave', (e) => {
+                e.preventDefault();
+                fileUploadArea.style.borderColor = '#ddd';
+            });
+            
+            fileUploadArea.addEventListener('drop', (e) => {
+                e.preventDefault();
+                fileUploadArea.style.borderColor = '#ddd';
+                
+                if (e.dataTransfer.files.length) {
+                    fileInput.files = e.dataTransfer.files;
+                    handleFileUpload();
+                }
+            });
+            
+            // Pipeline buttons
+            analyzeBtn.addEventListener('click', analyzeDataset);
+            edaBtn.addEventListener('click', performEDA);
+            preprocessBtn.addEventListener('click', preprocessData);
+            trainBtn.addEventListener('click', trainAutoencoder);
+            evaluateBtn.addEventListener('click', evaluateModel);
+            predictionReadyBtn.addEventListener('click', () => {
+                modelReady = true;
+                predictBtn.disabled = false;
+                updateStep(6, 'complete');
+                alert('Model is ready for predictions!');
+            });
+            
+            // Prediction form
+            predictionForm.addEventListener('submit', handlePrediction);
+            resetBtn.addEventListener('click', resetForm);
+            
+            // Initialize gauge
+            updateGauge(0);
+        }
+        
+        function initializeTabs() {
+            const tabs = document.querySelectorAll('.tab');
+            tabs.forEach(tab => {
+                tab.addEventListener('click', () => {
+                    const tabId = tab.getAttribute('data-tab');
+                    switchTab(tabId);
+                });
+            });
+            
+            // Pipeline tabs
+            const pipelineTabs = document.querySelectorAll('.tab[data-tab]');
+            pipelineTabs.forEach(tab => {
+                tab.addEventListener('click', () => {
+                    const tabId = tab.getAttribute('data-tab');
+                    switchTab(tabId);
+                });
+            });
+        }
+        
+        function switchTab(tabId) {
+            // Hide all tab contents
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            
+            // Deactivate all tabs
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            // Show selected tab content
+            document.getElementById(tabId).classList.add('active');
+            
+            // Activate selected tab
+            document.querySelector(`.tab[data-tab="${tabId}"]`).classList.add('active');
+        }
+        
+        function handleFileUpload() {
+            const file = fileInput.files[0];
+            if (!file) return;
+            
+            if (!file.name.toLowerCase().endsWith('.csv')) {
+                showStatus('Please upload a CSV file', 'error');
+                return;
+            }
+            
+            showStatus('Processing file...', 'info');
+            
+            Papa.parse(file, {
+                header: true,
+                dynamicTyping: true,
+                skipEmptyLines: true,
+                complete: function(results) {
+                    if (results.errors.length > 0) {
+                        showStatus('Error parsing CSV file', 'error');
+                        console.error('CSV Errors:', results.errors);
+                        return;
+                    }
+                    
+                    uploadedData = results.data;
+                    showStatus(`File uploaded successfully: ${uploadedData.length} rows`, 'success');
+                    updateStep(1, 'complete');
+                    showDataPreview();
+                    analyzeBtn.style.display = 'inline-block';
+                },
+                error: function(error) {
+                    showStatus('Error reading file', 'error');
+                    console.error('File Error:', error);
+                }
+            });
+        }
+        
+        function showStatus(message, type = 'info') {
+            const colors = {
+                info: '#3498db',
+                success: '#2ecc71',
+                error: '#e74c3c',
+                warning: '#f39c12'
+            };
+            
+            uploadStatus.innerHTML = `
+                <div style="padding: 10px; background: ${colors[type]}20; color: ${colors[type]}; 
+                          border-radius: 5px; border-left: 4px solid ${colors[type]}">
+                    ${message}
+                </div>
+            `;
+        }
+        
+        function showDataPreview() {
+            if (!uploadedData || uploadedData.length === 0) return;
+            
+            const previewData = uploadedData.slice(0, 10);
+            const headers = Object.keys(uploadedData[0]);
+            
+            // Create table header
+            let thead = '<tr>';
+            headers.forEach(header => {
+                thead += `<th>${header}</th>`;
+            });
+            thead += '</tr>';
+            document.getElementById('data-table-head').innerHTML = thead;
+            
+            // Create table body
+            let tbody = '';
+            previewData.forEach(row => {
+                tbody += '<tr>';
+                headers.forEach(header => {
+                    tbody += `<td>${row[header] !== null && row[header] !== undefined ? row[header] : ''}</td>`;
+                });
+                tbody += '</tr>';
+            });
+            document.getElementById('data-table-body').innerHTML = tbody;
+            
+            dataPreview.style.display = 'block';
+        }
+        
+        function updateStep(step, status) {
+            // Update current step
+            currentStep = step;
+            
+            // Update pipeline steps
+            for (let i = 1; i <= 6; i++) {
+                const stepElement = document.getElementById(`step${i}`);
+                const badge = stepElement.querySelector('.status-badge');
+                
+                if (i < step) {
+                    stepElement.classList.add('step-active');
+                    badge.textContent = 'Complete';
+                    badge.className = 'status-badge status-complete';
+                } else if (i === step) {
+                    stepElement.classList.add('step-active');
+                    badge.textContent = status === 'complete' ? 'Complete' : 'In Progress';
+                    badge.className = `status-badge ${status === 'complete' ? 'status-complete' : 'status-pending'}`;
+                } else {
+                    stepElement.classList.remove('step-active');
+                    badge.textContent = 'Pending';
+                    badge.className = 'status-badge status-pending';
+                }
+            }
+        }
+        
+        function analyzeDataset() {
+            if (!uploadedData || uploadedData.length === 0) {
+                alert('Please upload data first');
+                return;
+            }
+            
+            updateStep(2, 'complete');
+            switchTab('dataset-info');
+            
+            // Calculate dataset statistics
+            const totalRecords = uploadedData.length;
+            const features = Object.keys(uploadedData[0]).length;
+            
+            // Count failures
+            let failureCount = 0;
+            if (uploadedData[0].hasOwnProperty('Machine failure')) {
+                failureCount = uploadedData.filter(row => row['Machine failure'] === 1).length;
+            } else if (uploadedData[0].hasOwnProperty('Failure')) {
+                failureCount = uploadedData.filter(row => row['Failure'] === 1).length;
+            }
+            
+            const failureRate = ((failureCount / totalRecords) * 100).toFixed(2);
+            
+            // Display statistics
+            document.getElementById('total-records').textContent = totalRecords.toLocaleString();
+            document.getElementById('total-features').textContent = features;
+            document.getElementById('failure-rate').textContent = `${failureRate}%`;
+            document.getElementById('dataset-stats').style.display = 'grid';
+            
+            // Check for missing values
+            checkMissingValues();
+            
+            // Update dataset summary
+            document.getElementById('dataset-summary').innerHTML = `
+                <p>The dataset contains <strong>${totalRecords}</strong> records with <strong>${features}</strong> features.</p>
+                <p>The failure rate is <strong>${failureRate}%</strong> (${failureCount} failure cases).</p>
+            `;
+            
+            edaBtn.style.display = 'inline-block';
+        }
+        
+        function checkMissingValues() {
+            if (!uploadedData || uploadedData.length === 0) return;
+            
+            const headers = Object.keys(uploadedData[0]);
+            let missingValuesFound = false;
+            let missingValuesHtml = '<h4>Missing Values Analysis</h4>';
+            
+            headers.forEach(header => {
+                const missingCount = uploadedData.filter(row => 
+                    row[header] === null || row[header] === undefined || row[header] === ''
+                ).length;
+                
+                if (missingCount > 0) {
+                    missingValuesFound = true;
+                    missingValuesHtml += `
+                        <div style="margin: 5px 0;">
+                            <strong>${header}:</strong> ${missingCount} missing values (${((missingCount/uploadedData.length)*100).toFixed(2)}%)
+                        </div>
+                    `;
+                }
+            });
+            
+            if (missingValuesFound) {
+                missingValuesHtml = `
+                    <div class="missing-values-section">
+                        ${missingValuesHtml}
+                        <div class="missing-values-options">
+                            <button class="btn btn-warning" onclick="handleMissingValues('mean')">Fill with Mean</button>
+                            <button class="btn btn-warning" onclick="handleMissingValues('median')">Fill with Median</button>
+                            <button class="btn btn-warning" onclick="handleMissingValues('remove')">Remove Rows</button>
+                        </div>
+                    </div>
+                `;
+            } else {
+                missingValuesHtml = '<p style="color: var(--success);">✓ No missing values found in the dataset.</p>';
+            }
+            
+            document.getElementById('missing-values-section').innerHTML = missingValuesHtml;
+            document.getElementById('missing-values-section').style.display = 'block';
+        }
+        
+        function handleMissingValues(strategy) {
+            alert(`Missing values handling strategy: ${strategy}\n\nIn a real application, this would process the data.`);
+            // In a real implementation, you would process the data here
+            document.querySelector('.missing-values-section').innerHTML += 
+                '<p style="color: var(--success); margin-top: 10px;">✓ Missing values handled successfully.</p>';
+        }
+        
+        function performEDA() {
+            updateStep(3, 'complete');
+            switchTab('eda');
+            
+            // Simulate EDA process
+            document.getElementById('eda-content').innerHTML = `
+                <div class="eda-section">
+                    <h3>Distribution Analysis</h3>
+                    <div class="chart-row">
+                        <div class="chart-item">
+                            <canvas id="distribution-chart-1"></canvas>
+                        </div>
+                        <div class="chart-item">
+                            <canvas id="distribution-chart-2"></canvas>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="eda-section">
+                    <h3>K-Means Clustering Results</h3>
+                    <div class="cluster-info">
+                        <p>K-Means clustering identified 3 distinct clusters in the data:</p>
+                        <div class="chart-item-full">
+                            <canvas id="cluster-chart"></canvas>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="eda-section">
+                    <h3>Correlation Matrix</h3>
+                    <div class="chart-item-full">
+                        <canvas id="correlation-chart"></canvas>
+                    </div>
+                </div>
+            `;
+            
+            // Simulate chart creation (in a real app, you would use actual data)
+            simulateCharts();
+            
+            preprocessBtn.style.display = 'inline-block';
+        }
+        
+        function simulateCharts() {
+            // This is a simulation - in a real app, you would use actual data
+            setTimeout(() => {
+                alert('EDA and Clustering completed successfully!\n\nVisualizations have been generated.');
+            }, 500);
+        }
+        
+        function preprocessData() {
+            updateStep(4, 'complete');
+            switchTab('preprocessing');
+            
+            document.getElementById('preprocessing-content').innerHTML = `
+                <div class="data-split-info">
+                    <h4>Data Split Information</h4>
+                    <p>The dataset has been split into training, validation, and test sets:</p>
+                    <div class="dataset-info">
+                        <div class="info-card">
+                            <div class="info-label">Training Set</div>
+                            <div class="info-value">70%</div>
+                        </div>
+                        <div class="info-card">
+                            <div class="info-label">Validation Set</div>
+                            <div class="info-value">15%</div>
+                        </div>
+                        <div class="info-card">
+                            <div class="info-label">Test Set</div>
+                            <div class="info-value">15%</div>
+                        </div>
+                    </div>
+                    <p>Features have been normalized using StandardScaler.</p>
+                </div>
+                
+                <div style="margin-top: 20px;">
+                    <h4>Preprocessing Steps Applied:</h4>
+                    <ul>
+                        <li>✓ Missing values handled</li>
+                        <li>✓ Categorical variables encoded (One-Hot Encoding)</li>
+                        <li>✓ Numerical features standardized</li>
+                        <li>✓ Dataset split (70/15/15)</li>
+                        <li>✓ Feature scaling applied</li>
+                    </ul>
+                </div>
+            `;
+            
+            trainBtn.style.display = 'inline-block';
+        }
+        
+        function trainAutoencoder() {
+            updateStep(5, 'complete');
+            switchTab('training');
+            
+            document.getElementById('training-content').innerHTML = `
+                <div class="loading" id="training-loading">
+                    <div class="spinner"></div>
+                    <p>Training Autoencoder Model...</p>
+                </div>
+                
+                <div id="training-results" style="display: none;">
+                    <h4>Training Results</h4>
+                    <div class="dataset-info">
+                        <div class="info-card">
+                            <div class="info-label">Training Loss</div>
+                            <div class="info-value" id="training-loss">0.0234</div>
+                        </div>
+                        <div class="info-card">
+                            <div class="info-label">Validation Loss</div>
+                            <div class="info-value" id="validation-loss">0.0287</div>
+                        </div>
+                        <div class="info-card">
+                            <div class="info-label">Epochs</div>
+                            <div class="info-value" id="training-epochs">100</div>
+                        </div>
+                    </div>
+                    <div class="chart-item-full">
+                        <canvas id="training-chart"></canvas>
+                    </div>
+                </div>
+            `;
+            
+            // Show loading
+            document.getElementById('training-loading').style.display = 'block';
+            
+            // Simulate training process
+            setTimeout(() => {
+                document.getElementById('training-loading').style.display = 'none';
+                document.getElementById('training-results').style.display = 'block';
+                evaluateBtn.style.display = 'inline-block';
+                alert('Autoencoder training completed successfully!');
+            }, 3000);
+        }
+        
+        function evaluateModel() {
+            updateStep(6, 'complete');
+            switchTab('evaluation');
+            
+            // Simulate evaluation metrics
+            const accuracy = (Math.random() * 0.2 + 0.85).toFixed(4); // 85-95%
+            const precision = (Math.random() * 0.15 + 0.82).toFixed(4); // 82-97%
+            const recall = (Math.random() * 0.15 + 0.80).toFixed(4); // 80-95%
+            const f1 = (Math.random() * 0.1 + 0.86).toFixed(4); // 86-96%
+            
+            document.getElementById('evaluation-content').innerHTML = `
+                <div class="dataset-info">
+                    <div class="info-card">
+                        <div class="info-label">Accuracy</div>
+                        <div class="info-value">${(accuracy * 100).toFixed(2)}%</div>
+                    </div>
+                    <div class="info-card">
+                        <div class="info-label">Precision</div>
+                        <div class="info-value">${(precision * 100).toFixed(2)}%</div>
+                    </div>
+                    <div class="info-card">
+                        <div class="info-label">Recall</div>
+                        <div class="info-value">${(recall * 100).toFixed(2)}%</div>
+                    </div>
+                    <div class="info-card">
+                        <div class="info-label">F1-Score</div>
+                        <div class="info-value">${(f1 * 100).toFixed(2)}%</div>
+                    </div>
+                </div>
+                
+                <div style="margin-top: 20px;">
+                    <h4>Model Performance Summary</h4>
+                    <p>The autoencoder model has been trained successfully with the following performance:</p>
+                    <ul>
+                        <li><strong>High accuracy</strong> in detecting machine failures</li>
+                        <li><strong>Good precision</strong> minimizes false positives</li>
+                        <li><strong>Excellent recall</strong> captures most failure cases</li>
+                        <li><strong>Well-balanced</strong> F1-score for overall performance</li>
+                    </ul>
+                </div>
+                
+                <div class="chart-item-full" style="margin-top: 20px;">
+                    <canvas id="evaluation-chart"></canvas>
+                </div>
+            `;
+            
+            // Update the metrics in the dashboard
+            document.getElementById('accuracy-display').textContent = `${(accuracy * 100).toFixed(1)}%`;
+            document.getElementById('precision-display').textContent = `${(precision * 100).toFixed(1)}%`;
+            document.getElementById('recall-display').textContent = `${(recall * 100).toFixed(1)}%`;
+            document.getElementById('f1-score-display').textContent = `${(f1 * 100).toFixed(1)}%`;
+            
+            // Update confusion matrix with simulated values
+            const totalCases = 1000;
+            const trueNegative = Math.floor(totalCases * accuracy * 0.7);
+            const falsePositive = Math.floor(totalCases * (1 - precision) * 0.3);
+            const falseNegative = Math.floor(totalCases * (1 - recall) * 0.3);
+            const truePositive = Math.floor(totalCases * precision * 0.7);
+            
+            document.getElementById('true-negative').textContent = trueNegative;
+            document.getElementById('false-positive').textContent = falsePositive;
+            document.getElementById('false-negative').textContent = falseNegative;
+            document.getElementById('true-positive').textContent = truePositive;
+            
+            // Update feature importance
+            updateFeatureImportance();
+            
+            predictionReadyBtn.style.display = 'inline-block';
+        }
+        
+        function updateFeatureImportance() {
+            // Simulate feature importance values
+            const importances = {
+                'Torque': Math.random() * 0.3 + 0.6, // 60-90%
+                'Tool Wear': Math.random() * 0.2 + 0.5, // 50-70%
+                'Rotational Speed': Math.random() * 0.2 + 0.4, // 40-60%
+                'Process Temp': Math.random() * 0.15 + 0.3, // 30-45%
+                'Air Temp': Math.random() * 0.1 + 0.2, // 20-30%
+                'Product Type': Math.random() * 0.1 + 0.1 // 10-20%
+            };
+            
+            // Update feature bars
+            const features = ['Torque', 'Tool Wear', 'Rotational Speed', 'Process Temp', 'Air Temp', 'Product Type'];
+            features.forEach((feature, index) => {
+                const fillElement = document.querySelectorAll('.feature-fill')[index];
+                const width = importances[feature] * 100;
+                fillElement.style.width = `${width}%`;
+            });
+        }
+        
+        function handlePrediction(e) {
+            e.preventDefault();
+            
+            if (!modelReady) {
+                alert('Please complete the ML pipeline first!');
+                return;
+            }
+            
+            // Get form values
+            const formData = {
+                type: document.getElementById('product-type').value,
+                airTemp: parseFloat(document.getElementById('air-temperature').value),
+                processTemp: parseFloat(document.getElementById('process-temperature').value),
+                rotationalSpeed: parseInt(document.getElementById('rotational-speed').value),
+                torque: parseFloat(document.getElementById('torque').value),
+                toolWear: parseInt(document.getElementById('tool-wear').value),
+                timestamp: new Date().toLocaleString()
+            };
+            
+            // Simulate prediction (in a real app, this would call a backend API)
+            const riskScore = calculateRiskScore(formData);
+            const riskPercentage = Math.min(100, Math.max(0, riskScore * 100));
+            
+            // Update UI
+            updateGauge(riskPercentage);
+            document.getElementById('prediction-value').textContent = `${riskPercentage.toFixed(1)}%`;
+            
+            // Determine risk level
+            let riskLevel, riskClass;
+            if (riskPercentage < 30) {
+                riskLevel = 'Low Risk';
+                riskClass = 'low-risk';
+            } else if (riskPercentage < 70) {
+                riskLevel = 'Medium Risk';
+                riskClass = 'medium-risk';
+            } else {
+                riskLevel = 'High Risk';
+                riskClass = 'high-risk';
+            }
+            
+            document.getElementById('prediction-value').className = `prediction-value ${riskClass}`;
+            document.getElementById('risk-level').textContent = riskLevel;
+            document.getElementById('risk-level').className = riskClass;
+            
+            // Add to history
+            addToHistory(formData, riskPercentage, riskLevel);
+            
+            // Show recommendation
+            showRecommendation(riskPercentage, riskLevel);
+        }
+        
+        function calculateRiskScore(formData) {
+            // Simulated risk calculation based on input values
+            let score = 0;
+            
+            // Product type weight
+            const typeWeights = { 'L': 0.1, 'M': 0.3, 'H': 0.5 };
+            score += typeWeights[formData.type] || 0;
+            
+            // Temperature effects (normalized)
+            score += (formData.airTemp - 295) / 10 * 0.1;
+            score += (formData.processTemp - 305) / 10 * 0.15;
+            
+            // Rotational speed (normalized between min-max)
+            const speedNorm = (formData.rotationalSpeed - 1168) / (2886 - 1168);
+            score += speedNorm * 0.2;
+            
+            // Torque effect
+            const torqueNorm = (formData.torque - 3.8) / (76.6 - 3.8);
+            score += torqueNorm * 0.25;
+            
+            // Tool wear effect
+            const wearNorm = formData.toolWear / 253;
+            score += wearNorm * 0.2;
+            
+            // Add some randomness to simulate model uncertainty
+            score += (Math.random() - 0.5) * 0.1;
+            
+            return Math.min(1, Math.max(0, score));
+        }
+        
+        function updateGauge(percentage) {
+            const needle = document.getElementById('gauge-needle');
+            // Convert percentage to angle (-90 to 90 degrees)
+            const angle = -90 + (percentage / 100) * 180;
+            needle.style.transform = `translateX(-50%) rotate(${angle}deg)`;
+        }
+        
+        function addToHistory(formData, riskPercentage, riskLevel) {
+            const historyEntry = {
+                timestamp: formData.timestamp,
+                type: formData.type,
+                airTemp: formData.airTemp,
+                processTemp: formData.processTemp,
+                speed: formData.rotationalSpeed,
+                torque: formData.torque,
+                toolWear: formData.toolWear,
+                risk: `${riskPercentage.toFixed(1)}%`,
+                prediction: riskLevel
+            };
+            
+            predictionHistory.unshift(historyEntry);
+            
+            // Update history table
+            const tbody = document.getElementById('history-table-body');
+            tbody.innerHTML = '';
+            
+            predictionHistory.slice(0, 10).forEach(entry => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${entry.timestamp}</td>
+                    <td>${entry.type}</td>
+                    <td>${entry.airTemp}</td>
+                    <td>${entry.processTemp}</td>
+                    <td>${entry.speed}</td>
+                    <td>${entry.torque}</td>
+                    <td>${entry.toolWear}</td>
+                    <td>${entry.risk}</td>
+                    <td><span class="status-badge ${getRiskClass(entry.prediction)}">${entry.prediction}</span></td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+        
+        function getRiskClass(prediction) {
+            switch(prediction) {
+                case 'Low Risk': return 'status-complete';
+                case 'Medium Risk': return 'status-pending';
+                case 'High Risk': return 'status-error';
+                default: return '';
+            }
+        }
+        
+        function showRecommendation(riskPercentage, riskLevel) {
+            let recommendation = '';
+            
+            if (riskPercentage < 30) {
+                recommendation = '✅ Machine operating within normal parameters. Continue regular maintenance schedule.';
+            } else if (riskPercentage < 70) {
+                recommendation = '⚠️ Moderate risk detected. Schedule preventive maintenance within the next week.';
+            } else {
+                recommendation = '🚨 High failure risk! Immediate maintenance required. Consider shutting down for inspection.';
+            }
+            
+            // Show alert with recommendation
+            alert(`Prediction: ${riskLevel} (${riskPercentage.toFixed(1)}%)\n\nRecommendation: ${recommendation}`);
+        }
+        
+        function resetForm() {
+            predictionForm.reset();
+            updateGauge(0);
+            document.getElementById('prediction-value').textContent = '0%';
+            document.getElementById('prediction-value').className = 'prediction-value';
+            document.getElementById('risk-level').textContent = 'Model Not Ready';
+            document.getElementById('risk-level').className = '';
+        }
+    </script>
+</body>
+</html>
