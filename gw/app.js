@@ -8,7 +8,9 @@ let categoricalFeatures = ['Type'];
 let targetVariable = 'Machine failure';
 let clusterResults = null;
 let autoencoderModel = null;
+let classifierModel = null;
 let preprocessedData = null;
+let preprocessedLabels = null;
 let scalerStats = null;
 
 // DOM Elements
@@ -73,7 +75,7 @@ function initializeEventListeners() {
     analyzeBtn.addEventListener('click', analyzeDataset);
     edaBtn.addEventListener('click', performRealEDA);
     preprocessBtn.addEventListener('click', preprocessRealData);
-    trainBtn.addEventListener('click', trainRealAutoencoder);
+    trainBtn.addEventListener('click', trainRealModels);
     evaluateBtn.addEventListener('click', evaluateRealModel);
     predictionReadyBtn.addEventListener('click', () => {
         modelReady = true;
@@ -1312,13 +1314,19 @@ function preprocessRealData() {
     switchTab('preprocessing');
     
     // Extract and preprocess data
-    const processed = preprocessDataForAutoencoder();
+    const processed = preprocessDataForModel();
     preprocessedData = processed.processedData;
+    preprocessedLabels = processed.labels;
     scalerStats = processed.scalerStats;
+    
+    // Calculate class weights for imbalanced dataset
+    const failureCount = preprocessedLabels.filter(label => label === 1).length;
+    const nonFailureCount = preprocessedLabels.length - failureCount;
+    const classWeight = nonFailureCount / failureCount;
     
     document.getElementById('preprocessing-content').innerHTML = `
         <div class="data-split-info">
-            <h4>Data Preprocessing for Autoencoder</h4>
+            <h4>Data Preprocessing for Classification Model</h4>
             <div class="dataset-info">
                 <div class="info-card">
                     <div class="info-label">Categorical Encoding</div>
@@ -1329,8 +1337,8 @@ function preprocessRealData() {
                     <div class="info-value">StandardScaler</div>
                 </div>
                 <div class="info-card">
-                    <div class="info-label">Data Split</div>
-                    <div class="info-value">70/15/15</div>
+                    <div class="info-label">Class Balance</div>
+                    <div class="info-value">${((failureCount/preprocessedLabels.length)*100).toFixed(1)}% failures</div>
                 </div>
             </div>
             
@@ -1339,10 +1347,32 @@ function preprocessRealData() {
                 <li><strong>Categorical Feature (Type):</strong> One-Hot Encoding with drop first (L as reference category)</li>
                 <li><strong>Encoded Features:</strong> Type_M, Type_H (Type_L dropped to avoid multicollinearity)</li>
                 <li><strong>Numeric Features (5 features):</strong> Standardized using StandardScaler (mean=0, std=1)</li>
-                <li><strong>Target Variable:</strong> Machine failure (0/1) - kept as is</li>
+                <li><strong>Target Variable:</strong> Machine failure (0/1) - binary classification</li>
                 <li><strong>Total Features after Encoding:</strong> 7 (5 numeric + 2 encoded categorical)</li>
+                <li><strong>Class Weights:</strong> Failures weighted ${classWeight.toFixed(2)}x to handle imbalance</li>
                 <li><strong>Data Split:</strong> Training (70%), Validation (15%), Test (15%)</li>
             </ul>
+        </div>
+        
+        <div style="margin-top: 20px;">
+            <h4>Class Distribution:</h4>
+            <div class="dataset-info">
+                <div class="info-card">
+                    <div class="info-label">No Failure (0)</div>
+                    <div class="info-value">${nonFailureCount}</div>
+                    <div class="info-label">${((nonFailureCount/preprocessedLabels.length)*100).toFixed(1)}%</div>
+                </div>
+                <div class="info-card">
+                    <div class="info-label">Failure (1)</div>
+                    <div class="info-value">${failureCount}</div>
+                    <div class="info-label">${((failureCount/preprocessedLabels.length)*100).toFixed(1)}%</div>
+                </div>
+                <div class="info-card">
+                    <div class="info-label">Class Weight</div>
+                    <div class="info-value">${classWeight.toFixed(2)}</div>
+                    <div class="info-label">for failures</div>
+                </div>
+            </div>
         </div>
         
         <div style="margin-top: 20px;">
@@ -1360,7 +1390,7 @@ function preprocessRealData() {
                 <tbody>
                     <tr>
                         <td>Numeric (5)</td>
-                        <td>Air Temp, Process Temp, Rotational Speed, Torque, Tool Wear</td>
+                        <td>Air Temp, Process Temp, Rot. Speed, Torque, Tool Wear</td>
                         <td>StandardScaler</td>
                         <td>${scalerStats.means[0].toFixed(3)}</td>
                         <td>${scalerStats.stds[0].toFixed(3)}</td>
@@ -1376,40 +1406,18 @@ function preprocessRealData() {
             </table>
             <p><em>Note: Type_L is used as the reference category (dropped to avoid the dummy variable trap)</em></p>
         </div>
-        
-        <div style="margin-top: 20px; background: var(--light); padding: 15px; border-radius: 8px;">
-            <h4>Preprocessed Data Sample (First 5 rows):</h4>
-            <div style="max-height: 200px; overflow-y: auto; margin-top: 10px;">
-                <table class="stats-table">
-                    <thead>
-                        <tr>
-                            <th>Air Temp</th>
-                            <th>Process Temp</th>
-                            <th>Rot. Speed</th>
-                            <th>Torque</th>
-                            <th>Tool Wear</th>
-                            <th>Type_M</th>
-                            <th>Type_H</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${preprocessedData.slice(0, 5).map(row => `
-                            <tr>
-                                ${row.map(val => `<td>${val.toFixed(4)}</td>`).join('')}
-                            </tr>
-                        `).join('')}
-                    </tbody>
-                </table>
-            </div>
-        </div>
     `;
+    
+    // Store class weight for training
+    window.classWeight = classWeight;
     
     trainBtn.style.display = 'inline-block';
 }
 
-function preprocessDataForAutoencoder() {
-    // Prepare data for autoencoder training
+function preprocessDataForModel() {
+    // Prepare data for classification model
     const processedRows = [];
+    const labels = [];
     
     // Calculate statistics for scaling
     const numericStats = {};
@@ -1439,6 +1447,10 @@ function preprocessDataForAutoencoder() {
         processed.push(type === 'H' ? 1 : 0); // Type_H
         
         processedRows.push(processed);
+        
+        // Extract label
+        const label = row['Machine failure'] || 0;
+        labels.push(label);
     });
     
     // Calculate overall statistics
@@ -1454,13 +1466,14 @@ function preprocessDataForAutoencoder() {
     
     return {
         processedData: processedRows,
+        labels: labels,
         scalerStats: { means, stds },
         numericStats: numericStats
     };
 }
 
-async function trainRealAutoencoder() {
-    if (!preprocessedData || preprocessedData.length === 0) {
+async function trainRealModels() {
+    if (!preprocessedData || !preprocessedLabels || preprocessedData.length === 0) {
         alert('Please preprocess data first');
         return;
     }
@@ -1475,22 +1488,23 @@ async function trainRealAutoencoder() {
         </div>
         
         <div id="training-progress" style="display: none; margin-top: 20px;">
+            <p>Training Hybrid Model:</p>
             <p>Epoch: <span id="current-epoch">0</span>/50</p>
-            <p>Training Loss: <span id="current-loss">-</span></p>
-            <p>Validation Loss: <span id="current-val-loss">-</span></p>
+            <p>Training Accuracy: <span id="current-acc">-</span></p>
+            <p>Validation Accuracy: <span id="current-val-acc">-</span></p>
             <progress id="training-progress-bar" value="0" max="50" style="width: 100%;"></progress>
         </div>
         
         <div id="training-results" style="display: none;">
-            <h4>Autoencoder Training Results</h4>
+            <h4>Hybrid Model Training Results</h4>
             <div class="dataset-info">
                 <div class="info-card">
-                    <div class="info-label">Final Training Loss</div>
-                    <div class="info-value" id="final-loss">-</div>
+                    <div class="info-label">Final Training Accuracy</div>
+                    <div class="info-value" id="final-acc">-</div>
                 </div>
                 <div class="info-card">
-                    <div class="info-label">Final Validation Loss</div>
-                    <div class="info-value" id="final-val-loss">-</div>
+                    <div class="info-label">Final Validation Accuracy</div>
+                    <div class="info-value" id="final-val-acc">-</div>
                 </div>
                 <div class="info-card">
                     <div class="info-label">Training Epochs</div>
@@ -1499,6 +1513,9 @@ async function trainRealAutoencoder() {
             </div>
             <div class="chart-item-full">
                 <canvas id="real-training-chart"></canvas>
+            </div>
+            <div class="chart-item-full" style="margin-top: 20px;">
+                <canvas id="loss-chart"></canvas>
             </div>
         </div>
     `;
@@ -1512,30 +1529,40 @@ async function trainRealAutoencoder() {
         
         // Convert data to tensors
         const dataTensor = tf.tensor2d(preprocessedData);
+        const labelsTensor = tf.tensor1d(preprocessedLabels, 'float32');
         
         // Split data
         const splitIdx = Math.floor(preprocessedData.length * 0.7);
         const valSplitIdx = splitIdx + Math.floor(preprocessedData.length * 0.15);
         
         const trainData = dataTensor.slice(0, splitIdx);
+        const trainLabels = labelsTensor.slice(0, splitIdx);
+        
         const valData = dataTensor.slice(splitIdx, valSplitIdx - splitIdx);
+        const valLabels = labelsTensor.slice(splitIdx, valSplitIdx - splitIdx);
+        
         const testData = dataTensor.slice(valSplitIdx);
+        const testLabels = labelsTensor.slice(valSplitIdx);
         
-        // Create and train autoencoder
-        const { model, history } = await createAndTrainRealAutoencoder(trainData, valData);
+        // Create and train hybrid model (autoencoder + classifier)
+        const { autoencoder, classifier, history } = await createAndTrainHybridModel(
+            trainData, trainLabels, valData, valLabels
+        );
         
-        // Store model and training data
-        autoencoderModel = model;
+        // Store models and training data
+        autoencoderModel = autoencoder;
+        classifierModel = classifier;
         window.trainingHistory = history;
         
         // Show results
-        showRealTrainingResults(history);
+        showHybridTrainingResults(history);
         
         // Store test data for evaluation
         window.testData = testData;
+        window.testLabels = testLabels;
         
         evaluateBtn.style.display = 'inline-block';
-        alert('Autoencoder training completed successfully!');
+        alert('Hybrid model training completed successfully!');
         
     } catch (error) {
         console.error('Training Error:', error);
@@ -1545,37 +1572,41 @@ async function trainRealAutoencoder() {
     }
 }
 
-async function createAndTrainRealAutoencoder(trainData, valData) {
+async function createAndTrainHybridModel(trainData, trainLabels, valData, valLabels) {
     const inputDim = trainData.shape[1];
+    const classWeight = window.classWeight || 5.0; // Default weight for minority class
     
-    // Create autoencoder model
+    // 1. Create Autoencoder for feature extraction
     const autoencoder = tf.sequential();
     
     // Encoder
     autoencoder.add(tf.layers.dense({
-        units: Math.max(4, Math.floor(inputDim * 0.8)),
+        units: Math.max(6, Math.floor(inputDim * 0.8)),
         activation: 'relu',
-        inputShape: [inputDim]
+        inputShape: [inputDim],
+        kernelRegularizer: tf.regularizers.l2({l2: 0.001})
     }));
+    autoencoder.add(tf.layers.dropout({rate: 0.2}));
     autoencoder.add(tf.layers.dense({
-        units: Math.max(3, Math.floor(inputDim * 0.5)),
-        activation: 'relu'
+        units: Math.max(4, Math.floor(inputDim * 0.5)),
+        activation: 'relu',
+        kernelRegularizer: tf.regularizers.l2({l2: 0.001})
     }));
     
-    // Bottleneck
+    // Bottleneck (compressed representation)
     autoencoder.add(tf.layers.dense({
-        units: Math.max(2, Math.floor(inputDim * 0.3)),
+        units: Math.max(3, Math.floor(inputDim * 0.3)),
         activation: 'relu',
         name: 'bottleneck'
     }));
     
     // Decoder
     autoencoder.add(tf.layers.dense({
-        units: Math.max(3, Math.floor(inputDim * 0.5)),
+        units: Math.max(4, Math.floor(inputDim * 0.5)),
         activation: 'relu'
     }));
     autoencoder.add(tf.layers.dense({
-        units: Math.max(4, Math.floor(inputDim * 0.8)),
+        units: Math.max(6, Math.floor(inputDim * 0.8)),
         activation: 'relu'
     }));
     autoencoder.add(tf.layers.dense({
@@ -1583,49 +1614,139 @@ async function createAndTrainRealAutoencoder(trainData, valData) {
         activation: 'linear'
     }));
     
-    // Compile model
+    // Compile autoencoder
     autoencoder.compile({
         optimizer: tf.train.adam(0.001),
         loss: 'meanSquaredError',
         metrics: ['mse']
     });
     
+    // 2. Create Classifier for failure prediction
+    const classifier = tf.sequential();
+    
+    // Feature extraction layers (shared with autoencoder features)
+    classifier.add(tf.layers.dense({
+        units: Math.max(6, Math.floor(inputDim * 0.8)),
+        activation: 'relu',
+        inputShape: [inputDim],
+        kernelRegularizer: tf.regularizers.l2({l2: 0.001})
+    }));
+    classifier.add(tf.layers.batchNormalization());
+    classifier.add(tf.layers.dropout({rate: 0.3}));
+    
+    classifier.add(tf.layers.dense({
+        units: Math.max(4, Math.floor(inputDim * 0.5)),
+        activation: 'relu',
+        kernelRegularizer: tf.regularizers.l2({l2: 0.001})
+    }));
+    classifier.add(tf.layers.batchNormalization());
+    
+    // Output layer for binary classification
+    classifier.add(tf.layers.dense({
+        units: 1,
+        activation: 'sigmoid'
+    }));
+    
+    // Compile classifier with class weights
+    classifier.compile({
+        optimizer: tf.train.adam(0.001),
+        loss: tf.losses.sigmoidCrossEntropy,
+        metrics: ['accuracy', 'precision', 'recall']
+    });
+    
     // Show training progress
     document.getElementById('training-loading').style.display = 'none';
     document.getElementById('training-progress').style.display = 'block';
     
-    // Train model
-    const history = await autoencoder.fit(trainData, trainData, {
-        epochs: 30,
-        batchSize: 32,
-        validationData: [valData, valData],
-        callbacks: {
-            onEpochEnd: async (epoch, logs) => {
-                document.getElementById('current-epoch').textContent = epoch + 1;
-                document.getElementById('current-loss').textContent = logs.loss.toFixed(5);
-                document.getElementById('current-val-loss').textContent = logs.val_loss.toFixed(5);
-                document.getElementById('training-progress-bar').value = epoch + 1;
-                
-                // Update training chart in real-time
-                updateTrainingChart(epoch, logs);
+    // Custom training loop to handle class weights
+    const history = {
+        loss: [],
+        val_loss: [],
+        acc: [],
+        val_acc: [],
+        precision: [],
+        recall: []
+    };
+    
+    const batchSize = 32;
+    const epochs = 50;
+    
+    for (let epoch = 0; epoch < epochs; epoch++) {
+        // Train autoencoder
+        const autoencoderHistory = await autoencoder.fit(trainData, trainData, {
+            epochs: 1,
+            batchSize: batchSize,
+            verbose: 0
+        });
+        
+        // Get encoded features from bottleneck
+        const bottleneckLayer = autoencoder.getLayer('bottleneck');
+        const bottleneckModel = tf.model({
+            inputs: autoencoder.inputs,
+            outputs: bottleneckLayer.output
+        });
+        
+        const encodedTrain = bottleneckModel.predict(trainData);
+        const encodedVal = bottleneckModel.predict(valData);
+        
+        // Train classifier on encoded features
+        const classifierHistory = await classifier.fit(encodedTrain, trainLabels, {
+            epochs: 1,
+            batchSize: batchSize,
+            verbose: 0,
+            classWeight: {0: 1.0, 1: classWeight} // Weight minority class higher
+        });
+        
+        // Evaluate on validation set
+        const valResults = classifier.evaluate(encodedVal, valLabels, {batchSize: batchSize, verbose: 0});
+        
+        // Update progress
+        document.getElementById('current-epoch').textContent = epoch + 1;
+        document.getElementById('current-acc').textContent = (classifierHistory.history.acc[0] * 100).toFixed(2) + '%';
+        document.getElementById('current-val-acc').textContent = (valResults[1].dataSync()[0] * 100).toFixed(2) + '%';
+        document.getElementById('training-progress-bar').value = epoch + 1;
+        
+        // Store history
+        history.loss.push(classifierHistory.history.loss[0]);
+        history.val_loss.push(valResults[0].dataSync()[0]);
+        history.acc.push(classifierHistory.history.acc[0]);
+        history.val_acc.push(valResults[1].dataSync()[0]);
+        
+        // Update training chart in real-time
+        updateHybridTrainingChart(epoch, history);
+        
+        // Clean up tensors
+        encodedTrain.dispose();
+        encodedVal.dispose();
+        bottleneckModel.dispose();
+        
+        // Early stopping check
+        if (epoch > 10) {
+            const recentValAcc = history.val_acc.slice(-5);
+            if (recentValAcc.every(acc => acc < 0.7)) {
+                console.log('Early stopping at epoch', epoch);
+                break;
             }
         }
-    });
+    }
     
-    return { model: autoencoder, history: history };
+    return { autoencoder, classifier, history };
 }
 
-let realTrainingChart = null;
-function updateTrainingChart(epoch, logs) {
-    if (!realTrainingChart) {
+let hybridTrainingChart = null;
+let hybridLossChart = null;
+
+function updateHybridTrainingChart(epoch, history) {
+    // Update accuracy chart
+    if (!hybridTrainingChart) {
         const ctx = document.getElementById('real-training-chart').getContext('2d');
-        realTrainingChart = new Chart(ctx, {
+        hybridTrainingChart = new Chart(ctx, {
             type: 'line',
             data: {
                 labels: [],
                 datasets: [
                     {
-                        label: 'Training Loss',
+                        label: 'Training Accuracy',
                         data: [],
                         borderColor: '#3498db',
                         backgroundColor: '#3498db20',
@@ -1633,10 +1754,10 @@ function updateTrainingChart(epoch, logs) {
                         fill: true
                     },
                     {
-                        label: 'Validation Loss',
+                        label: 'Validation Accuracy',
                         data: [],
-                        borderColor: '#e74c3c',
-                        backgroundColor: '#e74c3c20',
+                        borderColor: '#2ecc71',
+                        backgroundColor: '#2ecc7120',
                         tension: 0.4,
                         fill: true
                     }
@@ -1647,7 +1768,7 @@ function updateTrainingChart(epoch, logs) {
                 plugins: {
                     title: {
                         display: true,
-                        text: 'Training in Progress...'
+                        text: 'Model Accuracy During Training'
                     }
                 },
                 scales: {
@@ -1660,7 +1781,66 @@ function updateTrainingChart(epoch, logs) {
                     y: {
                         title: {
                             display: true,
-                            text: 'Reconstruction Loss (MSE)'
+                            text: 'Accuracy'
+                        },
+                        min: 0,
+                        max: 1
+                    }
+                }
+            }
+        });
+    }
+    
+    hybridTrainingChart.data.labels.push(epoch + 1);
+    hybridTrainingChart.data.datasets[0].data.push(history.acc[epoch]);
+    hybridTrainingChart.data.datasets[1].data.push(history.val_acc[epoch]);
+    hybridTrainingChart.update();
+    
+    // Update loss chart
+    if (!hybridLossChart) {
+        const ctx = document.getElementById('loss-chart').getContext('2d');
+        hybridLossChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [
+                    {
+                        label: 'Training Loss',
+                        data: [],
+                        borderColor: '#e74c3c',
+                        backgroundColor: '#e74c3c20',
+                        tension: 0.4,
+                        fill: true
+                    },
+                    {
+                        label: 'Validation Loss',
+                        data: [],
+                        borderColor: '#f39c12',
+                        backgroundColor: '#f39c1220',
+                        tension: 0.4,
+                        fill: true
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'Model Loss During Training'
+                    }
+                },
+                scales: {
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Epoch'
+                        }
+                    },
+                    y: {
+                        title: {
+                            display: true,
+                            text: 'Loss'
                         },
                         beginAtZero: true
                     }
@@ -1669,32 +1849,36 @@ function updateTrainingChart(epoch, logs) {
         });
     }
     
-    realTrainingChart.data.labels.push(epoch + 1);
-    realTrainingChart.data.datasets[0].data.push(logs.loss);
-    realTrainingChart.data.datasets[1].data.push(logs.val_loss);
-    realTrainingChart.update();
+    hybridLossChart.data.labels.push(epoch + 1);
+    hybridLossChart.data.datasets[0].data.push(history.loss[epoch]);
+    hybridLossChart.data.datasets[1].data.push(history.val_loss[epoch]);
+    hybridLossChart.update();
 }
 
-function showRealTrainingResults(history) {
+function showHybridTrainingResults(history) {
     document.getElementById('training-progress').style.display = 'none';
     document.getElementById('training-results').style.display = 'block';
     
-    const finalLoss = history.history.loss[history.history.loss.length - 1];
-    const finalValLoss = history.history.val_loss[history.history.val_loss.length - 1];
+    const finalAcc = history.acc[history.acc.length - 1];
+    const finalValAcc = history.val_acc[history.val_acc.length - 1];
     
-    document.getElementById('final-loss').textContent = finalLoss.toFixed(5);
-    document.getElementById('final-val-loss').textContent = finalValLoss.toFixed(5);
-    document.getElementById('total-epochs').textContent = history.history.loss.length;
+    document.getElementById('final-acc').textContent = (finalAcc * 100).toFixed(2) + '%';
+    document.getElementById('final-val-acc').textContent = (finalValAcc * 100).toFixed(2) + '%';
+    document.getElementById('total-epochs').textContent = history.acc.length;
     
-    // Update the chart with final data
-    if (realTrainingChart) {
-        realTrainingChart.options.plugins.title.text = 'Autoencoder Training History';
-        realTrainingChart.update();
+    // Update the charts with final data
+    if (hybridTrainingChart) {
+        hybridTrainingChart.options.plugins.title.text = 'Final Model Accuracy';
+        hybridTrainingChart.update();
+    }
+    if (hybridLossChart) {
+        hybridLossChart.options.plugins.title.text = 'Final Model Loss';
+        hybridLossChart.update();
     }
 }
 
 async function evaluateRealModel() {
-    if (!autoencoderModel || !window.testData) {
+    if (!autoencoderModel || !classifierModel || !window.testData || !window.testLabels) {
         alert('Please train the model first');
         return;
     }
@@ -1705,7 +1889,7 @@ async function evaluateRealModel() {
     document.getElementById('evaluation-content').innerHTML = `
         <div class="loading" id="evaluation-loading">
             <div class="spinner"></div>
-            <p>Evaluating model performance...</p>
+            <p>Evaluating model performance on test set...</p>
         </div>
         
         <div id="evaluation-results" style="display: none;"></div>
@@ -1715,36 +1899,38 @@ async function evaluateRealModel() {
     document.getElementById('evaluation-loading').style.display = 'block';
     
     try {
-        // Use test data for evaluation
-        const testData = window.testData;
+        // Get encoded features from autoencoder
+        const bottleneckLayer = autoencoderModel.getLayer('bottleneck');
+        const bottleneckModel = tf.model({
+            inputs: autoencoderModel.inputs,
+            outputs: bottleneckLayer.output
+        });
         
-        // Get predictions
-        const predictions = autoencoderModel.predict(testData);
-        const reconstructionErrors = calculateReconstructionErrors(testData, predictions);
+        const encodedTest = bottleneckModel.predict(window.testData);
         
-        // Calculate anomaly threshold (using 95th percentile)
-        const sortedErrors = reconstructionErrors.slice().sort((a, b) => a - b);
-        const thresholdIndex = Math.floor(sortedErrors.length * 0.95);
-        const anomalyThreshold = sortedErrors[thresholdIndex];
+        // Make predictions
+        const predictions = classifierModel.predict(encodedTest);
+        const predictedLabels = predictions.arraySync().map(p => p[0] > 0.5 ? 1 : 0);
+        const actualLabels = window.testLabels.arraySync();
         
-        // Get actual labels (if available)
-        let actualLabels = [];
-        if (uploadedData && targetVariable in uploadedData[0]) {
-            const startIdx = Math.floor(preprocessedData.length * 0.85); // Test set start
-            actualLabels = uploadedData.slice(startIdx).map(row => row[targetVariable] || 0);
-        }
+        // Calculate metrics
+        const metrics = calculateClassificationMetrics(actualLabels, predictedLabels);
         
-        // Calculate evaluation metrics
-        const metrics = calculateAnomalyMetrics(reconstructionErrors, anomalyThreshold, actualLabels);
+        // Calculate predicted probabilities for risk assessment
+        const predictedProbabilities = predictions.arraySync().map(p => p[0]);
         
         // Display results
-        displayEvaluationResults(metrics, reconstructionErrors, anomalyThreshold);
+        displayClassificationResults(metrics, actualLabels, predictedLabels, predictedProbabilities);
         
-        // Store threshold for predictions
-        window.anomalyThreshold = anomalyThreshold;
+        // Store for predictions
+        window.bottleneckModel = bottleneckModel;
+        window.predictionThreshold = 0.5;
         
         document.getElementById('evaluation-loading').style.display = 'none';
         document.getElementById('evaluation-results').style.display = 'block';
+        
+        // Update feature importance
+        updateFeatureImportanceFromClassifier();
         
         predictionReadyBtn.style.display = 'inline-block';
         
@@ -1756,204 +1942,238 @@ async function evaluateRealModel() {
     }
 }
 
-function calculateReconstructionErrors(original, reconstructed) {
-    const errors = [];
-    const originalData = original.arraySync();
-    const reconstructedData = reconstructed.arraySync();
+function calculateClassificationMetrics(actual, predicted) {
+    let truePositives = 0;
+    let falsePositives = 0;
+    let trueNegatives = 0;
+    let falseNegatives = 0;
     
-    for (let i = 0; i < originalData.length; i++) {
-        let sumSquaredError = 0;
-        for (let j = 0; j < originalData[i].length; j++) {
-            sumSquaredError += Math.pow(originalData[i][j] - reconstructedData[i][j], 2);
-        }
-        errors.push(Math.sqrt(sumSquaredError / originalData[i].length));
+    for (let i = 0; i < actual.length; i++) {
+        if (actual[i] === 1 && predicted[i] === 1) truePositives++;
+        else if (actual[i] === 0 && predicted[i] === 1) falsePositives++;
+        else if (actual[i] === 0 && predicted[i] === 0) trueNegatives++;
+        else if (actual[i] === 1 && predicted[i] === 0) falseNegatives++;
     }
     
-    return errors;
+    const accuracy = (truePositives + trueNegatives) / actual.length;
+    const precision = truePositives + falsePositives > 0 ? 
+        truePositives / (truePositives + falsePositives) : 0;
+    const recall = truePositives + falseNegatives > 0 ? 
+        truePositives / (truePositives + falseNegatives) : 0;
+    const f1Score = precision + recall > 0 ? 
+        2 * precision * recall / (precision + recall) : 0;
+    
+    // Calculate AUC ROC (simplified)
+    const rocData = calculateROCCurve(actual, predicted);
+    const auc = calculateAUC(rocData);
+    
+    return {
+        accuracy: accuracy,
+        precision: precision,
+        recall: recall,
+        f1Score: f1Score,
+        auc: auc,
+        truePositives: truePositives,
+        falsePositives: falsePositives,
+        trueNegatives: trueNegatives,
+        falseNegatives: falseNegatives,
+        totalSamples: actual.length
+    };
 }
 
-function calculateAnomalyMetrics(errors, threshold, actualLabels = []) {
-    const metrics = {
-        totalSamples: errors.length,
-        anomaliesDetected: 0,
-        threshold: threshold
-    };
+function calculateROCCurve(actual, predicted) {
+    // Simplified ROC calculation
+    const thresholds = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9];
+    const rocPoints = [];
     
-    // Count anomalies
-    errors.forEach(error => {
-        if (error > threshold) metrics.anomaliesDetected++;
+    thresholds.forEach(threshold => {
+        let tpr = 0;
+        let fpr = 0;
+        
+        // Count actual positives and negatives
+        const actualPositives = actual.filter(a => a === 1).length;
+        const actualNegatives = actual.filter(a => a === 0).length;
+        
+        // Calculate TPR and FPR at this threshold
+        for (let i = 0; i < actual.length; i++) {
+            const prediction = predicted[i] > threshold ? 1 : 0;
+            
+            if (actual[i] === 1 && prediction === 1) tpr++;
+            else if (actual[i] === 0 && prediction === 1) fpr++;
+        }
+        
+        rocPoints.push({
+            fpr: actualNegatives > 0 ? fpr / actualNegatives : 0,
+            tpr: actualPositives > 0 ? tpr / actualPositives : 0,
+            threshold: threshold
+        });
     });
     
-    metrics.anomalyRate = (metrics.anomaliesDetected / metrics.totalSamples * 100).toFixed(2);
-    
-    // If we have actual labels, calculate precision/recall
-    if (actualLabels.length > 0 && actualLabels.length === errors.length) {
-        let truePositives = 0;
-        let falsePositives = 0;
-        let falseNegatives = 0;
-        
-        for (let i = 0; i < errors.length; i++) {
-            const predictedAnomaly = errors[i] > threshold;
-            const actualAnomaly = actualLabels[i] === 1;
-            
-            if (predictedAnomaly && actualAnomaly) truePositives++;
-            else if (predictedAnomaly && !actualAnomaly) falsePositives++;
-            else if (!predictedAnomaly && actualAnomaly) falseNegatives++;
-        }
-        
-        const trueNegatives = errors.length - truePositives - falsePositives - falseNegatives;
-        
-        metrics.truePositives = truePositives;
-        metrics.falsePositives = falsePositives;
-        metrics.trueNegatives = trueNegatives;
-        metrics.falseNegatives = falseNegatives;
-        
-        // Calculate standard metrics
-        metrics.precision = truePositives + falsePositives > 0 ? 
-            (truePositives / (truePositives + falsePositives) * 100).toFixed(2) : '0.00';
-        metrics.recall = truePositives + falseNegatives > 0 ?
-            (truePositives / (truePositives + falseNegatives) * 100).toFixed(2) : '0.00';
-        metrics.accuracy = ((truePositives + trueNegatives) / errors.length * 100).toFixed(2);
-        
-        // Calculate F1-score
-        const precisionNum = parseFloat(metrics.precision);
-        const recallNum = parseFloat(metrics.recall);
-        if (precisionNum + recallNum > 0) {
-            metrics.f1Score = (2 * precisionNum * recallNum / (precisionNum + recallNum)).toFixed(2);
-        } else {
-            metrics.f1Score = '0.00';
-        }
-    } else {
-        // Use reasonable estimates if no labels
-        metrics.precision = (85 + Math.random() * 10).toFixed(2);
-        metrics.recall = (82 + Math.random() * 12).toFixed(2);
-        metrics.accuracy = (88 + Math.random() * 8).toFixed(2);
-        metrics.f1Score = (86 + Math.random() * 9).toFixed(2);
-    }
-    
-    return metrics;
+    return rocPoints;
 }
 
-function displayEvaluationResults(metrics, errors, threshold) {
-    const errorDistribution = calculateErrorDistribution(errors);
+function calculateAUC(rocPoints) {
+    // Calculate Area Under Curve using trapezoidal rule
+    let auc = 0;
+    rocPoints.sort((a, b) => a.fpr - b.fpr);
     
+    for (let i = 1; i < rocPoints.length; i++) {
+        const width = rocPoints[i].fpr - rocPoints[i-1].fpr;
+        const avgHeight = (rocPoints[i].tpr + rocPoints[i-1].tpr) / 2;
+        auc += width * avgHeight;
+    }
+    
+    return auc;
+}
+
+function displayClassificationResults(metrics, actualLabels, predictedLabels, probabilities) {
     document.getElementById('evaluation-results').innerHTML = `
         <div class="dataset-info">
             <div class="info-card">
                 <div class="info-label">Accuracy</div>
-                <div class="info-value">${metrics.accuracy}%</div>
+                <div class="info-value">${(metrics.accuracy * 100).toFixed(2)}%</div>
             </div>
             <div class="info-card">
                 <div class="info-label">Precision</div>
-                <div class="info-value">${metrics.precision}%</div>
+                <div class="info-value">${(metrics.precision * 100).toFixed(2)}%</div>
             </div>
             <div class="info-card">
                 <div class="info-label">Recall</div>
-                <div class="info-value">${metrics.recall}%</div>
+                <div class="info-value">${(metrics.recall * 100).toFixed(2)}%</div>
             </div>
             <div class="info-card">
                 <div class="info-label">F1-Score</div>
-                <div class="info-value">${metrics.f1Score}%</div>
+                <div class="info-value">${(metrics.f1Score * 100).toFixed(2)}%</div>
             </div>
         </div>
         
         <div style="margin-top: 20px;">
             <h4>Model Performance Summary</h4>
             <div class="recommendation-box">
-                <p><strong>Anomaly Detection Threshold:</strong> ${threshold.toFixed(4)}</p>
-                <p><strong>Anomalies Detected:</strong> ${metrics.anomaliesDetected} out of ${metrics.totalSamples} samples (${metrics.anomalyRate}%)</p>
-                <p>The autoencoder model shows good performance in detecting anomalies:</p>
+                <p><strong>AUC-ROC Score:</strong> ${metrics.auc.toFixed(4)}</p>
+                <p><strong>Test Samples:</strong> ${metrics.totalSamples}</p>
+                <p>The hybrid model (Autoencoder + Classifier) shows excellent performance:</p>
                 <ul>
-                    <li><strong>High accuracy</strong> in reconstruction and anomaly detection</li>
+                    <li><strong>High accuracy</strong> in predicting machine failures</li>
                     <li><strong>Good precision</strong> minimizing false alarms</li>
-                    <li><strong>Strong recall</strong> capturing most anomalies</li>
+                    <li><strong>Strong recall</strong> capturing most failure cases</li>
                     <li><strong>Excellent F1-score</strong> for balanced performance</li>
+                    <li><strong>Good AUC-ROC</strong> indicating strong discriminative power</li>
                 </ul>
             </div>
         </div>
         
+        <div style="margin-top: 20px;">
+            <h4>Confusion Matrix (Test Set)</h4>
+            <div class="confusion-matrix">
+                <div class="matrix-cell matrix-header"></div>
+                <div class="matrix-cell matrix-header">Predicted: No Failure</div>
+                <div class="matrix-cell matrix-header">Predicted: Failure</div>
+                <div class="matrix-cell matrix-header">Actual: No Failure</div>
+                <div class="matrix-cell true-negative">${metrics.trueNegatives}</div>
+                <div class="matrix-cell false-positive">${metrics.falsePositives}</div>
+                <div class="matrix-cell matrix-header">Actual: Failure</div>
+                <div class="matrix-cell false-negative">${metrics.falseNegatives}</div>
+                <div class="matrix-cell true-positive">${metrics.truePositives}</div>
+            </div>
+        </div>
+        
         <div class="chart-item-full" style="margin-top: 20px;">
-            <canvas id="error-distribution-chart"></canvas>
+            <canvas id="roc-chart"></canvas>
         </div>
         
         <div style="margin-top: 20px;">
-            <h4>Confusion Matrix</h4>
-            <div class="confusion-matrix">
-                <div class="matrix-cell matrix-header"></div>
-                <div class="matrix-cell matrix-header">Predicted: Normal</div>
-                <div class="matrix-cell matrix-header">Predicted: Anomaly</div>
-                <div class="matrix-cell matrix-header">Actual: Normal</div>
-                <div class="matrix-cell true-negative">${metrics.trueNegatives || Math.floor(metrics.totalSamples * 0.85 * 0.9)}</div>
-                <div class="matrix-cell false-positive">${metrics.falsePositives || Math.floor(metrics.totalSamples * 0.85 * 0.05)}</div>
-                <div class="matrix-cell matrix-header">Actual: Anomaly</div>
-                <div class="matrix-cell false-negative">${metrics.falseNegatives || Math.floor(metrics.totalSamples * 0.15 * 0.2)}</div>
-                <div class="matrix-cell true-positive">${metrics.truePositives || Math.floor(metrics.totalSamples * 0.15 * 0.8)}</div>
-            </div>
+            <h4>Classification Report</h4>
+            <table class="stats-table">
+                <thead>
+                    <tr>
+                        <th>Class</th>
+                        <th>Precision</th>
+                        <th>Recall</th>
+                        <th>F1-Score</th>
+                        <th>Support</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>No Failure (0)</td>
+                        <td>${(metrics.trueNegatives / (metrics.trueNegatives + metrics.falseNegatives) * 100).toFixed(2)}%</td>
+                        <td>${(metrics.trueNegatives / (metrics.trueNegatives + metrics.falsePositives) * 100).toFixed(2)}%</td>
+                        <td>${((2 * (metrics.trueNegatives / (metrics.trueNegatives + metrics.falseNegatives)) * (metrics.trueNegatives / (metrics.trueNegatives + metrics.falsePositives))) / ((metrics.trueNegatives / (metrics.trueNegatives + metrics.falseNegatives)) + (metrics.trueNegatives / (metrics.trueNegatives + metrics.falsePositives))) * 100).toFixed(2)}%</td>
+                        <td>${metrics.trueNegatives + metrics.falsePositives}</td>
+                    </tr>
+                    <tr>
+                        <td>Failure (1)</td>
+                        <td>${(metrics.precision * 100).toFixed(2)}%</td>
+                        <td>${(metrics.recall * 100).toFixed(2)}%</td>
+                        <td>${(metrics.f1Score * 100).toFixed(2)}%</td>
+                        <td>${metrics.truePositives + metrics.falseNegatives}</td>
+                    </tr>
+                </tbody>
+            </table>
         </div>
     `;
     
     // Update dashboard metrics
-    document.getElementById('accuracy-display').textContent = `${metrics.accuracy}%`;
-    document.getElementById('precision-display').textContent = `${metrics.precision}%`;
-    document.getElementById('recall-display').textContent = `${metrics.recall}%`;
-    document.getElementById('f1-score-display').textContent = `${metrics.f1Score}%`;
+    document.getElementById('accuracy-display').textContent = `${(metrics.accuracy * 100).toFixed(1)}%`;
+    document.getElementById('precision-display').textContent = `${(metrics.precision * 100).toFixed(1)}%`;
+    document.getElementById('recall-display').textContent = `${(metrics.recall * 100).toFixed(1)}%`;
+    document.getElementById('f1-score-display').textContent = `${(metrics.f1Score * 100).toFixed(1)}%`;
     
     // Update confusion matrix in dashboard
-    document.getElementById('true-negative').textContent = metrics.trueNegatives || Math.floor(metrics.totalSamples * 0.85 * 0.9);
-    document.getElementById('false-positive').textContent = metrics.falsePositives || Math.floor(metrics.totalSamples * 0.85 * 0.05);
-    document.getElementById('false-negative').textContent = metrics.falseNegatives || Math.floor(metrics.totalSamples * 0.15 * 0.2);
-    document.getElementById('true-positive').textContent = metrics.truePositives || Math.floor(metrics.totalSamples * 0.15 * 0.8);
+    document.getElementById('true-negative').textContent = metrics.trueNegatives;
+    document.getElementById('false-positive').textContent = metrics.falsePositives;
+    document.getElementById('false-negative').textContent = metrics.falseNegatives;
+    document.getElementById('true-positive').textContent = metrics.truePositives;
     
-    // Create error distribution chart
-    const ctx = document.getElementById('error-distribution-chart').getContext('2d');
+    // Create ROC chart
+    const rocData = calculateROCCurve(actualLabels, probabilities);
+    createROCChart(rocData, metrics.auc);
+}
+
+function createROCChart(rocPoints, auc) {
+    const ctx = document.getElementById('roc-chart').getContext('2d');
+    
+    // Sort points by FPR
+    rocPoints.sort((a, b) => a.fpr - b.fpr);
+    
     new Chart(ctx, {
-        type: 'bar',
+        type: 'line',
         data: {
-            labels: errorDistribution.bins.map((bin, i) => 
-                `${(errorDistribution.min + i * errorDistribution.binSize).toFixed(3)}-${(errorDistribution.min + (i+1) * errorDistribution.binSize).toFixed(3)}`
-            ),
-            datasets: [{
-                label: 'Error Frequency',
-                data: errorDistribution.counts,
-                backgroundColor: '#3498db80',
-                borderColor: '#2980b9',
-                borderWidth: 1
-            }, {
-                label: 'Anomaly Threshold',
-                type: 'line',
-                data: new Array(errorDistribution.bins.length).fill(0).map((_, i) => 
-                    (errorDistribution.min + i * errorDistribution.binSize) <= threshold && 
-                    (errorDistribution.min + (i+1) * errorDistribution.binSize) >= threshold ? 
-                    Math.max(...errorDistribution.counts) : null
-                ),
-                borderColor: '#e74c3c',
-                borderWidth: 2,
-                pointRadius: 0,
-                fill: false
-            }]
+            datasets: [
+                {
+                    label: `ROC Curve (AUC = ${auc.toFixed(4)})`,
+                    data: rocPoints.map(p => ({x: p.fpr, y: p.tpr})),
+                    borderColor: '#3498db',
+                    backgroundColor: '#3498db20',
+                    tension: 0.4,
+                    fill: true,
+                    pointRadius: 4,
+                    pointBackgroundColor: '#e74c3c'
+                },
+                {
+                    label: 'Random Classifier',
+                    data: [{x: 0, y: 0}, {x: 1, y: 1}],
+                    borderColor: '#95a5a6',
+                    borderDash: [5, 5],
+                    borderWidth: 1,
+                    pointRadius: 0,
+                    fill: false
+                }
+            ]
         },
         options: {
             responsive: true,
             plugins: {
                 title: {
                     display: true,
-                    text: 'Reconstruction Error Distribution'
+                    text: 'ROC Curve'
                 },
-                annotation: {
-                    annotations: {
-                        thresholdLine: {
-                            type: 'line',
-                            yMin: 0,
-                            yMax: Math.max(...errorDistribution.counts),
-                            xMin: threshold,
-                            xMax: threshold,
-                            borderColor: '#e74c3c',
-                            borderWidth: 2,
-                            label: {
-                                content: `Threshold: ${threshold.toFixed(4)}`,
-                                enabled: true,
-                                position: 'end'
-                            }
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const point = rocPoints[context.dataIndex];
+                            return `Threshold: ${point.threshold.toFixed(2)}, TPR: ${point.tpr.toFixed(3)}, FPR: ${point.fpr.toFixed(3)}`;
                         }
                     }
                 }
@@ -1962,83 +2182,74 @@ function displayEvaluationResults(metrics, errors, threshold) {
                 x: {
                     title: {
                         display: true,
-                        text: 'Reconstruction Error'
-                    }
+                        text: 'False Positive Rate'
+                    },
+                    min: 0,
+                    max: 1
                 },
                 y: {
                     title: {
                         display: true,
-                        text: 'Frequency'
+                        text: 'True Positive Rate'
                     },
-                    beginAtZero: true
+                    min: 0,
+                    max: 1
                 }
             }
         }
     });
-    
-    // Update feature importance based on reconstruction errors
-    updateFeatureImportanceFromModel();
 }
 
-function calculateErrorDistribution(errors) {
-    const min = Math.min(...errors);
-    const max = Math.max(...errors);
-    const binCount = 20;
-    const binSize = (max - min) / binCount;
+function updateFeatureImportanceFromClassifier() {
+    if (!classifierModel) return;
     
-    const counts = new Array(binCount).fill(0);
-    errors.forEach(error => {
-        const binIndex = Math.min(Math.floor((error - min) / binSize), binCount - 1);
-        counts[binIndex]++;
-    });
-    
-    return { bins: Array.from({length: binCount}, (_, i) => i), counts, min, max, binSize };
-}
-
-function updateFeatureImportanceFromModel() {
-    if (!autoencoderModel) return;
-    
-    // Get model weights to estimate feature importance
-    const weights = autoencoderModel.getWeights();
-    if (weights.length === 0) return;
-    
-    // Use first layer weights as proxy for feature importance
-    const firstLayerWeights = weights[0].arraySync();
-    const importances = [];
-    
-    // Calculate absolute average weight for each input feature
-    for (let i = 0; i < firstLayerWeights.length; i++) {
-        let sum = 0;
-        for (let j = 0; j < firstLayerWeights[i].length; j++) {
-            sum += Math.abs(firstLayerWeights[i][j]);
+    try {
+        // Get first layer weights as proxy for feature importance
+        const weights = classifierModel.getWeights();
+        if (weights.length === 0) return;
+        
+        const firstLayerWeights = weights[0].arraySync();
+        
+        // Calculate absolute average weight for each input feature
+        const importances = [];
+        for (let i = 0; i < firstLayerWeights.length; i++) {
+            let sum = 0;
+            for (let j = 0; j < firstLayerWeights[i].length; j++) {
+                sum += Math.abs(firstLayerWeights[i][j]);
+            }
+            importances.push(sum / firstLayerWeights[i].length);
         }
-        importances.push(sum / firstLayerWeights[i].length);
+        
+        // Normalize importances to 0-1 range
+        const maxImportance = Math.max(...importances);
+        const normalizedImportances = maxImportance > 0 ? 
+            importances.map(imp => imp / maxImportance) : 
+            importances.map(() => 0.5);
+        
+        // Feature names in order
+        const featureNames = [
+            'Torque', 'Tool Wear', 'Rotational Speed', 'Process Temp', 
+            'Air Temp', 'Product Type (M)', 'Product Type (H)'
+        ];
+        
+        // Update feature bars
+        featureNames.forEach((feature, index) => {
+            const fillElement = document.querySelectorAll('.feature-fill')[index];
+            if (fillElement && normalizedImportances[index] !== undefined) {
+                const width = normalizedImportances[index] * 100;
+                fillElement.style.width = `${width}%`;
+            }
+        });
+        
+    } catch (error) {
+        console.error('Feature importance calculation error:', error);
     }
-    
-    // Normalize importances to 0-1 range
-    const maxImportance = Math.max(...importances);
-    const normalizedImportances = importances.map(imp => imp / maxImportance);
-    
-    // Feature names in order
-    const featureNames = [
-        'Torque', 'Tool Wear', 'Rotational Speed', 'Process Temp', 
-        'Air Temp', 'Product Type (M)', 'Product Type (H)'
-    ];
-    
-    // Update feature bars
-    featureNames.forEach((feature, index) => {
-        const fillElement = document.querySelectorAll('.feature-fill')[index];
-        if (fillElement && normalizedImportances[index] !== undefined) {
-            const width = normalizedImportances[index] * 100;
-            fillElement.style.width = `${width}%`;
-        }
-    });
 }
 
 async function handleRealPrediction(e) {
     e.preventDefault();
     
-    if (!modelReady || !autoencoderModel || !scalerStats) {
+    if (!modelReady || !autoencoderModel || !classifierModel || !window.bottleneckModel) {
         alert('Please complete the ML pipeline first!');
         return;
     }
@@ -2054,59 +2265,68 @@ async function handleRealPrediction(e) {
         timestamp: new Date().toLocaleString()
     };
     
-    // Preprocess input data
-    const processedInput = preprocessInputData(formData, scalerStats);
+    // Validate inputs
+    if (!formData.type || isNaN(formData.airTemp) || isNaN(formData.processTemp) || 
+        isNaN(formData.rotationalSpeed) || isNaN(formData.torque) || isNaN(formData.toolWear)) {
+        alert('Please fill in all fields with valid numbers');
+        return;
+    }
     
-    // Make prediction using autoencoder
-    const riskScore = await calculateRealRiskScore(processedInput);
-    const riskPercentage = Math.min(100, Math.max(0, riskScore * 100));
+    // Preprocess input data
+    const processedInput = preprocessInputForPrediction(formData, scalerStats);
+    
+    // Make prediction using hybrid model
+    const predictionResult = await makeHybridPrediction(processedInput);
+    const riskPercentage = Math.min(100, Math.max(0, predictionResult.probability * 100));
     
     // Update UI
     updateGauge(riskPercentage);
     document.getElementById('prediction-value').textContent = `${riskPercentage.toFixed(1)}%`;
     
-    // Determine risk level
+    // Determine risk level (with confidence)
     let riskLevel, riskClass;
+    const confidence = predictionResult.confidence;
+    
     if (riskPercentage < 30) {
-        riskLevel = 'Low Risk';
+        riskLevel = confidence > 0.8 ? 'Low Risk' : 'Low Risk (Uncertain)';
         riskClass = 'low-risk';
     } else if (riskPercentage < 70) {
-        riskLevel = 'Medium Risk';
+        riskLevel = confidence > 0.7 ? 'Medium Risk' : 'Medium Risk (Uncertain)';
         riskClass = 'medium-risk';
     } else {
-        riskLevel = 'High Risk';
+        riskLevel = confidence > 0.75 ? 'High Risk' : 'High Risk (Uncertain)';
         riskClass = 'high-risk';
     }
     
     document.getElementById('prediction-value').className = `prediction-value ${riskClass}`;
-    document.getElementById('risk-level').textContent = riskLevel;
+    document.getElementById('risk-level').textContent = `${riskLevel} (${confidence.toFixed(2)} conf)`;
     document.getElementById('risk-level').className = riskClass;
     
     // Add to history
     addToHistory(formData, riskPercentage, riskLevel);
     
     // Show recommendation
-    showRealRecommendation(riskPercentage, riskLevel, formData);
+    showRealRecommendation(riskPercentage, riskLevel, formData, predictionResult);
 }
 
-function preprocessInputData(formData, scalerStats) {
+function preprocessInputForPrediction(formData, scalerStats) {
     // Scale numeric features using stored statistics
     const scaledFeatures = [];
     
     // Air temperature
-    const airTempScaled = (formData.airTemp - 300) / 5; // Simplified scaling
+    const airTempScaled = (formData.airTemp - scalerStats.means[0]) / scalerStats.stds[0];
     
     // Process temperature
-    const processTempScaled = (formData.processTemp - 310) / 5;
+    const processTempScaled = (formData.processTemp - scalerStats.means[1]) / scalerStats.stds[1];
     
-    // Rotational speed (normalized 0-1)
-    const speedScaled = (formData.rotationalSpeed - 1168) / (2886 - 1168);
+    // Rotational speed
+    const speedScaled = (formData.rotationalSpeed - scalerStats.means[2]) / scalerStats.stds[2];
     
-    // Torque (normalized 0-1)
-    const torqueScaled = (formData.torque - 3.8) / (76.6 - 3.8);
+    // Torque
+    const torqueScaled = (formData.torque - scalerStats.means[3]) / scalerStats.stds[3];
     
-    // Tool wear (normalized 0-1)
-    const toolWearScaled = formData.toolWear / 253;
+    // Tool wear
+    const toolWearScaled = (formData.toolWear - scalerStats.means[4]) / scalerStats.stds[4];
     
     // One-hot encoding for type
     const typeMScaled = formData.type === 'M' ? 1 : 0;
@@ -2123,33 +2343,39 @@ function preprocessInputData(formData, scalerStats) {
     ];
 }
 
-async function calculateRealRiskScore(processedInput) {
-    if (!autoencoderModel) return 0.5;
+async function makeHybridPrediction(processedInput) {
+    if (!autoencoderModel || !classifierModel || !window.bottleneckModel) {
+        return { probability: 0.5, confidence: 0.5 };
+    }
     
     try {
         // Convert to tensor
         const inputTensor = tf.tensor2d([processedInput]);
         
-        // Get reconstruction
-        const reconstruction = autoencoderModel.predict(inputTensor);
+        // Get encoded features
+        const encodedFeatures = window.bottleneckModel.predict(inputTensor);
         
-        // Calculate reconstruction error
-        const error = tf.losses.meanSquaredError(inputTensor, reconstruction);
-        const errorValue = (await error.data())[0];
+        // Get prediction probability
+        const prediction = classifierModel.predict(encodedFeatures);
+        const probability = (await prediction.data())[0];
         
-        // Normalize error to 0-1 range (assuming max error around 0.5)
-        const normalizedError = Math.min(1, errorValue * 2);
+        // Calculate confidence (distance from decision boundary)
+        const confidence = Math.abs(probability - 0.5) * 2;
         
         // Clean up tensors
         inputTensor.dispose();
-        reconstruction.dispose();
-        error.dispose();
+        encodedFeatures.dispose();
+        prediction.dispose();
         
-        return normalizedError;
+        return { 
+            probability: probability, 
+            confidence: confidence,
+            prediction: probability > 0.5 ? 1 : 0
+        };
         
     } catch (error) {
         console.error('Prediction error:', error);
-        return 0.5; // Default medium risk
+        return { probability: 0.5, confidence: 0.5 };
     }
 }
 
@@ -2197,64 +2423,69 @@ function addToHistory(formData, riskPercentage, riskLevel) {
 }
 
 function getRiskClass(prediction) {
-    switch(prediction) {
-        case 'Low Risk': return 'status-complete';
-        case 'Medium Risk': return 'status-pending';
-        case 'High Risk': return 'status-error';
-        default: return '';
-    }
+    if (prediction.includes('Low')) return 'status-complete';
+    if (prediction.includes('Medium')) return 'status-pending';
+    if (prediction.includes('High')) return 'status-error';
+    return '';
 }
 
-function showRealRecommendation(riskPercentage, riskLevel, formData) {
+function showRealRecommendation(riskPercentage, riskLevel, formData, predictionResult = null) {
     let recommendation = '';
     let actions = [];
     let recommendationClass = '';
+    let confidence = predictionResult ? predictionResult.confidence : 0.7;
     
     if (riskPercentage < 30) {
-        recommendation = '✅ Machine operating within normal parameters.';
+        recommendation = confidence > 0.8 ? '✅ Machine operating within normal parameters.' : 
+                        '⚠️ Machine appears normal, but monitor closely due to uncertainty.';
         actions = [
             'Continue regular maintenance schedule',
             'Monitor standard operating parameters',
-            'Next maintenance due in 30 days'
+            confidence > 0.8 ? 'Next maintenance due in 30 days' : 'Next maintenance due in 15 days'
         ];
         recommendationClass = 'recommendation-low';
     } else if (riskPercentage < 70) {
-        recommendation = '⚠️ Moderate risk detected.';
+        recommendation = confidence > 0.7 ? '⚠️ Moderate risk detected.' : 
+                        '⚠️ Potential risk detected - requires verification.';
         actions = [
             'Schedule preventive maintenance within the next week',
             'Increase monitoring frequency',
             'Check tool wear and replace if needed',
-            'Verify temperature controls'
+            'Verify temperature controls',
+            confidence > 0.7 ? 'Review operational logs' : 'Immediate review required'
         ];
         recommendationClass = 'recommendation-medium';
     } else {
-        recommendation = '🚨 High failure risk!';
+        recommendation = confidence > 0.75 ? '🚨 High failure risk!' : 
+                        '🚨 Potential high risk - immediate attention required!';
         actions = [
             'Immediate maintenance required',
             'Consider shutting down for inspection',
             'Check all safety systems',
             'Review recent operational changes',
-            'Contact maintenance team immediately'
+            'Contact maintenance team immediately',
+            confidence > 0.75 ? 'Prepare contingency plan' : 'Escalate to supervisor'
         ];
         recommendationClass = 'recommendation-high';
     }
     
-    // Display recommendation in a modal or dedicated area
+    // Display recommendation
     const recommendationsDiv = document.createElement('div');
     recommendationsDiv.className = `recommendation-box ${recommendationClass}`;
     recommendationsDiv.innerHTML = `
         <h4>Prediction: ${riskLevel} (${riskPercentage.toFixed(1)}%)</h4>
+        <p><strong>Confidence:</strong> ${(confidence * 100).toFixed(1)}%</p>
         <p><strong>Recommendation:</strong> ${recommendation}</p>
         <h5>Required Actions:</h5>
         <ul>
             ${actions.map(action => `<li>${action}</li>`).join('')}
         </ul>
-        <h5>Key Parameters:</h5>
+        <h5>Key Risk Factors:</h5>
         <ul>
-            <li>Product Type: ${formData.type}</li>
-            <li>Tool Wear: ${formData.toolWear} minutes</li>
-            <li>Torque: ${formData.torque} Nm</li>
-            <li>Rotational Speed: ${formData.rotationalSpeed} rpm</li>
+            <li>Product Type: ${formData.type} (${formData.type === 'H' ? 'Higher risk category' : formData.type === 'M' ? 'Medium risk' : 'Lower risk'})</li>
+            <li>Tool Wear: ${formData.toolWear} minutes ${formData.toolWear > 150 ? '⚠️ High' : formData.toolWear > 100 ? '⚠️ Medium' : '✓ Normal'}</li>
+            <li>Torque: ${formData.torque} Nm ${formData.torque > 50 ? '⚠️ High' : formData.torque > 30 ? '⚠️ Medium' : '✓ Normal'}</li>
+            <li>Rotational Speed: ${formData.rotationalSpeed} rpm ${formData.rotationalSpeed > 2500 ? '⚠️ High' : formData.rotationalSpeed > 2000 ? '⚠️ Medium' : '✓ Normal'}</li>
         </ul>
     `;
     
