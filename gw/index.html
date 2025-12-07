@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Machine Failure Prediction - Autoencoder Model</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/papaparse@5.3.2/papaparse.min.js"></script>
+    <!-- TensorFlow.js для реального ML -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.10.0/dist/tf.min.js"></script>
+    <!-- ML.js для K-Prototypes кластеризации -->
+    <script src="https://cdn.jsdelivr.net/npm/ml-kprototypes@1.0.0/dist/kprototypes.min.js"></script>
+    <!-- Статистические функции -->
+    <script src="https://cdn.jsdelivr.net/npm/simple-statistics@7.8.3/dist/simple-statistics.min.js"></script>
+    
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🤖 Machine Failure Prediction System</h1>
+            <p class="subtitle">Autoencoder-Based Anomaly Detection with K-Prototypes Clustering</p>
+        </header>
+        
+        <div class="ml-pipeline">
+            <h2>Machine Learning Pipeline</h2>
+            <div class="pipeline-steps">
+                <div class="pipeline-step step-active" id="step1">
+                    <div class="step-number">1</div>
+                    <h3>Data Upload</h3>
+                    <p>Upload CSV dataset</p>
+                    <div class="status-badge status-pending">Pending</div>
+                </div>
+                <div class="pipeline-step" id="step2">
+                    <div class="step-number">2</div>
+                    <h3>Dataset Info</h3>
+                    <p>Analyze characteristics</p>
+                    <div class="status-badge status-pending">Pending</div>
+                </div>
+                <div class="pipeline-step" id="step3">
+                    <div class="step-number">3</div>
+                    <h3>EDA & Clustering</h3>
+                    <p>Explore & cluster data</p>
+                    <div class="status-badge status-pending">Pending</div>
+                </div>
+                <div class="pipeline-step" id="step4">
+                    <div class="step-number">4</div>
+                    <h3>Preprocessing</h3>
+                    <p>Prepare for modeling</p>
+                    <div class="status-badge status-pending">Pending</div>
+                </div>
+                <div class="pipeline-step" id="step5">
+                    <div class="step-number">5</div>
+                    <h3>Autoencoder</h3>
+                    <p>Train deep model</p>
+                    <div class="status-badge status-pending">Pending</div>
+                </div>
+                <div class="pipeline-step" id="step6">
+                    <div class="step-number">6</div>
+                    <h3>Evaluation</h3>
+                    <p>Test performance</p>
+                    <div class="status-badge status-pending">Pending</div>
+                </div>
+            </div>
+            
+            <div class="card">
+                <div class="tabs">
+                    <div class="tab active" data-tab="data-upload">Data Upload</div>
+                    <div class="tab" data-tab="dataset-info">Dataset Info</div>
+                    <div class="tab" data-tab="eda">EDA & Clustering</div>
+                    <div class="tab" data-tab="preprocessing">Preprocessing</div>
+                    <div class="tab" data-tab="training">Autoencoder Training</div>
+                    <div class="tab" data-tab="evaluation">Evaluation</div>
+                </div>
+                
+                <div class="tab-content active" id="data-upload">
+                    <h3>Upload Your Dataset</h3>
+                    <p>Upload a CSV file containing machine data with the required columns.</p>
+                    
+                    <div class="csv-format-info">
+                        <h4>Expected Columns:</h4>
+                        <ul>
+                            <li><strong>Type</strong> - Product type (L, M, H)</li>
+                            <li><strong>Air temperature [K]</strong> - Ambient temperature</li>
+                            <li><strong>Process temperature [K]</strong> - Operating temperature</li>
+                            <li><strong>Rotational speed [rpm]</strong> - Machine speed</li>
+                            <li><strong>Torque [Nm]</strong> - Force measurement</li>
+                            <li><strong>Tool wear [min]</strong> - Tool usage time</li>
+                            <li><strong>Machine failure</strong> - Target variable (0/1)</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="file-upload" id="file-upload-area">
+                        <p>📁 Drag & drop your CSV file here or click to browse</p>
+                        <input type="file" id="file-input" accept=".csv" style="display: none;">
+                        <button type="button" class="btn btn-success" id="upload-btn">Choose File</button>
+                    </div>
+                    
+                    <div id="upload-status" style="margin-top: 15px;"></div>
+                    
+                    <div class="data-preview" id="data-preview" style="display: none;">
+                        <h4>Data Preview (First 10 rows)</h4>
+                        <table id="data-table">
+                            <thead id="data-table-head"></thead>
+                            <tbody id="data-table-body"></tbody>
+                        </table>
+                    </div>
+                    
+                    <button class="btn btn-warning" id="analyze-btn" style="margin-top: 15px; display: none;">Analyze Dataset</button>
+                </div>
+                
+                <div class="tab-content" id="dataset-info">
+                    <h3>Dataset Information</h3>
+                    <div id="dataset-summary">
+                        <p>Please upload a dataset to see information</p>
+                    </div>
+                    
+                    <div class="dataset-info" id="dataset-stats" style="display: none;">
+                        <div class="info-card">
+                            <div class="info-label">Total Records</div>
+                            <div class="info-value" id="total-records">0</div>
+                        </div>
+                        <div class="info-card">
+                            <div class="info-label">Features</div>
+                            <div class="info-value" id="total-features">0</div>
+                        </div>
+                        <div class="info-card">
+                            <div class="info-label">Failure Rate</div>
+                            <div class="info-value" id="failure-rate">0%</div>
+                        </div>
+                    </div>
+                    
+                    <div id="missing-values-section" style="display: none;"></div>
+                    
+                    <button class="btn btn-warning" id="eda-btn" style="margin-top: 15px; display: none;">Perform EDA & Clustering</button>
+                </div>
+                
+                <div class="tab-content" id="eda">
+                    <h3>Exploratory Data Analysis & K-Prototypes Clustering</h3>
+                    <div id="eda-content">
+                        <p>Please analyze the dataset first</p>
+                    </div>
+                    
+                    <button class="btn btn-warning" id="preprocess-btn" style="margin-top: 15px; display: none;">Preprocess Data</button>
+                </div>
+                
+                <div class="tab-content" id="preprocessing">
+                    <h3>Data Preprocessing</h3>
+                    <div id="preprocessing-content">
+                        <p>Please complete EDA first</p>
+                    </div>
+                    
+                    <div id="data-split-info" style="display: none;"></div>
+                    
+                    <button class="btn btn-warning" id="train-btn" style="margin-top: 15px; display: none;">Train Autoencoder</button>
+                </div>
+                
+                <div class="tab-content" id="training">
+                    <h3>Autoencoder Model Training</h3>
+                    <div id="training-content">
+                        <p>Please preprocess data first</p>
+                    </div>
+                    
+                    <button class="btn btn-warning" id="evaluate-btn" style="margin-top: 15px; display: none;">Evaluate Model</button>
+                </div>
+                
+                <div class="tab-content" id="evaluation">
+                    <h3>Model Evaluation</h3>
+                    <div id="evaluation-content">
+                        <p>Please train the model first</p>
+                    </div>
+                    
+                    <button class="btn btn-success" id="prediction-ready-btn" style="margin-top: 15px; display: none;">Ready for Predictions</button>
+                </div>
+            </div>
+        </div>
+        
+        <div class="dashboard">
+            <div class="card">
+                <h2>Machine Parameters</h2>
+                <form id="prediction-form">
+                    <div class="form-group">
+                        <label for="product-type">Product Type</label>
+                        <select id="product-type" required>
+                            <option value="">Select Type</option>
+                            <option value="L">Low (L)</option>
+                            <option value="M">Medium (M)</option>
+                            <option value="H">High (H)</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="air-temperature">Air Temperature (K)</label>
+                        <input type="number" id="air-temperature" min="295" max="305" step="0.1" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="process-temperature">Process Temperature (K)</label>
+                        <input type="number" id="process-temperature" min="305" max="315" step="0.1" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="rotational-speed">Rotational Speed (rpm)</label>
+                        <input type="number" id="rotational-speed" min="1168" max="2886" step="1" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="torque">Torque (Nm)</label>
+                        <input type="number" id="torque" min="3.8" max="76.6" step="0.1" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="tool-wear">Tool Wear (min)</label>
+                        <input type="number" id="tool-wear" min="0" max="253" step="1" required>
+                    </div>
+                    
+                    <button type="submit" class="btn" id="predict-btn" disabled>🔮 Predict Failure Risk</button>
+                    <button type="button" class="btn btn-danger" id="reset-btn">🔄 Reset</button>
+                </form>
+            </div>
+            
+            <div class="card">
+                <h2>Failure Risk Prediction</h2>
+                <div class="prediction-result">
+                    <p>Failure Probability</p>
+                    <div class="gauge-container">
+                        <div class="gauge"></div>
+                        <div class="gauge-inner"></div>
+                        <div class="gauge-needle" id="gauge-needle"></div>
+                    </div>
+                    <div class="prediction-value" id="prediction-value">0%</div>
+                    <p id="risk-level">Model Not Ready</p>
+                </div>
+                
+                <div class="metrics-grid">
+                    <div class="metric">
+                        <div class="metric-label">Accuracy</div>
+                        <div class="metric-value" id="accuracy-display">0%</div>
+                    </div>
+                    <div class="metric">
+                        <div class="metric-label">Precision</div>
+                        <div class="metric-value" id="precision-display">0%</div>
+                    </div>
+                    <div class="metric">
+                        <div class="metric-label">Recall</div>
+                        <div class="metric-value" id="recall-display">0%</div>
+                    </div>
+                    <div class="metric">
+                        <div class="metric-label">F1-Score</div>
+                        <div class="metric-value" id="f1-score-display">0%</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card">
+            <div class="tabs">
+                <div class="tab active" data-tab="feature-importance">Feature Importance</div>
+                <div class="tab" data-tab="performance">Performance</div>
+                <div class="tab" data-tab="history">History</div>
+            </div>
+            
+            <div class="tab-content active" id="feature-importance">
+                <h2>Feature Importance Analysis</h2>
+                <div class="feature-importance">
+                    <div class="feature-bar">
+                        <div class="feature-name">Torque</div>
+                        <div class="feature-value"><div class="feature-fill" style="width: 0%"></div></div>
+                    </div>
+                    <div class="feature-bar">
+                        <div class="feature-name">Tool Wear</div>
+                        <div class="feature-value"><div class="feature-fill" style="width: 0%"></div></div>
+                    </div>
+                    <div class="feature-bar">
+                        <div class="feature-name">Rotational Speed</div>
+                        <div class="feature-value"><div class="feature-fill" style="width: 0%"></div></div>
+                    </div>
+                    <div class="feature-bar">
+                        <div class="feature-name">Process Temp</div>
+                        <div class="feature-value"><div class="feature-fill" style="width: 0%"></div></div>
+                    </div>
+                    <div class="feature-bar">
+                        <div class="feature-name">Air Temp</div>
+                        <div class="feature-value"><div class="feature-fill" style="width: 0%"></div></div>
+                    </div>
+                    <div class="feature-bar">
+                        <div class="feature-name">Product Type (M)</div>
+                        <div class="feature-value"><div class="feature-fill" style="width: 0%"></div></div>
+                    </div>
+                    <div class="feature-bar">
+                        <div class="feature-name">Product Type (H)</div>
+                        <div class="feature-value"><div class="feature-fill" style="width: 0%"></div></div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="tab-content" id="performance">
+                <h2>Model Performance</h2>
+                <div class="confusion-matrix">
+                    <div class="matrix-cell matrix-header"></div>
+                    <div class="matrix-cell matrix-header">Predicted: No Failure</div>
+                    <div class="matrix-cell matrix-header">Predicted: Failure</div>
+                    <div class="matrix-cell matrix-header">Actual: No Failure</div>
+                    <div class="matrix-cell true-negative" id="true-negative">0</div>
+                    <div class="matrix-cell false-positive" id="false-positive">0</div>
+                    <div class="matrix-cell matrix-header">Actual: Failure</div>
+                    <div class="matrix-cell false-negative" id="false-negative">0</div>
+                    <div class="matrix-cell true-positive" id="true-positive">0</div>
+                </div>
+                <div class="chart-container">
+                    <canvas id="performance-chart"></canvas>
+                </div>
+            </div>
+            
+            <div class="tab-content" id="history">
+                <h2>Prediction History</h2>
+                <div class="preview-table">
+                    <table id="history-table">
+                        <thead>
+                            <tr>
+                                <th>Timestamp</th>
+                                <th>Type</th>
+                                <th>Air Temp</th>
+                                <th>Process Temp</th>
+                                <th>Speed</th>
+                                <th>Torque</th>
+                                <th>Tool Wear</th>
+                                <th>Risk</th>
+                                <th>Prediction</th>
+                            </tr>
+                        </thead>
+                        <tbody id="history-table-body"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        
+        <footer>
+            <p>Machine Failure Prediction System | Autoencoder Model with Mixed Data Clustering | © 2024</p>
+        </footer>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
